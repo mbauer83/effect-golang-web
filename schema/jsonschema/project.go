@@ -22,7 +22,23 @@ func Project(node structure.Node) Document {
 // ProjectAll projects several structures against one component set, which is
 // what an OpenAPI document needs: every endpoint's shapes share the components.
 func ProjectAll(nodes ...structure.Node) ([]Node, map[string]Node) {
-	projection := &projector{components: map[string]Node{}, visiting: map[string]bool{}}
+	return ProjectAllReferencing(ReferenceTo, nodes...)
+}
+
+// ProjectAllReferencing is ProjectAll with the caller's own pointer form.
+//
+// A standalone schema keeps its components under $defs; an OpenAPI document
+// keeps them under #/components/schemas. The shapes are identical, so only the
+// pointer differs and only the enclosing document knows what it should be.
+func ProjectAllReferencing(
+	pointer func(string) string,
+	nodes ...structure.Node,
+) ([]Node, map[string]Node) {
+	projection := &projector{
+		components: map[string]Node{},
+		visiting:   map[string]bool{},
+		reference:  pointer,
+	}
 	projected := make([]Node, 0, len(nodes))
 	for _, node := range nodes {
 		projected = append(projected, projection.node(node))

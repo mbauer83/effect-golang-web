@@ -30,6 +30,22 @@ func Returns[Out any](status int, shape schema.Schema[Out]) Output[Out] {
 	}
 }
 
+// ReturnsRaw answers with an entity that is already encoded.
+//
+// It is for a payload this program did not build from a value: a published
+// contract, a file, an image. The document says what media type it is and says
+// nothing about its shape, because there is no description to say it from --
+// which is exactly what a content entry with no schema means.
+func ReturnsRaw(status int, mediaType string) Output[[]byte] {
+	return Output[[]byte]{
+		status:  status,
+		content: &Content{MediaType: mediaType},
+		encode: func(entity []byte) (Response, error) {
+			return Bytes(status, mediaType, entity), nil
+		},
+	}
+}
+
 // ReturnsNothing answers with a status and no entity, which is what a delete or
 // an accepted command says.
 func ReturnsNothing(status int) Output[effect.Unit] {

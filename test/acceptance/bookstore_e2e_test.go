@@ -35,7 +35,7 @@ func running(t *testing.T, store *bookstore.Store) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	surface, err := bookstore.Surface(store)
+	surface, err := bookstore.Published(store)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,32 +187,5 @@ func TestAMethodTheSurfaceDoesNotServeIsToldWhatItCouldHaveUsed(t *testing.T) {
 	}
 	if allowed := response.Header.Get("Allow"); allowed != "GET, POST" {
 		t.Fatalf("expected the allowed methods, got %q", allowed)
-	}
-}
-
-func TestTheSurfaceDescribesItselfForAPublishedContract(t *testing.T) {
-	// Dispatch and the document come from the same declarations, which is why
-	// separating an endpoint from its handler was worth doing.
-	surface, err := bookstore.Surface(bookstore.NewStore())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	declarations := surface.Declarations()
-	if len(declarations) != 3 {
-		t.Fatalf("expected three routes described, got %d", len(declarations))
-	}
-	for _, declared := range declarations {
-		if declared.Summary == "" {
-			t.Errorf("%s %s has no summary", declared.Method, declared.Path)
-		}
-		if declared.Status == 0 {
-			t.Errorf("%s %s does not say what it answers with", declared.Method, declared.Path)
-		}
-	}
-	found := declarations[2]
-	if found.Path != "/books/{title}" || len(found.Parameters) != 1 ||
-		found.Parameters[0].Doc == "" {
-		t.Fatalf("expected the path parameter described, got %#v", found)
 	}
 }

@@ -12,7 +12,8 @@ Nothing here is finished yet. What exists, and what is planned, is below.
 | [Schema](docs/reference/schema.md) | usable: shapes, sums, refinement, JSON, JSON Schema |
 | [HTTP core: request, response, handler, server](docs/reference/web.md) | usable |
 | [Routing: matching, dispatch, middleware](docs/reference/web.md) | usable |
-| [Typed endpoints](docs/reference/web.md) | usable; OpenAPI generation planned |
+| [Typed endpoints](docs/reference/web.md) | usable |
+| [OpenAPI generation](docs/reference/openapi.md) | usable |
 | WebSockets | planned |
 | SQL | planned |
 | AMQP | planned |
@@ -29,6 +30,7 @@ schema/                     Schema[A]: shapes, codecs, refinement
   schema/structure/         the description a projection walks
   schema/jsonschema/        the JSON Schema 2020-12 projection
 web/                        Request, Response, Handler, codecs, routes, Server
+openapi/                    the OpenAPI 3.1 projection of a surface
 examples/bookstore/         a complete HTTP program on the web core
 examples/catalog/           a complete program using one schema three ways
 examples/cmd/webdemo/       the examples as a runnable command

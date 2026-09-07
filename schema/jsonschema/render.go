@@ -66,6 +66,19 @@ func (document Document) writeDefinitions(encoder *jsontext.Encoder) error {
 	return encoder.WriteToken(jsontext.EndObject)
 }
 
+// Render writes one schema as JSON, without a dialect declaration.
+//
+// It is what an enclosing document embeds: an OpenAPI component is a schema on
+// its own terms but not a document of its own, so it carries no $schema.
+func (node Node) Render() ([]byte, error) {
+	var written bytes.Buffer
+	encoder := jsontext.NewEncoder(&written)
+	if err := writeNode(encoder, node); err != nil {
+		return nil, err
+	}
+	return written.Bytes(), nil
+}
+
 func writeNode(encoder *jsontext.Encoder, node Node) error {
 	if err := encoder.WriteToken(jsontext.BeginObject); err != nil {
 		return err

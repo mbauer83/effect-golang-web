@@ -64,7 +64,7 @@ func runBookstore(runtime *effect.Runtime) {
 	store := bookstore.NewStore(
 		bookstore.Book{Title: "Zionomicon", Authors: []string{"John A. De Goes"}, Pages: 632},
 	)
-	surface, err := bookstore.Surface(store)
+	surface, err := bookstore.Published(store)
 	if err != nil {
 		fail(err)
 	}
@@ -84,6 +84,7 @@ func runBookstore(runtime *effect.Runtime) {
 	report(base+"/books (again)", post(base+"/books", `{"title":"New","authors":["A"],"pages":10}`))
 	report(base+"/books/Zionomicon", get(base+"/books/Zionomicon"))
 	report(base+"/books/Missing", get(base+"/books/Missing"))
+	report(base+"/openapi.json", get(base+"/openapi.json"))
 
 	stop()
 	<-stopped

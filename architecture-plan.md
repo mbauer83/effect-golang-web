@@ -325,7 +325,7 @@ Prepared statements are the default, per the project's standards.
 1. schema core: nodes, values, combinators, JSON codec, JSON Schema projection  DONE
 2. web core: Request, Response, Handler, net/http interoperability, Server  DONE
 3. codecs, Endpoint, route matching and dispatch, middleware  DONE
-4. OpenAPI generation
+4. OpenAPI generation  DONE
 5. websocket
 6. sql
 7. amqp
@@ -364,6 +364,16 @@ One correction: 4.4's check that a path's captures and its path parameters agree
 holds in one direction only. A parameter the path does not capture is a mistake;
 a captured segment nothing reads is ordinary, because a pattern often needs a
 variable segment whose value the handler has no use for.
+
+Step 4 delivered: an OpenAPI 3.1 document projected from Declarations, with
+shared components, and validated by kin-openapi in both suites -- the
+end-to-end one against the document the bookstore actually serves at
+/openapi.json.
+
+The validator earned its place immediately. It found that an operation must
+declare every parameter of its path template, including a captured segment the
+codecs do not read, so the projection supplies one; without that the emitted
+document was invalid and no amount of reading it would have said so.
 
 ---
 

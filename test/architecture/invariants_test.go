@@ -26,6 +26,14 @@ var forbiddenImports = map[string][]string{
 		"effect-golang-web/web",
 	},
 	"web": {
+		// A projection depends on the declaration, never the other way round.
+		"effect-golang-web/openapi",
+		"effect-golang-web/websocket",
+		"effect-golang-web/amqp",
+		"effect-golang-web/grpc",
+		"effect-golang-web/sql",
+	},
+	"openapi": {
 		"effect-golang-web/websocket",
 		"effect-golang-web/amqp",
 		"effect-golang-web/grpc",
