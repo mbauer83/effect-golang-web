@@ -35,12 +35,16 @@ func running(t *testing.T, store *bookstore.Store) string {
 	if err != nil {
 		t.Fatal(err)
 	}
+	surface, err := bookstore.Surface(store)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	serving, stop := context.WithCancel(context.Background())
 	stopped := make(chan struct{})
 	go func() {
 		defer close(stopped)
-		runtime.Run(serving, effect.Unit{}, bookstore.Serve(listener, boundary, store))
+		runtime.Run(serving, effect.Unit{}, bookstore.Serve(listener, boundary, surface))
 	}()
 	t.Cleanup(func() {
 		stop()
@@ -140,5 +144,75 @@ func TestSomethingTheStoreDoesNotHoldIsNotFound(t *testing.T) {
 
 	if got := get(t, base+"/books/Missing").StatusCode; got != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d", got)
+	}
+}
+
+func TestAnApplicationRefusalBecomesItsStatusAtTheBoundaryAndNowhereElse(t *testing.T) {
+	// The store refuses a duplicate title in its own vocabulary. Nothing in the
+	// handler or the store mentions 409; the boundary decides that once.
+	base := running(t, bookstore.NewStore(
+		bookstore.Book{Title: "Held", Authors: []string{"A"}, Pages: 10},
+	))
+
+	response, err := http.Post(base+"/books", "application/json",
+		strings.NewReader(`{"title":"Held","authors":["A"],"pages":10}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = response.Body.Close() }()
+
+	if response.StatusCode != http.StatusConflict {
+		t.Fatalf("expected 409, got %d", response.StatusCode)
+	}
+	if body := string(read(t, response)); !strings.Contains(body, "already held") {
+		t.Fatalf("expected the application's own words, got %q", body)
+	}
+}
+
+func TestAMethodTheSurfaceDoesNotServeIsToldWhatItCouldHaveUsed(t *testing.T) {
+	base := running(t, bookstore.NewStore())
+
+	request, err := http.NewRequest(http.MethodDelete, base+"/books", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = response.Body.Close() }()
+
+	if response.StatusCode != http.StatusMethodNotAllowed {
+		t.Fatalf("expected 405, got %d", response.StatusCode)
+	}
+	if allowed := response.Header.Get("Allow"); allowed != "GET, POST" {
+		t.Fatalf("expected the allowed methods, got %q", allowed)
+	}
+}
+
+func TestTheSurfaceDescribesItselfForAPublishedContract(t *testing.T) {
+	// Dispatch and the document come from the same declarations, which is why
+	// separating an endpoint from its handler was worth doing.
+	surface, err := bookstore.Surface(bookstore.NewStore())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	declarations := surface.Declarations()
+	if len(declarations) != 3 {
+		t.Fatalf("expected three routes described, got %d", len(declarations))
+	}
+	for _, declared := range declarations {
+		if declared.Summary == "" {
+			t.Errorf("%s %s has no summary", declared.Method, declared.Path)
+		}
+		if declared.Status == 0 {
+			t.Errorf("%s %s does not say what it answers with", declared.Method, declared.Path)
+		}
+	}
+	found := declarations[2]
+	if found.Path != "/books/{title}" || len(found.Parameters) != 1 ||
+		found.Parameters[0].Doc == "" {
+		t.Fatalf("expected the path parameter described, got %#v", found)
 	}
 }

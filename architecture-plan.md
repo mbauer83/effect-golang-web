@@ -324,7 +324,7 @@ Prepared statements are the default, per the project's standards.
 ```text
 1. schema core: nodes, values, combinators, JSON codec, JSON Schema projection  DONE
 2. web core: Request, Response, Handler, net/http interoperability, Server  DONE
-3. codecs, Endpoint, route matching and dispatch, middleware
+3. codecs, Endpoint, route matching and dispatch, middleware  DONE
 4. OpenAPI generation
 5. websocket
 6. sql
@@ -352,6 +352,18 @@ because the runtime emits its fiber events for forked fibers -- so the
 boundary's report hook is not optional (4.2). And a shutdown that abandons
 in-flight requests must report through the scope's closing cause rather than the
 serve fiber's failure, because an interrupted program joins nothing (4.2).
+
+Step 3 delivered: codecs per location over the same Schema that describes a
+body, structural combination through Product, Endpoint separated from its
+handler, a backtracking segment tree with ambiguity refused at assembly, and
+middleware. `examples/bookstore` was rewritten onto it and its end-to-end tests
+did not change, which is the evidence that the layer replaced the hand-written
+switch rather than displacing the behaviour.
+
+One correction: 4.4's check that a path's captures and its path parameters agree
+holds in one direction only. A parameter the path does not capture is a mistake;
+a captured segment nothing reads is ordinary, because a pattern often needs a
+variable segment whose value the handler has no use for.
 
 ---
 

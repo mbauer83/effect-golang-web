@@ -154,9 +154,133 @@ and a program interrupted while waiting joins nothing — so the one outcome tha
 must never be lost would be exactly the one that is. A scope composes its
 finalizers' faults into the closing cause whatever happened to the body.
 
+## Reading a request
+
+A request's parts decode independently, each described by the same `Schema` that
+describes a field of a body — so a path segment, a query parameter and a header
+need no description of their own:
+
+| Codec | Reads |
+|---|---|
+| `PathParam(name, schema)` | a captured path segment; always required |
+| `QueryParam(name, schema)` | a required query parameter |
+| `OptionalQueryParam(name, schema)` | one that may be absent, as a pointer |
+| `HeaderParam(name, schema)` | a required header |
+| `OptionalHeaderParam(name, schema)` | one that may be absent |
+| `Entity(schema)` | the JSON body, decoded straight from its reader |
+| `Nothing()` | nothing |
+
+`Describing(codec, doc)` attaches prose for the published document, to a codec
+that reads exactly one parameter.
+
+Absent and empty are different: `?shelf=` carries an empty value and no `shelf`
+at all carries none, and an optional codec tells them apart.
+
+Two codecs combine into one that keeps both parts:
+
+```go
+codec := web.Convert(
+    web.Both(web.QueryParam("shelf", schema.Text()), web.QueryParam("page", schema.Int())),
+    func(parts effect.Product[string, int]) (Query, error) {
+        return Query{Shelf: parts.First, Page: parts.Second}, nil
+    },
+)
+```
+
+The result is a `Product` because no information may be discarded and Go has no
+type-level record to widen — the same structural composition the runtime uses
+for environments, for the same reason. `Both` is a package function because a
+method cannot grow the type parameters its own result needs.
+
+Two codecs that both read the entity, or that read the same parameter twice, are
+a declaration mistake reported by `ValidateCodec`.
+
+## Endpoints
+
+An endpoint declares what a route accepts and returns; its handler is separate.
+That is what makes three things possible from one value — dispatch, a published
+document, and eventually a typed client — where a route carrying only a function
+could give none of them.
+
+```go
+web.Handle(
+    web.GET("/books/{title}",
+        web.Describing(web.PathParam("title", schema.Text()), "the title to look for"),
+        web.Returns(http.StatusOK, BookSchema)).
+        Summary("Find a book by title").
+        Failing(http.StatusNotFound, "no book with that title is held"),
+    func(title string) storeEffect[Book] { ... },
+)
+```
+
+The handler takes the decoded input and returns the **output value**, not a
+response: the endpoint already says how that value is encoded and with what
+status. `Returns(status, schema)` encodes through a schema; `ReturnsNothing(status)`
+sends none. `Failing` documents a status the boundary's mapping will produce —
+it does not perform the mapping.
+
+A request the codecs refuse never reaches the handler and never becomes the
+application's failure. That is what the failure channel is for: a malformed
+request is the transport's business, and the handler's `E` stays about the
+application.
+
+`ValidateEndpoint` reports a declaration mistake, including a path parameter the
+path does not capture — a mistyped name would otherwise be a rejection on every
+request, found in production. The other direction is allowed: a pattern often
+needs a variable segment the handler has no use for.
+
+## Matching
+
+```text
+/books                a literal
+/books/{title}        one captured segment
+/files/{path...}      a wildcard capturing the rest, only at the end
+```
+
+Routes compile into a tree over segments. A literal is tried before a capture
+and a capture before a wildcard, so the most specific pattern that can match
+does — and the walk backtracks, so a literal that matches one segment but leads
+nowhere does not shadow a capture that would have matched the whole path. That
+is the classic router bug this tree exists to avoid, and it is tested.
+
+A path that matched with the wrong method answers **405 with an `Allow` header**,
+sorted, rather than 404. Backtracking applies here too: a literal branch that
+matches the path but not the method does not stop a capture branch that serves
+it.
+
+A trailing slash is part of the pattern rather than something to normalise away:
+`/books` and `/books/` are different paths, and a router that quietly redirected
+between them would be guessing.
+
+**Ambiguity is a construction error.** Two routes that could match the same
+request, or two routes capturing one segment under different names, are refused
+when the surface is assembled — the second because they share one node in the
+tree, so one of the two names would silently never be bound.
+
+```go
+surface, err := web.NewRoutes(listBooks, addBook, findBook)
+```
+
+`NewRoutesRejecting` supplies the surface's own answer to a request the codecs
+refused, because a client meets one API and not a collection of separately
+worded ones. `Declarations()` returns what the routes say about themselves, in
+declared order, which is what a published document is projected from.
+
+## Middleware
+
+```go
+type Middleware[R, E any] func(Handler[R, E]) Handler[R, E]
+
+handler := web.Wrap(surface.Handler(), authenticating, logging)
+```
+
+Applied outermost first: the first given sees the request first and the response
+last, which is the order the list reads in. A nil entry is skipped. Because a
+handler is a description, middleware composes with retries, races and timeouts
+rather than sitting outside them. `Transform` is the narrower form for a wrapper
+that only needs to see the response.
+
 ## What is not here yet
 
-Routing, path and query codecs, typed endpoints, middleware and OpenAPI
-generation are the next step. Until then dispatch is a switch on the method and
-the path, as `examples/bookstore` shows — which is the clearest statement of
-what routing will replace.
+OpenAPI generation is the next step, projected from `Declarations()`. WebSockets,
+SQL, AMQP and gRPC follow.

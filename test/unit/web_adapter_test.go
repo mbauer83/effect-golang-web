@@ -29,9 +29,20 @@ func refusalStatus(refusal Refusal) web.Response {
 
 type webEffect[A any] = effect.Effect[effect.Unit, Refusal, A]
 
-// served interprets one handler through the boundary and returns what a client
-// would have received.
+// served interprets one handler through the boundary against a bare GET / and
+// returns what a client would have received.
 func served(t *testing.T, handler web.Handler[effect.Unit, Refusal], options ...effect.RuntimeOption) *http.Response {
+	t.Helper()
+	return servedRequest(t, handler, httptest.NewRequest(http.MethodGet, "/", nil), options...)
+}
+
+// servedRequest is served for a request the test builds itself.
+func servedRequest(
+	t *testing.T,
+	handler web.Handler[effect.Unit, Refusal],
+	request *http.Request,
+	options ...effect.RuntimeOption,
+) *http.Response {
 	t.Helper()
 	runtime, err := effect.NewRuntime(options...)
 	if err != nil {
@@ -47,7 +58,7 @@ func served(t *testing.T, handler web.Handler[effect.Unit, Refusal], options ...
 	recorder := httptest.NewRecorder()
 	adapter.WithReport(func(context.Context, error) {}).
 		Handler(handler).
-		ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/", nil))
+		ServeHTTP(recorder, request)
 	return recorder.Result()
 }
 

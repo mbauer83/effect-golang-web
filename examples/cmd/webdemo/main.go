@@ -64,12 +64,16 @@ func runBookstore(runtime *effect.Runtime) {
 	store := bookstore.NewStore(
 		bookstore.Book{Title: "Zionomicon", Authors: []string{"John A. De Goes"}, Pages: 632},
 	)
+	surface, err := bookstore.Surface(store)
+	if err != nil {
+		fail(err)
+	}
 
 	serving, stop := context.WithCancel(context.Background())
 	stopped := make(chan struct{})
 	go func() {
 		defer close(stopped)
-		runtime.Run(serving, effect.Unit{}, bookstore.Serve(listener, boundary, store))
+		runtime.Run(serving, effect.Unit{}, bookstore.Serve(listener, boundary, surface))
 	}()
 
 	base := "http://" + listener.Addr().String()
@@ -77,6 +81,8 @@ func runBookstore(runtime *effect.Runtime) {
 	report(base+"/books", get(base+"/books"))
 	report(base+"/books (post)", post(base+"/books", `{"title":"New","authors":["A"],"pages":10}`))
 	report(base+"/books (bad)", post(base+"/books", `{"title":"New","authors":["A"],"pages":0}`))
+	report(base+"/books (again)", post(base+"/books", `{"title":"New","authors":["A"],"pages":10}`))
+	report(base+"/books/Zionomicon", get(base+"/books/Zionomicon"))
 	report(base+"/books/Missing", get(base+"/books/Missing"))
 
 	stop()

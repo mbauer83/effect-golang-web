@@ -16,11 +16,11 @@ import (
 func Serve(
 	listener net.Listener,
 	boundary web.Adapter[effect.Unit, Fault],
-	store *Store,
+	surface web.Routes[effect.Unit, Fault],
 ) effect.Effect[effect.Unit, web.Fault, effect.Unit] {
 	return effect.Scoped(func(scope effect.Scope) effect.Effect[effect.Unit, web.Fault, effect.Unit] {
 		settings := web.Settings{Listener: listener}
-		return web.ServeWith[effect.Unit](scope, settings, boundary.Handler(Handler(store))).
+		return web.ServeWith[effect.Unit](scope, settings, boundary.Handler(surface.Handler())).
 			FlatMap(web.Await[effect.Unit]).
 			Named("bookstore")
 	})

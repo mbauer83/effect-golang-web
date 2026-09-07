@@ -23,10 +23,8 @@ type FaultKind string
 const (
 	// NotFound is a request for something the store does not hold.
 	NotFound FaultKind = "not-found"
-	// Unacceptable is a request whose entity the schema refused.
-	Unacceptable FaultKind = "unacceptable"
-	// Unreadable is a request whose entity could not be read at all.
-	Unreadable FaultKind = "unreadable"
+	// AlreadyHeld is an attempt to add a title the store already has.
+	AlreadyHeld FaultKind = "already-held"
 )
 
 func (fault Fault) Error() string {
@@ -42,16 +40,17 @@ func (fault Fault) Unwrap() error {
 
 // StatusFor maps the application's vocabulary to statuses, once.
 //
-// A rejected entity says which field was wrong, because the schema knows and a
-// client that is not told cannot fix its request.
+// This is the only place in the program that mentions a status for a failure.
+// A request the schema refused never arrives here at all: that is a rejection,
+// answered by the surface, and it is not the application failing.
 func StatusFor(fault Fault) web.Response {
 	switch fault.Kind {
 	case NotFound:
 		return web.Empty(http.StatusNotFound)
-	case Unacceptable:
-		return web.Text(http.StatusBadRequest, fault.Error())
+	case AlreadyHeld:
+		return web.Text(http.StatusConflict, fault.Error())
 	default:
-		return web.Empty(http.StatusBadRequest)
+		return web.Empty(http.StatusInternalServerError)
 	}
 }
 

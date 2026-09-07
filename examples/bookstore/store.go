@@ -4,13 +4,14 @@
 // schema, and its lifetime is a scope: cancelling the caller's context shuts
 // the server down and lets the requests already in flight finish.
 //
-// Dispatch here is a switch on the method and the path. That is deliberate at
-// this stage -- routing, path codecs and typed endpoints are the next step, and
-// writing this by hand once is the clearest statement of what they will
-// replace.
+// Each endpoint is a declaration and its handler is separate, so dispatch and
+// the published contract come from one value. A handler takes the decoded input
+// and returns the value to answer with: it never sees a status, because which
+// status its refusal becomes is the boundary's decision and not the handler's.
 package bookstore
 
 import (
+	"errors"
 	"slices"
 	"sync"
 )
@@ -43,12 +44,20 @@ func (store *Store) All() []Book {
 	return slices.Clone(store.books)
 }
 
-// Add appends a book and reports how many the store then holds.
-func (store *Store) Add(book Book) int {
+// Add appends a book, or refuses because the store already holds that title.
+//
+// The refusal is the application's own, in the application's own vocabulary. It
+// is not a status, and nothing here knows that it will become one.
+func (store *Store) Add(book Book) error {
 	store.mutex.Lock()
 	defer store.mutex.Unlock()
+	for _, held := range store.books {
+		if held.Title == book.Title {
+			return Fault{Kind: AlreadyHeld, Err: errors.New(book.Title + " is already held")}
+		}
+	}
 	store.books = append(store.books, book)
-	return len(store.books)
+	return nil
 }
 
 // Find returns the book with the given title.
