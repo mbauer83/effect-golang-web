@@ -215,6 +215,25 @@ scope, and closing that scope shuts the server down gracefully and awaits
 in-flight requests. Graceful shutdown is therefore not a separate mechanism; it
 is what scope closure already means.
 
+ADDED during implementation, from two things that only became visible once it
+ran:
+
+- A **shutdown that gives up** on requests still in flight is reported through
+  the scope's closing cause, not as the serve loop's failure. A forked fiber's
+  outcome is observed by joining it, and a program interrupted while waiting
+  joins nothing -- so the outcome that must never be lost would be exactly the
+  one that is. A scope composes its finalizers' faults into the closing cause
+  whatever happened to the body.
+- A **defect at the boundary** reaches no observer on its own. MEASURED: the
+  runtime emits its fiber events for forked fibers, and every request is an
+  effect the boundary interprets directly. The boundary therefore has a report
+  hook with a default rather than an optional one. A write failure could not
+  reach an observer in any case, because it happens after the status has gone.
+
+The read-header deadline has a non-zero default for the same class of reason:
+net/http has none, so a client that opens a connection and never finishes its
+headers can hold one indefinitely.
+
 ## 4.3 Codecs are per location and compose structurally
 
 A request's parts decode independently:
@@ -304,7 +323,7 @@ Prepared statements are the default, per the project's standards.
 
 ```text
 1. schema core: nodes, values, combinators, JSON codec, JSON Schema projection  DONE
-2. web core: Request, Response, Handler, net/http interoperability, Server
+2. web core: Request, Response, Handler, net/http interoperability, Server  DONE
 3. codecs, Endpoint, route matching and dispatch, middleware
 4. OpenAPI generation
 5. websocket
@@ -322,6 +341,17 @@ a projection walks; a JSON codec over `encoding/json/jsontext`; the JSON Schema
 2020-12 projection with shared components; `examples/catalog` as a complete
 program; and the pair test above. Derivation and the remaining projections stay
 deferred as 3.4 records.
+
+Step 2 delivered: Request and Response over net/http's own types, Handler as a
+description, an Adapter that interprets one as an http.Handler, and a server
+whose lifetime is a scope. `examples/bookstore` is the program.
+
+Two findings from building it are recorded where they matter rather than only
+here. A defect in the effect a boundary interprets directly reaches no observer,
+because the runtime emits its fiber events for forked fibers -- so the
+boundary's report hook is not optional (4.2). And a shutdown that abandons
+in-flight requests must report through the scope's closing cause rather than the
+serve fiber's failure, because an interrupted program joins nothing (4.2).
 
 ---
 

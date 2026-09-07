@@ -25,6 +25,12 @@ var forbiddenImports = map[string][]string{
 		"effect-golang-web/schema\"",
 		"effect-golang-web/web",
 	},
+	"web": {
+		"effect-golang-web/websocket",
+		"effect-golang-web/amqp",
+		"effect-golang-web/grpc",
+		"effect-golang-web/sql",
+	},
 	"schema/jsonschema": {
 		// A projection walks the description. Reaching for the codec package
 		// would let one projection depend on how another format encodes.

@@ -1,4 +1,5 @@
-// Command webdemo runs the example scenarios against live capabilities.
+// Command webdemo runs the example scenarios against live capabilities,
+// including a real server on a real socket.
 //
 // It exists so the examples are demonstrably runnable programs and not only
 // test fixtures. Each scenario is also composed by an end-to-end test, so the
@@ -8,9 +9,14 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
+	"net"
+	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
+	"github.com/mbauer83/effect-golang-web/examples/bookstore"
 	"github.com/mbauer83/effect-golang-web/examples/catalog"
 	"github.com/mbauer83/effect-golang/effect"
 )
@@ -40,6 +46,67 @@ func main() {
 	defer reportShutdown(runtime)
 
 	runCatalog(runtime, workspace)
+	runBookstore(runtime)
+}
+
+// runBookstore starts the HTTP program on a port the operating system chooses,
+// talks to it over a real socket, and then lets its scope close -- which is
+// what shuts it down.
+func runBookstore(runtime *effect.Runtime) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		fail(err)
+	}
+	boundary, err := bookstore.Boundary(runtime)
+	if err != nil {
+		fail(err)
+	}
+	store := bookstore.NewStore(
+		bookstore.Book{Title: "Zionomicon", Authors: []string{"John A. De Goes"}, Pages: 632},
+	)
+
+	serving, stop := context.WithCancel(context.Background())
+	stopped := make(chan struct{})
+	go func() {
+		defer close(stopped)
+		runtime.Run(serving, effect.Unit{}, bookstore.Serve(listener, boundary, store))
+	}()
+
+	base := "http://" + listener.Addr().String()
+	fmt.Printf("bookstore: listening on %s\n", base)
+	report(base+"/books", get(base+"/books"))
+	report(base+"/books (post)", post(base+"/books", `{"title":"New","authors":["A"],"pages":10}`))
+	report(base+"/books (bad)", post(base+"/books", `{"title":"New","authors":["A"],"pages":0}`))
+	report(base+"/books/Missing", get(base+"/books/Missing"))
+
+	stop()
+	<-stopped
+	fmt.Printf("bookstore: stopped with %d books\n", len(store.All()))
+}
+
+func get(url string) *http.Response {
+	response, err := http.Get(url)
+	if err != nil {
+		fail(err)
+	}
+	return response
+}
+
+func post(url string, document string) *http.Response {
+	response, err := http.Post(url, "application/json", strings.NewReader(document))
+	if err != nil {
+		fail(err)
+	}
+	return response
+}
+
+func report(what string, response *http.Response) {
+	defer func() { _ = response.Body.Close() }()
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		fail(err)
+	}
+	fmt.Printf("  %-24s %d %s\n", what, response.StatusCode, strings.TrimSpace(string(body)))
 }
 
 func runCatalog(runtime *effect.Runtime, workspace string) {

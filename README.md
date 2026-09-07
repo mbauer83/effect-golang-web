@@ -10,7 +10,7 @@ Nothing here is finished yet. What exists, and what is planned, is below.
 | Area | State |
 |---|---|
 | [Schema](docs/reference/schema.md) | usable: shapes, sums, refinement, JSON, JSON Schema |
-| HTTP core: request, response, handler, server | planned |
+| [HTTP core: request, response, handler, server](docs/reference/web.md) | usable |
 | Routing: matching, dispatch, middleware | planned |
 | Typed endpoints and OpenAPI generation | planned |
 | WebSockets | planned |
@@ -28,6 +28,8 @@ rejected.
 schema/                     Schema[A]: shapes, codecs, refinement
   schema/structure/         the description a projection walks
   schema/jsonschema/        the JSON Schema 2020-12 projection
+web/                        Request, Response, Handler, Adapter, Server
+examples/bookstore/         a complete HTTP program on the web core
 examples/catalog/           a complete program using one schema three ways
 examples/cmd/webdemo/       the examples as a runnable command
 test/unit/                  behaviour of the public API
@@ -68,7 +70,8 @@ dependency stays inside that transport's package.
 go run ./examples/cmd/webdemo
 ```
 
-`examples/catalog` loads a catalogue document, writes it back normalised, and
+`examples/bookstore` serves a small collection over JSON on a port the operating
+system chooses, and `examples/catalog` loads a catalogue document, writes it back normalised, and
 publishes the JSON Schema contract that says what it accepts — three uses of one
 description. `test/acceptance` composes the same program, so the example and its
 test cannot drift apart.
