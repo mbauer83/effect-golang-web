@@ -58,6 +58,19 @@ func fail(reason string, cause error) error {
 	return &Error{Reason: reason, Err: cause}
 }
 
+// refused reports a value a conversion would not accept.
+//
+// The conversion's own message follows the reason rather than replacing it, so
+// a path can still be prefixed as the failure unwinds and errors.Is still
+// reaches whatever sentinel the refinement used.
+func refused(err error) error {
+	var failure *Error
+	if errors.As(err, &failure) {
+		return err
+	}
+	return &Error{Reason: "did not pass its refinement", Err: err}
+}
+
 // within prefixes a failure with the part it happened inside, so the path
 // accumulates as decoding unwinds rather than being threaded through every
 // call.

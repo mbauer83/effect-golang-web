@@ -169,7 +169,7 @@ func TransformOrFail[A, B any](
 		func(value B, into Sink) error {
 			underlying, err := from(value)
 			if err != nil {
-				return err
+				return refused(err)
 			}
 			return Encode(inner, underlying, into)
 		},
@@ -179,7 +179,12 @@ func TransformOrFail[A, B any](
 				var missing B
 				return missing, err
 			}
-			return to(underlying)
+			converted, err := to(underlying)
+			if err != nil {
+				var missing B
+				return missing, refused(err)
+			}
+			return converted, nil
 		},
 	)
 }

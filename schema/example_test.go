@@ -87,7 +87,7 @@ func ExampleTransformOrFail() {
 	fmt.Println(err)
 	// Output:
 	// 21.5 <nil>
-	// below absolute zero
+	// schema: did not pass its refinement: below absolute zero
 }
 
 // A declaration mistake is reported rather than panicking, and Validate is

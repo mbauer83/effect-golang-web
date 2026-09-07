@@ -5,6 +5,7 @@ package unit
 // here checks the message as well as the refusal.
 
 import (
+	"errors"
 	"reflect"
 	"strings"
 	"testing"
@@ -99,3 +100,41 @@ func TestATruncatedDocumentSaysSoRatherThanReportingAShapeMistake(t *testing.T) 
 		t.Fatalf("expected the reason to name truncation, got %v", err)
 	}
 }
+
+func TestARefinementSaysWhichLayerRefusedAndKeepsItsOwnError(t *testing.T) {
+	// "could not be processed at pages" tells a client nothing it can act on.
+	// The refinement's own message is what says why, and errors.Is has to keep
+	// reaching the sentinel it used so a caller can still branch on it.
+	type entry struct{ Pages int }
+	entrySchema := schema.Struct[entry]("Entry",
+		schema.FieldOf("pages",
+			schema.TransformOrFail(schema.Int(),
+				func(pages int) (int, error) {
+					if pages < 1 {
+						return 0, errTooFew
+					}
+					return pages, nil
+				},
+				func(pages int) (int, error) { return pages, nil }),
+			func(value entry) int { return value.Pages },
+			func(value *entry, pages int) { value.Pages = pages }),
+	)
+
+	_, err := schema.DecodeJSON(entrySchema, []byte(`{"pages":0}`))
+	if err == nil {
+		t.Fatal("expected the refinement to refuse the value")
+	}
+	path, _ := schema.PathOf(err)
+	if !reflect.DeepEqual(path, []string{"pages"}) {
+		t.Fatalf("expected the path to name the field, got %v", path)
+	}
+	if !strings.Contains(err.Error(), "did not pass its refinement") ||
+		!strings.Contains(err.Error(), "at least one page") {
+		t.Fatalf("expected both the layer and the reason, got %v", err)
+	}
+	if !errors.Is(err, errTooFew) {
+		t.Fatalf("expected the refinement's own error to stay reachable, got %v", err)
+	}
+}
+
+var errTooFew = errors.New("an entry has at least one page")
