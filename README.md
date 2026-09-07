@@ -28,7 +28,10 @@ rejected.
 schema/                     Schema[A]: shapes, codecs, refinement
   schema/structure/         the description a projection walks
   schema/jsonschema/        the JSON Schema 2020-12 projection
+examples/catalog/           a complete program using one schema three ways
+examples/cmd/webdemo/       the examples as a runnable command
 test/unit/                  behaviour of the public API
+test/acceptance/            the example programs, end to end
 docs/                       reference, how-to, explanation
 architecture-plan.md        design decisions and the implementation sequence
 ```
@@ -58,6 +61,17 @@ alternatives are in the [architecture plan](architecture-plan.md).
 
 No third-party dependency is needed to use the HTTP core, and a transport's
 dependency stays inside that transport's package.
+
+## Running the examples
+
+```sh
+go run ./examples/cmd/webdemo
+```
+
+`examples/catalog` loads a catalogue document, writes it back normalised, and
+publishes the JSON Schema contract that says what it accepts — three uses of one
+description. `test/acceptance` composes the same program, so the example and its
+test cannot drift apart.
 
 ## Building
 
