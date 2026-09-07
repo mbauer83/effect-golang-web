@@ -9,7 +9,7 @@ Nothing here is finished yet. What exists, and what is planned, is below.
 
 | Area | State |
 |---|---|
-| [Schema](docs/reference/schema.md) | usable: shapes, sums, refinement, JSON |
+| [Schema](docs/reference/schema.md) | usable: shapes, sums, refinement, JSON, JSON Schema |
 | HTTP core: request, response, handler, server | planned |
 | Routing: matching, dispatch, middleware | planned |
 | Typed endpoints and OpenAPI generation | planned |
@@ -27,6 +27,7 @@ rejected.
 ```text
 schema/                     Schema[A]: shapes, codecs, refinement
   schema/structure/         the description a projection walks
+  schema/jsonschema/        the JSON Schema 2020-12 projection
 test/unit/                  behaviour of the public API
 docs/                       reference, how-to, explanation
 architecture-plan.md        design decisions and the implementation sequence
@@ -53,6 +54,7 @@ alternatives are in the [architecture plan](architecture-plan.md).
 | gRPC transport | pluggable; `connectrpc.com/connect` as the reference |
 | SQL | `database/sql` port, `github.com/jackc/pgx/v5` reference adapter |
 | OpenAPI | emitted from our own model; `kin-openapi` in tests only |
+| JSON Schema validation | `santhosh-tekuri/jsonschema/v6`, in tests only |
 
 No third-party dependency is needed to use the HTTP core, and a transport's
 dependency stays inside that transport's package.
