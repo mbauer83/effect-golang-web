@@ -1,0 +1,10 @@
+# Build and test output
+*.test
+*.out
+/dist/
+/bin/
+
+# Editor and OS noise
+.idea/
+.vscode/
+.DS_Store

@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      # effect-golang is not published yet, so go.mod resolves it from a sibling
+      # working copy. CI reproduces that layout rather than carrying a second
+      # replace directive that would drift from the local one. Replace both with
+      # a version requirement once the runtime is tagged.
+      - uses: actions/checkout@v5
+        with:
+          path: effect-golang-web
+      - uses: actions/checkout@v5
+        with:
+          repository: mbauer83/effect-golang
+          path: effect-golang
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.27.1'
+          check-latest: true
+
+      - name: Formatting
+        working-directory: effect-golang-web
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            echo "gofmt would rewrite:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Build
+        working-directory: effect-golang-web
+        run: go build ./...
+
+      - name: Vet
+        working-directory: effect-golang-web
+        run: go vet ./...
+
+      # Unit, acceptance and architecture suites, plus the runnable examples in
+      # the schema package. -count=1 defeats the test result cache, so a green
+      # run always reflects the commit it ran on. -coverpkg is needed because
+      # the suites live outside the packages they exercise.
+      - name: Test
+        working-directory: effect-golang-web
+        run: go test -count=1 -coverpkg=./... ./...
+
+      # Correctness under concurrency is not established by ordinary tests
+      # passing, and the transports to come are concurrent by nature.
+      - name: Race
+        working-directory: effect-golang-web
+        run: go test -race -count=1 ./...
+
+      # The examples must remain runnable programs, not only test fixtures.
+      - name: Examples
+        working-directory: effect-golang-web
+        run: go run ./examples/cmd/webdemo

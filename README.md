@@ -1,0 +1,66 @@
+# effect-golang-web
+
+Typed, composable web and integration capabilities on the
+[effect-golang](https://github.com/mbauer83/effect-golang) runtime.
+
+Nothing here is finished yet. What exists, and what is planned, is below.
+
+## Status
+
+| Area | State |
+|---|---|
+| [Schema](docs/reference/schema.md) | usable: shapes, sums, refinement, JSON |
+| HTTP core: request, response, handler, server | planned |
+| Routing: matching, dispatch, middleware | planned |
+| Typed endpoints and OpenAPI generation | planned |
+| WebSockets | planned |
+| SQL | planned |
+| AMQP | planned |
+| gRPC and protobuf | planned |
+
+The [architecture plan](architecture-plan.md) records the design decisions,
+including which underlying library was chosen for each concern and what was
+rejected.
+
+## Layout
+
+```text
+schema/                     Schema[A]: shapes, codecs, refinement
+  schema/structure/         the description a projection walks
+test/unit/                  behaviour of the public API
+docs/                       reference, how-to, explanation
+architecture-plan.md        design decisions and the implementation sequence
+```
+
+The module root holds no source. Dependencies point one way: `schema` knows
+nothing about HTTP, and no transport knows about another — so a caller who wants
+only the HTTP core does not acquire an AMQP dependency.
+
+## Underlying libraries
+
+Chosen on maintenance, protocol coverage and whether they compose with
+`net/http`, which is this module's spine. The reasoning and the rejected
+alternatives are in the [architecture plan](architecture-plan.md).
+
+| Concern | Choice |
+|---|---|
+| HTTP server and client | `net/http` |
+| Routing | our own typed matcher |
+| JSON syntax | `encoding/json/jsontext` (standard library) |
+| WebSocket | `github.com/coder/websocket` |
+| AMQP 0-9-1 | `github.com/rabbitmq/amqp091-go` |
+| protobuf | `google.golang.org/protobuf` |
+| gRPC transport | pluggable; `connectrpc.com/connect` as the reference |
+| SQL | `database/sql` port, `github.com/jackc/pgx/v5` reference adapter |
+| OpenAPI | emitted from our own model; `kin-openapi` in tests only |
+
+No third-party dependency is needed to use the HTTP core, and a transport's
+dependency stays inside that transport's package.
+
+## Building
+
+`effect-golang` is not published yet, so `go.mod` resolves it from the working
+copy beside this one. Replace that directive with a version requirement once it
+is tagged.
+
+Go 1.27 is required, by the runtime and by `encoding/json/v2`.
