@@ -97,3 +97,15 @@ func (sqlite) Text(value string) string {
 func (dialect sqlite) Key(scalar structure.Scalar) (string, error) {
 	return dialect.Column(scalar)
 }
+
+// Retype refuses.
+//
+// SQLite's ALTER TABLE can rename a column, add one and drop one, and cannot
+// change one's type at all: the way to do it is a new table, a copy, a drop and
+// a rename. That is four statements and a decision about what to do with the
+// values, so it is the caller's to write rather than something to emit as if it
+// were one change.
+func (sqlite) Retype() (RetypeForm, error) { return 0, errNoRetype }
+
+// MayDefault accepts any of them: this dialect puts a default on any column.
+func (sqlite) MayDefault(structure.Scalar) error { return nil }

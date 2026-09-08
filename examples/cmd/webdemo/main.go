@@ -52,6 +52,7 @@ func main() {
 	runConsign(runtime)
 	runQuoting(runtime)
 	runWarehouse()
+	runEvolving()
 }
 
 // runBookstore starts the HTTP program on a port the operating system chooses,

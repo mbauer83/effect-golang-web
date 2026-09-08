@@ -50,7 +50,18 @@ func columnOf(
 }
 
 // defaulted is the dialect's spelling of what the field falls back to.
+//
+// The dialect gets to refuse first, because whether a column of that shape may
+// carry a default at all is its rule and not the description's: a statement it
+// would reject is worse than a description it will not project.
 func defaulted(dialect Dialect, field structure.Field) (string, error) {
+	if field.Default != nil {
+		if scalar, isScalar := underlying(field.Node); isScalar {
+			if err := dialect.MayDefault(scalar); err != nil {
+				return "", fmt.Errorf("the default of %q: %w", field.Name, err)
+			}
+		}
+	}
 	switch held := field.Default.(type) {
 	case nil:
 		return "", nil
@@ -218,4 +229,16 @@ func firstParagraph(doc string) string {
 		return strings.TrimSpace(doc[:split])
 	}
 	return strings.TrimSpace(doc)
+}
+
+// underlying is the scalar a node is, through a nullable.
+func underlying(node structure.Node) (structure.Scalar, bool) {
+	switch held := node.(type) {
+	case structure.Scalar:
+		return held, true
+	case structure.Nullable:
+		return underlying(held.Inner)
+	default:
+		return structure.Scalar{}, false
+	}
 }

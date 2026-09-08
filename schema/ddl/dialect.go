@@ -43,6 +43,13 @@ type Dialect interface {
 	TableSuffix() string
 	// Now is how this dialect writes the moment a row is written.
 	Now() string
+	// Retype says how this dialect spells a change of a column's type, or
+	// refuses because it cannot do it in place.
+	Retype() (RetypeForm, error)
+	// MayDefault refuses a default this dialect will not accept on a column of
+	// that shape. MySQL takes none on an unbounded text or blob column, which
+	// is a statement it rejects outright rather than a preference.
+	MayDefault(scalar structure.Scalar) error
 	// Text is a string literal in this dialect's own quoting, for a default.
 	Text(value string) string
 }
@@ -140,7 +147,11 @@ var (
 		"this dialect has no unsigned 64-bit integer, and a decimal that held the values " +
 			"would not be an integer: describe it as a signed 64-bit integer, or as text " +
 			"if the range is really needed")
-	errUnresolved   = errors.New("a reference has nothing behind it to make a column from")
+	errUnresolved       = errors.New("a reference has nothing behind it to make a column from")
+	errUnboundedDefault = errors.New(
+		"this dialect takes no default on an unbounded text or blob column and would " +
+			"reject the statement: give the field a maximum length, which makes it a " +
+			"varchar, and a varchar takes one")
 	errUnboundedKey = errors.New(
 		"this dialect cannot key an unbounded string, and a prefix length invented here " +
 			"would make two different keys equal whenever they agreed for that many " +

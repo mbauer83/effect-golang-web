@@ -965,6 +965,55 @@ restating it as prose in exponent notation. A column typed `integer` says it in
 the type, so a bound that is precisely the width's own limit is now left out --
 exactly, so a narrower one the author asked for survives.
 
+## 7.1.3 The migrations, built
+
+`schema/evolve` and `ddl.Alter` are the third piece, and the approach 7.1
+recorded turned out to be right in every respect that was checked. Four things
+came out of building it.
+
+**Only version one is written.** Every later version is derived by applying the
+steps, so the objection 7.1 raised about writing the target twice does not
+arise: there is no second declaration to disagree with the step. That is the
+Cambria refinement and it cost nothing to take.
+
+**The N-squared generated compositions are unnecessary**, which is a correction
+to what 7.2 recorded. The TypeScript prior art builds the matrix at runtime
+because it has a type per version; here values cross as the universal
+representation -- typed at the edges, untyped in the middle, exactly as the
+protobuf codec is -- so there is no erasure to hide and nothing to generate.
+Folding a handful of changes per call costs less than remembering the answer.
+The codegen the plan imagined was a consequence of TypeScript's per-version
+types, not of the design.
+
+**Backwards reverses twice over**, which was not obvious until a test said so:
+the steps in reverse, and the changes within each step in reverse too. A step
+that renamed one field and added another has to drop the addition before undoing
+the rename, or the inverse looks for a field under a name it no longer has.
+
+**One declaration, two projections, and they agree by construction.** The same
+changes produce the statements that move the table and the function that moves a
+value, so a value carried forward in memory is a value the migrated table
+accepts. The acceptance suite checks it directly rather than trusting it, and
+separately writes a row, migrates, and reads the value back under its new name --
+which is the claim a diff cannot make and which a drop-and-add would have lost.
+
+One more MySQL statement it would have rejected, found by reading the emitted
+alter rather than by a test: MySQL takes **no default on a TEXT or BLOB column**
+and there is no expression form that changes it. So a dialect now gets to refuse
+a default before one is written, with the same remedy a key needs -- bound the
+text, which makes it a varchar. That is the third defect of exactly this shape,
+and all three were caught by looking at the output.
+
+Two things are not built and are named in the reference rather than left to be
+discovered. The **drift check** -- assert the live database matches the
+declaration at N before applying N to N+1 -- which is what keeps determinism
+while still noticing that somebody altered production by hand. And **splits and
+merges**, one column becoming two or two becoming one, which need a value
+function in both directions and are the escape hatch the closed set deliberately
+does not yet have. Nothing here runs migrations either: these are statements and
+a function, and applying them in order exactly once across several processes is a
+migrator.
+
 ## 7.2 Prior art: a previous attempt at exactly this
 
 `up2parts-aggregate-schema` (TypeScript, over Zod) is a working attempt at the
@@ -1032,14 +1081,18 @@ computation. Where a Go type per variant is wanted, `schemagen` already writes
 the Go types a description implies, with a drift test. The escape hatch becomes
 a generator.
 
-The same applies to the migration matrix. `buildAllMigrations` builds it at
-runtime behind erased signatures; in Go the N-squared compositions would be
-**generated**: deterministic, checked-in, fully typed, gofmt-formatted -- which
-is what this project's rule on generation permits, and N-squared mechanical
-compositions of hand-written steps is what "demonstrated repetition" means. Each
-step stays typed as `func(FromVersion) ToVersion`; only the registry that holds
-steps of differing types needs a seam, and that is one named boundary of the
-kind this module already has four of.
+The same looked to apply to the migration matrix. `buildAllMigrations` builds it
+at runtime behind erased signatures, and the plan recorded that in Go the
+N-squared compositions would be **generated** instead: deterministic, checked-in,
+fully typed.
+
+CORRECTED by building it (7.1.3). No generation is needed and no seam either.
+The TypeScript version needs the matrix because it has a *type per version*;
+here a value crosses as the universal representation, so a step is a function
+over `dynamic.Value` and composing steps is a fold over data. Typed at the
+edges through `ToDynamic` and `FromDynamic`, untyped in the middle, exactly as
+the protobuf codec is. The codegen was a consequence of TypeScript's per-version
+types rather than of the design.
 
 # 8. Implementation sequence
 

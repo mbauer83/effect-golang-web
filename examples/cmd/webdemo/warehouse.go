@@ -12,6 +12,7 @@ import (
 
 	"github.com/mbauer83/effect-golang-web/examples/warehouse"
 	"github.com/mbauer83/effect-golang-web/schema/ddl"
+	"github.com/mbauer83/effect-golang-web/schema/dynamic"
 	"github.com/mbauer83/effect-golang-web/schema/structure"
 	"github.com/mbauer83/effect-golang-web/schema/variant"
 )
@@ -64,4 +65,67 @@ func fieldsOf(node structure.Node) string {
 		named = append(named, field.Name)
 	}
 	return strings.Join(named, ", ")
+}
+
+// runEvolving shows the migration: one declared step, and the three things it
+// produces -- the derived version, the statements, and the value carried.
+func runEvolving() {
+	if err := warehouse.Pallets.Fault(); err != nil {
+		fail(err)
+	}
+	fmt.Printf("\nwarehouse: the pallet has %d versions\n", warehouse.Pallets.Latest())
+	for version := 1; version <= warehouse.Pallets.Latest(); version++ {
+		node, err := warehouse.Pallets.At(version)
+		if err != nil {
+			fail(err)
+		}
+		fmt.Printf("  version %d              %s\n", version, fieldsOf(node))
+	}
+
+	// A value written under version one, carried to version two. The rename
+	// moves it; the added field takes its default, because a pallet that
+	// predates the field has nothing else it could hold.
+	var held dynamic.Value = dynamic.Object{Fields: []dynamic.Field{
+		{Name: "reference", Value: dynamic.OfText("P-1")},
+		{Name: "warehouse", Value: dynamic.OfText("Kiel")},
+	}}
+	carried, err := warehouse.Pallets.Migrate(1, 2, held)
+	if err != nil {
+		fail(err)
+	}
+	fmt.Printf("  a value, 1 to 2        %s\n", membersOf(carried))
+	back, err := warehouse.Pallets.Migrate(2, 1, carried)
+	if err != nil {
+		fail(err)
+	}
+	fmt.Printf("  and back, 2 to 1       %s\n", membersOf(back))
+
+	for _, dialect := range []ddl.Dialect{ddl.Postgres, ddl.MySQL} {
+		statements, err := ddl.Alter(dialect, warehouse.Pallets, 1, 2)
+		if err != nil {
+			fail(err)
+		}
+		fmt.Printf("\nwarehouse: 1 to 2, in %s\n", dialect.Name())
+		for _, statement := range statements {
+			fmt.Println("  " + statement + ";")
+		}
+	}
+}
+
+// membersOf names a value's members and what they hold, briefly.
+func membersOf(value dynamic.Value) string {
+	object, isObject := value.(dynamic.Object)
+	if !isObject {
+		return "(not an object)"
+	}
+	written := make([]string, 0, len(object.Fields))
+	for _, field := range object.Fields {
+		text, isText := field.Value.(dynamic.Text)
+		if !isText {
+			written = append(written, field.Name)
+			continue
+		}
+		written = append(written, field.Name+"="+text.Value)
+	}
+	return strings.Join(written, ", ")
 }

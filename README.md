@@ -22,7 +22,7 @@ Nothing here is finished yet. What exists, and what is planned, is below.
 | [gRPC](docs/reference/grpc.md) | usable: unary procedures, Connect transport, projected contract |
 | [Derived shapes: create, update, select](docs/reference/variant.md) | usable |
 | [DDL: Postgres, MySQL/MariaDB, SQLite](docs/reference/ddl.md) | usable; the two asked-for dialects are executed in CI only |
-| Migrations | researched, not built ([the findings](architecture-plan.md#71-ddl-and-migrations-researched-not-built)) |
+| [Migrations: declared steps, both directions](docs/reference/evolve.md) | usable; no migrator and no drift check |
 
 The [architecture plan](architecture-plan.md) records the design decisions,
 including which underlying library was chosen for each concern and what was
@@ -38,6 +38,7 @@ schema/                     Schema[A]: shapes, codecs, refinement
   schema/protobuf/          the proto3 projection and the protobuf wire codec
   schema/variant/           the create, update and select shapes one description has
   schema/ddl/               the tables an aggregate is, for three dialects
+  schema/evolve/            the steps between versions, and the values across them
 schemagen/                  writes the Go types a description implies
 web/                        Request, Response, Handler, codecs, routes, Server
 openapi/                    the OpenAPI 3.1 projection of a surface
@@ -54,7 +55,7 @@ examples/library/           a repository over the database port, driver-free
 examples/dispatch/          a producer and a consumer over the broker port
 examples/consign/           the four dispositions AMQP 1.0 settles a message by
 examples/quoting/           a gRPC service, and the .proto file it implies
-examples/warehouse/         an aggregate, and the tables it becomes
+examples/warehouse/         an aggregate, the tables it becomes, and its history
 examples/catalog/           one schema three ways, sequenced in direct style
 examples/inventory/         Go types generated from a description
 examples/cmd/webdemo/       the examples as a runnable command

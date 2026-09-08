@@ -108,3 +108,9 @@ func (postgres) Text(value string) string {
 func (dialect postgres) Key(scalar structure.Scalar) (string, error) {
 	return dialect.Column(scalar)
 }
+
+// Retype: Postgres changes the type and leaves the rest of the definition alone.
+func (postgres) Retype() (RetypeForm, error) { return RetypeTypeOnly, nil }
+
+// MayDefault accepts any of them: this dialect puts a default on any column.
+func (postgres) MayDefault(structure.Scalar) error { return nil }

@@ -121,8 +121,87 @@ func stampedKey(stored warehouse.Stored) string {
 	return strconv.FormatInt(stored.ID, 10)
 }
 
+// migrated runs the aggregate's DDL, then the statements that carry it to the
+// next version, then reads the renamed column back.
+//
+// The claim only a real database can settle: that these are statements it
+// accepts, and that the rename kept what was in the column.
+func migrated(t *testing.T, dialect ddl.Dialect, variable string, driver string) {
+	t.Helper()
+	address := os.Getenv(variable)
+	if address == "" {
+		t.Skipf("set %s to run this against a real %s", variable, dialect.Name())
+	}
+
+	first, err := warehouse.Pallets.At(1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	create, err := ddl.Create(dialect, first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	drop, err := ddl.Drop(dialect, first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	alter, err := ddl.Alter(dialect, warehouse.Pallets, 1, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	runtime, err := effect.NewRuntime(effect.WithDebugTracking())
+	if err != nil {
+		t.Fatal(err)
+	}
+	program := effect.Scoped(func(scope effect.Scope) building[warehouse.Sited] {
+		return sql.Open[effect.Unit](scope, driver, address).
+			FlatMap(func(database *sql.Connected) building[warehouse.Sited] {
+				return executed(database, drop).
+					AndThen(executed(database, create)).
+					AndThen(sql.Execute[effect.Unit](database,
+						`insert into `+dialect.Quoted("Pallet")+` (`+
+							dialect.Quoted("reference")+`, `+dialect.Quoted("warehouse")+
+							`) values ('P-9', 'Kiel')`)).
+					AndThen(executed(database, alter)).
+					FlatMap(func(effect.Unit) building[warehouse.Sited] {
+						return sql.QueryRow[effect.Unit](database, warehouse.SitedSchema,
+							`select `+dialect.Quoted("site")+`, `+dialect.Quoted("handling")+
+								` from `+dialect.Quoted("Pallet")+
+								` where `+dialect.Quoted("reference")+` = 'P-9'`)
+					})
+			})
+	})
+
+	within, giveUp := context.WithTimeout(context.Background(), 60*time.Second)
+	defer giveUp()
+
+	exit := runtime.Run(within, effect.Unit{}, program)
+	sited, ok := exit.Value()
+	if !ok {
+		t.Fatalf("unexpected exit: %+v", exit)
+	}
+	// The row was written before the column had this name, so its value being
+	// here is the whole claim -- and a drop-and-add would have lost it.
+	if sited.Site != "Kiel" {
+		t.Errorf("the rename lost the column's contents: %#v", sited)
+	}
+	// And the row that predated the added column got its default.
+	if sited.Handling != "standard" {
+		t.Errorf("expected the default for the existing row, got %q", sited.Handling)
+	}
+}
+
 func TestThePostgresSchemaIsOnePostgresAccepts(t *testing.T) {
 	accepted(t, ddl.Postgres, "EFFECT_GOLANG_POSTGRES_URL", "pgx")
+}
+
+func TestThePostgresMigrationIsOnePostgresAccepts(t *testing.T) {
+	migrated(t, ddl.Postgres, "EFFECT_GOLANG_POSTGRES_URL", "pgx")
+}
+
+func TestTheMySQLMigrationIsOneMySQLAccepts(t *testing.T) {
+	migrated(t, ddl.MySQL, "EFFECT_GOLANG_MYSQL_URL", "mysql")
 }
 
 func TestTheMySQLSchemaIsOneMySQLAccepts(t *testing.T) {

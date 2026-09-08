@@ -140,3 +140,24 @@ func (dialect mysql) Key(scalar structure.Scalar) (string, error) {
 	}
 	return dialect.Column(scalar)
 }
+
+// Retype: MySQL's modify restates the whole definition, so anything left out of the
+// restatement is lost -- which is why the form has to be known rather than
+// assumed.
+func (mysql) Retype() (RetypeForm, error) { return RetypeWhole, nil }
+
+// MayDefault refuses a default on an unbounded string or blob.
+//
+// MySQL rejects the statement: a TEXT or BLOB column takes no default, and
+// there is no expression form that changes that. The remedy is the same as for
+// a key -- bound the text with MaxLength, which makes it a varchar, and a
+// varchar takes a default.
+func (mysql) MayDefault(scalar structure.Scalar) error {
+	if scalar.Kind != structure.Text && scalar.Kind != structure.Bytes {
+		return nil
+	}
+	if _, bounded := longest(scalar.Constraints); !bounded {
+		return errUnboundedDefault
+	}
+	return nil
+}
