@@ -912,6 +912,59 @@ refused over the identity it could not have known to omit, and the identity it
 sent is dropped rather than carried through. That is this layer's ordinary
 tolerance and the right answer here.
 
+## 7.1.2 The tables, built
+
+`schema/ddl` is the second piece: `Tables`, `Create` and `Drop` for Postgres,
+MySQL/MariaDB and SQLite. Five things came out of building it, and three of them
+were found by looking at the emitted statements rather than by a test passing.
+
+**The aggregate really is the unit.** An entity gets a table, a value lives in
+its holder's row, the children come back after the parent because that is the
+order they have to be created in, and a child carries a cascading key, an index
+on it, and -- when the field was a list -- a position column, because a list is
+ordered and a table is not.
+
+**A third dialect, for evidence.** Postgres and MySQL are what was asked for and
+neither runs on the machine this was written on, so without SQLite the
+derivation could only have been checked by comparing strings to strings. With
+it, the statements are executed and the schema is then asked what it holds. It
+is a real dialect and not a stub.
+
+**`Computed` needed a second half.** It says a value is not the caller's, which
+is all a derived shape needs; a column with no value and no default is one no row
+can be written for. So the description gained a closed default vocabulary -- a
+value, or *now* -- rather than a SQL string, which would have been one dialect's
+spelling in a description meant to outlive the choice. `on update
+current_timestamp` is deliberately absent: MySQL has it, Postgres needs a
+trigger, and one that silently did nothing on Postgres would be worse than none.
+
+**Two defects that would have made the MySQL schema fail outright**, both found
+by reading the output rather than by a test. MySQL cannot put a TEXT column in a
+key specification at all, so an application-generated UUID key -- the commonest
+case there is -- produced a table MySQL rejects; a dialect now says what an
+application-supplied key becomes and MySQL refuses an unbounded one, because a
+prefix length invented here would make two different keys equal whenever they
+agreed for that many characters. And a default on a TEXT column is not something
+MySQL takes, which the example was relying on until its timestamp became a
+timestamp.
+
+**Idempotency was half-working, so it went.** `create table if not exists` makes
+the tables skippable and leaves the indexes failing on a second run, because
+MySQL has no such clause for an index. A schema that half re-ran is worse than
+one that did not, so these statements make a schema once and changing an
+existing one is a migration.
+
+One refusal was wrong and a test said so: a root that is only an identity with
+children beneath it is a legitimate aggregate -- a basket is its lines and
+nothing else -- and since every entity has an identity the check was also dead
+code.
+
+One quality fix, from reading the output: a description states the range its
+width implies, because JSON Schema has no integer widths, and the projection was
+restating it as prose in exponent notation. A column typed `integer` says it in
+the type, so a bound that is precisely the width's own limit is now left out --
+exactly, so a narrower one the author asked for survives.
+
 ## 7.2 Prior art: a previous attempt at exactly this
 
 `up2parts-aggregate-schema` (TypeScript, over Zod) is a working attempt at the

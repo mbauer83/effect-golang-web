@@ -120,3 +120,62 @@ jobs:
           go test -count=1 -v
           -run 'CrossesARealBroker|StoppingEarlyStopsTheBroker'
           ./test/acceptance/
+
+  # The generated DDL, against the two databases it was written for. The
+  # derivation they share with SQLite -- which tables, which keys, which column
+  # a child carries -- is established in the ordinary suite; what only these can
+  # answer is whether the statements are statements they accept: a
+  # generated-always identity, a datetime with a fractional default, an engine
+  # clause, a foreign key on a bounded varchar key.
+  #
+  # A job of its own, so a service container that will not start blocks this and
+  # not the suite that needs nothing.
+  schema:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: effect
+          POSTGRES_DB: effect
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: effect
+          MYSQL_DATABASE: effect
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -peffect"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: effect-golang-web
+      - uses: actions/checkout@v5
+        with:
+          repository: mbauer83/effect-golang
+          path: effect-golang
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.27.1'
+          check-latest: true
+
+      # -run selects them by name, so the job says what it established rather
+      # than running the whole suite again with two variables set.
+      - name: The generated schema against Postgres and MySQL
+        working-directory: effect-golang-web
+        env:
+          EFFECT_GOLANG_POSTGRES_URL: postgres://postgres:effect@127.0.0.1:5432/effect?sslmode=disable
+          EFFECT_GOLANG_MYSQL_URL: root:effect@tcp(127.0.0.1:3306)/effect?parseTime=true
+        run: go test -count=1 -v -run 'SchemaIsOne' ./test/acceptance/

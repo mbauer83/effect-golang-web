@@ -1,6 +1,7 @@
 package schema
 
 import (
+	"github.com/mbauer83/effect-golang-web/schema/dynamic"
 	"github.com/mbauer83/effect-golang-web/schema/structure"
 )
 
@@ -19,6 +20,7 @@ type Field[A any] struct {
 	number   int
 	identity bool
 	computed bool
+	fallback structure.Default
 	fault    error
 	encode   func(A, Sink) error
 	decode   func(*A, Source) error
@@ -147,6 +149,32 @@ func (field Field[A]) Identity() Field[A] {
 // other libraries spell with two separate concepts.
 func (field Field[A]) Computed() Field[A] {
 	field.computed = true
+	return field
+}
+
+// Defaulting says what the field holds when nobody gives it a value.
+//
+// The value is a dynamic.Value rather than a Go value because a description
+// need not have a Go type at all, and because every projection already knows
+// how to write one.
+//
+// It is separate from Computed, which says the value is not the caller's. A
+// field can have a default and still be the caller's to give -- that is what a
+// default *is* -- and a computed field with no default is a projection to
+// storage's problem rather than a declaration mistake, so the two are declared
+// separately and each says its own thing.
+func (field Field[A]) Defaulting(value dynamic.Value) Field[A] {
+	field.fallback = structure.DefaultTo{Value: value}
+	return field
+}
+
+// DefaultingToNow says the field holds the moment the row is written.
+//
+// Its own method rather than a value passed to Defaulting, because it is an
+// expression and not a value: there is no instant to put in a description that
+// would still be the right one when the row is written.
+func (field Field[A]) DefaultingToNow() Field[A] {
+	field.fallback = structure.DefaultNow{}
 	return field
 }
 

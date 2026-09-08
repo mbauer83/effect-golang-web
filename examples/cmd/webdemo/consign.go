@@ -44,9 +44,9 @@ func runConsign(runtime *effect.Runtime) {
 				}
 				return effect.For[effect.Unit, amqp10.Fault]().
 					Succeed[consign.Outcome](consign.Refused{
-						Finality: consign.NotNow,
-						Reason:   "no room on today's van",
-					})
+					Finality: consign.NotNow,
+					Reason:   "no room on today's van",
+				})
 			})
 	}
 

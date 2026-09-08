@@ -133,6 +133,15 @@ type Field struct {
 	// spell with two separate concepts: an identity the application supplies is
 	// Identity alone, and one the database generates is both.
 	Computed bool
+	// Default is what produces the value when the caller does not. It is nil
+	// when the description does not say, and a projection that needs to know
+	// says so rather than inventing one: a column with no value and no default
+	// is a column no row can be written for, and a default invented here would
+	// be a rule nobody asked for.
+	//
+	// A generated identity needs none, because the database's own key
+	// generation is what produces it.
+	Default Default
 }
 
 // Sequence is an ordered, variable-length list.

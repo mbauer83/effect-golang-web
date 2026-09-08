@@ -13,6 +13,12 @@ require (
 	github.com/bufbuild/protocompile v0.14.1
 	github.com/coder/websocket v1.8.15
 	github.com/getkin/kin-openapi v0.149.0
+	// The two drivers the generated DDL is checked against, used only by the
+	// tests: the derivation is established with sqlite, and these are what say
+	// the statements are ones Postgres and MySQL accept. Nothing in the module
+	// imports either, because sql depends on a port and not on a driver.
+	github.com/go-sql-driver/mysql v1.10.1
+	github.com/jackc/pgx/v5 v5.11.0
 	github.com/mbauer83/effect-golang v0.0.0
 	github.com/rabbitmq/amqp091-go v1.14.0
 	// A JSON Schema validator, used only by the tests: the projection is
@@ -29,10 +35,14 @@ require (
 )
 
 require (
+	filippo.io/edwards25519 v1.2.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/go-openapi/jsonpointer v0.22.5 // indirect
 	github.com/go-openapi/swag/jsonname v0.25.5 // indirect
 	github.com/google/uuid v1.6.0 // indirect
+	github.com/jackc/pgpassfile v1.0.0 // indirect
+	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
+	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect

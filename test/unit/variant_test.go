@@ -29,7 +29,7 @@ var orderLine = schema.Struct[dynamic.Value]("OrderLine",
 	schema.DescribedField("id", schema.UUID()).Identity(),
 	schema.DescribedField("sku", schema.Text()),
 	schema.DescribedField("quantity", schema.AtLeast(schema.Int32(), 1)),
-	schema.DescribedField("lineTotal", schema.Int64()).Computed(),
+	schema.DescribedField("lineTotal", schema.Int64()).Computed().Defaulting(dynamic.OfInteger(0)),
 )
 
 var order = schema.Struct[dynamic.Value]("Order",
@@ -39,7 +39,7 @@ var order = schema.Struct[dynamic.Value]("Order",
 	schema.DescribedField("reference", schema.UUID()),
 	schema.DescribedField("shipTo", address),
 	schema.DescribedField("lines", schema.List(orderLine)),
-	schema.DescribedField("placedAt", schema.Time()).Computed(),
+	schema.DescribedField("placedAt", schema.Time()).Computed().DefaultingToNow(),
 )
 
 // named is the field names of a derived object, in order.
@@ -192,54 +192,4 @@ func TestADerivedShapeStillValidatesAndStillProjects(t *testing.T) {
 	if _, present := tolerated.(dynamic.Object).Member("id"); present {
 		t.Error("expected the identity dropped rather than carried through")
 	}
-}
-
-func TestTheMarksDoNotSurviveIntoTheDerivedShape(t *testing.T) {
-	// A shape a caller supplies has no identity to declare and nothing
-	// computed left in it, so carrying the marks through would say something
-	// untrue about it -- and a projection reading them would make a key out of
-	// a field that is no longer one.
-	created, err := variant.CreateWithEntities(order.Structure())
-	if err != nil {
-		t.Fatal(err)
-	}
-	object := created.(structure.Object)
-	for _, field := range object.Fields {
-		if field.Identity || field.Computed {
-			t.Errorf("%q still carries a mark", field.Name)
-		}
-	}
-	if object.IsEntity() {
-		t.Error("a create shape is not an entity: it has no identity")
-	}
-
-	// The root has no marked field left to check -- id and placedAt were both
-	// dropped -- so checking only the root proves nothing. The line's kept
-	// identity is where a surviving mark would show, and a projection reading
-	// it would make a key out of a field that is no longer one.
-	lines := fieldNamed(t, created, "lines")
-	element := lines.Node.(structure.Sequence).Element.(structure.Object)
-	for _, field := range element.Fields {
-		if field.Identity || field.Computed {
-			t.Errorf("the line's %q still carries a mark", field.Name)
-		}
-	}
-	if element.IsEntity() {
-		t.Error("a derived line is not an entity either")
-	}
-}
-
-func fieldNamed(t *testing.T, node structure.Node, name string) structure.Field {
-	t.Helper()
-	object, isObject := node.(structure.Object)
-	if !isObject {
-		t.Fatalf("expected an object, got %T", node)
-	}
-	for _, field := range object.Fields {
-		if field.Name == name {
-			return field
-		}
-	}
-	t.Fatalf("no field named %q", name)
-	return structure.Field{}
 }

@@ -23,6 +23,7 @@ func describeFields[A any](fields []Field[A]) []structure.Field {
 			Number:   field.number,
 			Identity: field.identity,
 			Computed: field.computed,
+			Default:  field.fallback,
 		})
 	}
 	return described
