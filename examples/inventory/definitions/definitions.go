@@ -24,25 +24,25 @@ import (
 
 // item is one stocked line.
 var item = schema.Struct[dynamic.Value]("Item",
-	schema.Describing("sku", schema.Matching(schema.Text(), `^[A-Z]{3}-[0-9]{5}$`)).
+	schema.DescribedField("sku", schema.Matching(schema.Text(), `^[A-Z]{3}-[0-9]{5}$`)).
 		Documented("the stock-keeping unit, three letters and five digits"),
-	schema.Describing("onHand", schema.Uint16()).
+	schema.DescribedField("onHand", schema.Uint16()).
 		Documented("how many are on hand"),
-	schema.Describing("weightGrams", schema.Float32()).
+	schema.DescribedField("weightGrams", schema.Float32()).
 		Documented("what one unit weighs"),
-	schema.Describing("id", schema.UUID()),
-	schema.Describing("tags", schema.MinItems(schema.List(schema.Text()), 1)),
-	schema.Describing("note", schema.MaxLength(schema.Text(), 200)).Optional(),
+	schema.DescribedField("id", schema.UUID()),
+	schema.DescribedField("tags", schema.MinItems(schema.List(schema.Text()), 1)),
+	schema.DescribedField("note", schema.MaxLength(schema.Text(), 200)).Optional(),
 ).Documented("one stocked line")
 
 // movement is a change in what is stocked.
 var movement = schema.OneOf[dynamic.Value]("Movement",
-	schema.Choosing("received", schema.Struct[dynamic.Value]("Received",
-		schema.Describing("count", schema.Uint16()),
+	schema.DescribedVariant("received", schema.Struct[dynamic.Value]("Received",
+		schema.DescribedField("count", schema.Uint16()),
 	)).Documented("stock arriving"),
-	schema.Choosing("shipped", schema.Struct[dynamic.Value]("Shipped",
-		schema.Describing("count", schema.Uint16()),
-		schema.Describing("to", schema.Hostname()),
+	schema.DescribedVariant("shipped", schema.Struct[dynamic.Value]("Shipped",
+		schema.DescribedField("count", schema.Uint16()),
+		schema.DescribedField("to", schema.Hostname()),
 	)).Documented("stock leaving"),
 ).Documented("a change in what is stocked")
 

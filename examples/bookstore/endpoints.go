@@ -108,7 +108,7 @@ func addBook(store *Store) web.Route[effect.Unit, Fault] {
 func findBook(store *Store) web.Route[effect.Unit, Fault] {
 	return web.Handle(
 		web.GET("/books/{title}",
-			web.Describing(web.PathParam("title", schema.Text()), "the title to look for"),
+			web.PathParam("title", schema.Text()).Documented("the title to look for"),
 			web.Returns(http.StatusOK, BookSchema)).
 			Summary("Find a book by title").
 			Failing(http.StatusNotFound, "no book with that title is held"),

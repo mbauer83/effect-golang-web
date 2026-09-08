@@ -170,7 +170,7 @@ need no description of their own:
 | `Entity(schema)` | the JSON body, decoded straight from its reader |
 | `Nothing()` | nothing |
 
-`Describing(codec, doc)` attaches prose for the published document, to a codec
+`codec.Documented(doc)` attaches prose for the published document, to a codec
 that reads exactly one parameter.
 
 Absent and empty are different: `?shelf=` carries an empty value and no `shelf`
@@ -205,7 +205,7 @@ could give none of them.
 ```go
 web.Handle(
     web.GET("/books/{title}",
-        web.Describing(web.PathParam("title", schema.Text()), "the title to look for"),
+        web.PathParam("title", schema.Text()).Documented("the title to look for"),
         web.Returns(http.StatusOK, BookSchema)).
         Summary("Find a book by title").
         Failing(http.StatusNotFound, "no book with that title is held"),

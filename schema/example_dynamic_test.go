@@ -11,10 +11,10 @@ import (
 // A description with no Go type is written with the same combinators, minus the
 // accessors a Go value would need. It validates, transcodes, describes itself
 // and composes exactly as a typed schema does.
-func ExampleDescribing() {
+func ExampleDescribedField() {
 	reading := schema.Struct[dynamic.Value]("Reading",
-		schema.Describing("code", schema.Matching(schema.Text(), `^[A-Z]{2}-[0-9]{4}$`)),
-		schema.Describing("pages", schema.AtMost(schema.AtLeast(schema.Int(), 1), 20000)),
+		schema.DescribedField("code", schema.Matching(schema.Text(), `^[A-Z]{2}-[0-9]{4}$`)),
+		schema.DescribedField("pages", schema.AtMost(schema.AtLeast(schema.Int(), 1), 20000)),
 	)
 
 	value, err := schema.DecodeJSON(reading, []byte(`{"code":"AB-1234","pages":632}`))

@@ -45,17 +45,17 @@ accessors:
 
 ```go
 var Book = schema.Struct[dynamic.Value]("Book",
-    schema.Describing("title", schema.MinLength(schema.Text(), 1)).
+    schema.DescribedField("title", schema.MinLength(schema.Text(), 1)).
         Documented("what the book is called"),
-    schema.Describing("pages", schema.AtMost(schema.AtLeast(schema.Int(), 1), 20000)),
-    schema.Describing("subtitle", schema.Text()).Optional(),
-    schema.Describing("id", schema.UUID()),
+    schema.DescribedField("pages", schema.AtMost(schema.AtLeast(schema.Int(), 1), 20000)),
+    schema.DescribedField("subtitle", schema.Text()).Optional(),
+    schema.DescribedField("id", schema.UUID()),
 )
 ```
 
-`Describing` is `FieldOf` without the getter and setter — the only part of a
+`DescribedField` is `FieldOf` without the getter and setter — the only part of a
 field declaration that needs the Go type, so leaving them out is exactly the
-difference between *describing* a shape and *binding* one. `Choosing` is
+difference between *describing* a shape and *binding* one. `DescribedVariant` is
 `VariantOf` without the narrowing, for the same reason: a described value
 carries its own tag, so narrowing to a variant is reading a name.
 `Dynamic(node)` is the general door: a typed schema's `Structure()` passed
@@ -104,9 +104,9 @@ Where the description is the source of truth, the Go types come from it:
 ```go
 // examples/inventory/definitions -- unexported, because they are input
 var item = schema.Struct[dynamic.Value]("Item",
-    schema.Describing("sku", schema.Matching(schema.Text(), `^[A-Z]{3}-[0-9]{5}$`)),
-    schema.Describing("onHand", schema.Uint16()),
-    schema.Describing("note", schema.MaxLength(schema.Text(), 200)).Optional(),
+    schema.DescribedField("sku", schema.Matching(schema.Text(), `^[A-Z]{3}-[0-9]{5}$`)),
+    schema.DescribedField("onHand", schema.Uint16()),
+    schema.DescribedField("note", schema.MaxLength(schema.Text(), 200)).Optional(),
 )
 
 func Descriptions() []structure.Node { return []structure.Node{item.Structure()} }
@@ -191,7 +191,7 @@ to remember about which wrap and which are called on what they change:
 schema.Struct[Book]("Book", …).Documented("one entry")
 schema.FieldOf("note", schema.Text(), get, set).Documented("a note")
 schema.VariantOf("circle", circleSchema, narrow, widen).Documented("a circle")
-schema.Describing("note", schema.Text()).Optional()
+schema.DescribedField("note", schema.Text()).Optional()
 ```
 
 `Optional()` applies to a field whose absence can be *seen* — a described field,

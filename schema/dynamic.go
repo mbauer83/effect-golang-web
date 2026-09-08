@@ -64,14 +64,18 @@ func dynamicCodec(node structure.Node) Schema[dynamic.Value] {
 	}
 }
 
-// Describing declares a field of a description: a name and a shape, and no
+// DescribedField declares a field of a description: a name and a shape, and no
 // accessors.
 //
 // The accessors are the only part of a field declaration that needs a Go type,
 // so leaving them out is exactly the difference between describing a shape and
 // binding one. Everything else is the same Field, so the same modifiers apply:
 // Optional and Documented.
-func Describing[B any](name string, shape Schema[B]) Field[dynamic.Value] {
+//
+// It is named for what it returns, as FieldOf is. A third word for a field --
+// a member, an entry -- would be one more thing to learn about something the
+// reader already knows.
+func DescribedField[B any](name string, shape Schema[B]) Field[dynamic.Value] {
 	described := Dynamic(shape.Structure())
 	if fault := Validate(shape); fault != nil {
 		return Field[dynamic.Value]{name: name, node: shape.Structure(), fault: fault}
@@ -99,13 +103,16 @@ func Describing[B any](name string, shape Schema[B]) Field[dynamic.Value] {
 	}
 }
 
-// Choosing declares an alternative of a described union: a name and a shape,
-// and no narrowing.
+// DescribedVariant declares a variant of a described union: a name and a
+// shape, and no narrowing.
 //
 // A described value carries its own tag -- the chosen variant is the object's
 // single member -- so narrowing to it is reading that name, which needs no Go
 // type either.
-func Choosing[B any](name string, shape Schema[B]) Variant[dynamic.Value] {
+//
+// It is a variant and not an alternative or a choice, because the type it
+// returns is Variant and OneOf takes Variants. The word was already chosen.
+func DescribedVariant[B any](name string, shape Schema[B]) Variant[dynamic.Value] {
 	described := Dynamic(shape.Structure())
 	if fault := Validate(shape); fault != nil {
 		return Variant[dynamic.Value]{name: name, node: shape.Structure(), fault: fault}

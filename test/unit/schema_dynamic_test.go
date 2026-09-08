@@ -18,12 +18,12 @@ import (
 // without the accessors, which is the only part of a field declaration that
 // needs the type.
 var bookDescription = schema.Struct[dynamic.Value]("Book",
-	schema.Describing("title", schema.MinLength(schema.Text(), 1)).
+	schema.DescribedField("title", schema.MinLength(schema.Text(), 1)).
 		Documented("what the book is called"),
-	schema.Describing("authors", schema.MinItems(schema.List(schema.Text()), 1)),
-	schema.Describing("pages", schema.AtMost(schema.AtLeast(schema.Int(), 1), 20000)),
-	schema.Describing("subtitle", schema.Text()).Optional(),
-	schema.Describing("id", schema.UUID()),
+	schema.DescribedField("authors", schema.MinItems(schema.List(schema.Text()), 1)),
+	schema.DescribedField("pages", schema.AtMost(schema.AtLeast(schema.Int(), 1), 20000)),
+	schema.DescribedField("subtitle", schema.Text()).Optional(),
+	schema.DescribedField("id", schema.UUID()),
 )
 
 const bookDocument = `{"title":"Zionomicon","authors":["John A. De Goes"],` +
@@ -181,13 +181,13 @@ func TestATypedValueCrossesToADescriptionAndBack(t *testing.T) {
 
 func TestADescriptionsMistakesAreReportedRatherThanPanicking(t *testing.T) {
 	cases := map[string]error{
-		"a nameless member":  schema.Validate(schema.Struct[dynamic.Value]("Book", schema.Describing("", schema.Text()))),
-		"two members alike":  schema.Validate(schema.Struct[dynamic.Value]("Book", schema.Describing("title", schema.Text()), schema.Describing("title", schema.Text()))),
-		"an unusable member": schema.Validate(schema.Struct[dynamic.Value]("Book", schema.Describing("title", schema.Schema[string]{}))),
+		"a nameless member":  schema.Validate(schema.Struct[dynamic.Value]("Book", schema.DescribedField("", schema.Text()))),
+		"two members alike":  schema.Validate(schema.Struct[dynamic.Value]("Book", schema.DescribedField("title", schema.Text()), schema.DescribedField("title", schema.Text()))),
+		"an unusable member": schema.Validate(schema.Struct[dynamic.Value]("Book", schema.DescribedField("title", schema.Schema[string]{}))),
 		// A faulted schema has a shape as well as a fault, so a description
 		// that took the shape and dropped the fault would look complete.
 		"a member whose schema is faulted": schema.Validate(
-			schema.Struct[dynamic.Value]("Book", schema.Describing("title", schema.Matching(schema.Text(), `[`)))),
+			schema.Struct[dynamic.Value]("Book", schema.DescribedField("title", schema.Matching(schema.Text(), `[`)))),
 		"no description":  schema.Validate(schema.Dynamic(nil)),
 		"no alternatives": schema.Validate(schema.OneOf[dynamic.Value]("Shape")),
 		// A bound field's getter returns a value and not whether there is one,

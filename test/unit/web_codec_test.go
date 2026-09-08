@@ -136,9 +136,10 @@ func TestCodecDeclarationMistakesAreReportedRatherThanPanicking(t *testing.T) {
 		"two codecs reading one parameter": web.ValidateCodec(
 			web.Both(web.QueryParam("shelf", schema.Text()), web.QueryParam("shelf", schema.Text()))),
 		"prose for more than one parameter": web.ValidateCodec(
-			web.Describing(web.Both(
+			web.Both(
 				web.QueryParam("shelf", schema.Text()),
-				web.QueryParam("page", schema.Int())), "both of them")),
+				web.QueryParam("page", schema.Int()),
+			).Documented("both of them")),
 	}
 	for mistake, err := range cases {
 		if err == nil {
@@ -148,7 +149,7 @@ func TestCodecDeclarationMistakesAreReportedRatherThanPanicking(t *testing.T) {
 }
 
 func TestProseOnAParameterReachesItsDeclaration(t *testing.T) {
-	codec := web.Describing(web.QueryParam("shelf", schema.Text()), "which shelf to list")
+	codec := web.QueryParam("shelf", schema.Text()).Documented("which shelf to list")
 
 	if err := web.ValidateCodec(codec); err != nil {
 		t.Fatal(err)

@@ -36,7 +36,7 @@ func dynamicScalar(shape structure.Scalar) Schema[dynamic.Value] {
 func dynamicObject(shape structure.Object) Schema[dynamic.Value] {
 	fields := make([]Field[dynamic.Value], 0, len(shape.Fields))
 	for _, member := range shape.Fields {
-		described := Describing(member.Name, Dynamic(member.Node)).Documented(member.Doc)
+		described := DescribedField(member.Name, Dynamic(member.Node)).Documented(member.Doc)
 		if member.Optional {
 			described = described.Optional()
 		}
@@ -49,7 +49,7 @@ func dynamicUnion(shape structure.Union) Schema[dynamic.Value] {
 	variants := make([]Variant[dynamic.Value], 0, len(shape.Variants))
 	for _, alternative := range shape.Variants {
 		variants = append(variants,
-			Choosing(alternative.Name, Dynamic(alternative.Node)).Documented(alternative.Doc))
+			DescribedVariant(alternative.Name, Dynamic(alternative.Node)).Documented(alternative.Doc))
 	}
 	return OneOf[dynamic.Value](shape.Name, variants...).Documented(shape.Doc)
 }

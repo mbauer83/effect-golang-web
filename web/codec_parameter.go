@@ -43,11 +43,13 @@ func OptionalHeaderParam[A any](name string, shape schema.Schema[A]) Codec[*A] {
 	return optional(name, InHeader, shape, headerValue(name))
 }
 
-// Describing attaches prose to a codec's parameter, for the published document.
+// Documented attaches prose to a codec's parameter, for the published document.
 //
 // It applies to a codec that reads exactly one parameter, because prose about
-// "the parameters" would not tell a reader which one it meant.
-func Describing[A any](codec Codec[A], doc string) Codec[A] {
+// "the parameters" would not tell a reader which one it meant. It is a method
+// because it modifies a codec rather than building one, as every modifier in
+// this module is.
+func (codec Codec[A]) Documented(doc string) Codec[A] {
 	if len(codec.parameters) != 1 {
 		codec.fault = faulted("describing a parameter", errNotOneParameter)
 		return codec
