@@ -297,7 +297,57 @@ deep-equal to the description it came from, and both refuse the same documents
 -- because a binding that admitted a different shape from the one it was
 generated from is the single bug this arrangement exists to prevent.
 
-## 3.6 What a generator will not guess
+## 3.6 Why the binding cannot be written away
+
+ASKED, and worth recording so it is not re-litigated: Python lets an annotation
+name a type that does not exist yet, as a string. Could a schema do the same and
+be its own binding, so there is one declaration rather than a description and a
+generated `NameSchema`?
+
+The forward reference itself is already here and is not the obstacle. A
+description names a shape it has not built -- itself, or another description --
+through `Deferred`, which contributes a `structure.Reference`: a name and a way
+to reach what it names later. Two descriptions may name each other. And the type
+name in `Struct[dynamic.Value]("Item")` is exactly the string Python writes: a
+name for a Go type that need not exist, resolved by generation rather than by
+`get_type_hints`.
+
+What Python's version rides on is the part Go does not have. `pydantic` reads
+annotations and *constructs* objects reflectively, setting fields it discovered
+at run time. Skipping the binding needs that: something has to fill an `Item`,
+and without accessors the only filler is reflection.
+
+Three arrangements were considered and two are impossible:
+
+```text
+one hand-written schema naming "Item"      the accessors cannot be written,
+                                           because Item does not exist yet
+a generated binding referring to the       the accessor knows B, the description
+hand-written description                   knows a node; converting between them
+                                           needs a Schema[B] that only the
+                                           accessor could have supplied
+a generated struct and a generated         what is built
+binding, from one description
+```
+
+The middle one is the interesting failure. A binding that referred to the
+description rather than restating it would put the shape in exactly one place,
+which is what the question is really after -- and it cannot be typed: giving
+each accessor its member's schema restates the base types anyway, and not giving
+it one leaves no way from a `dynamic.Value` to a `B`.
+
+So the restatement in the generated file is forced, and what makes it safe is
+that it is checked rather than trusted: the binding's structure is deep-equal to
+the description it came from, and both refuse the same documents.
+
+There is one real alternative, not built: a reflection-based `Bind[A](description)`
+in a package of its own, giving one line instead of a generated binding. It
+would discover the struct at run time, so it would lose the compile-time check
+that the type matches the description, and it would put erasure back into a
+module whose architecture test forbids a top type. It stays an option rather
+than a default for that reason.
+
+## 3.7 What a generator will not guess
 
 Go has neither Scala's implicit derivation nor TypeScript's mapped types, so a
 schema for a struct is written rather than summoned. Three ways existed to

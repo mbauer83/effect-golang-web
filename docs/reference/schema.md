@@ -97,6 +97,40 @@ and a parse is not a keyword, so a description alone annotates and no more.
 enforced. Saying so plainly beats a described path that silently admits what the
 typed path refuses.
 
+### Naming a shape before it exists
+
+`Deferred` is the forward reference. It contributes a `structure.Reference` — a
+name and a way to reach what it names later — so a description may mention a
+shape that is not built yet, including itself and including another description
+whose turn has not come:
+
+```go
+var folder, file schema.Schema[dynamic.Value]
+
+func init() {
+    folder = schema.Struct[dynamic.Value]("Folder",
+        schema.DescribedField("files",
+            schema.List(schema.Deferred(func() schema.Schema[dynamic.Value] { return file }))),
+    )
+    file = schema.Struct[dynamic.Value]("File",
+        schema.DescribedField("parent",
+            schema.Nullable(schema.Deferred(func() schema.Schema[dynamic.Value] { return folder }))),
+    )
+}
+```
+
+Nothing is resolved until something reads it, which is what lets two
+descriptions name each other. A projection of a cycle terminates, because the
+second time a name is reached a pointer is written rather than the shape again.
+
+The type name in `Struct[dynamic.Value]("Item")` is a forward reference of the
+same kind: a string naming a Go type that need not exist, resolved by
+generation. What it cannot do is remove the binding — something has to fill an
+`Item`, and without accessors the only filler is reflection, which is what
+`pydantic` uses and what this module refuses. `architecture-plan.md` §3.6
+records the arrangements that were considered and why two of them cannot be
+typed.
+
 ## Generating the Go types
 
 Where the description is the source of truth, the Go types come from it:
@@ -187,7 +221,7 @@ changed without a regeneration fails there rather than at the next request.
 | `Nullable(inner)` | present and null, as a pointer -- not the same as an absent field |
 | `Struct(name, fields...)` | a fixed set of named fields |
 | `OneOf(name, variants...)` | a choice between named alternatives |
-| `Deferred(resolve)` | a schema not built yet, for recursion |
+| `Deferred(resolve)` | a schema not built yet: itself, or another not yet written |
 
 `FieldOf` declares a required field and `OptionalFieldOf` one that may be
 absent. An optional field's getter reports presence, because an empty string
