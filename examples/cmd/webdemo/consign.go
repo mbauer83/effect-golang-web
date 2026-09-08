@@ -15,6 +15,7 @@ import (
 	"github.com/mbauer83/effect-golang-web/amqp10/inprocess"
 	"github.com/mbauer83/effect-golang-web/examples/consign"
 	"github.com/mbauer83/effect-golang/effect"
+	"github.com/mbauer83/effect-golang/experimental/direct"
 )
 
 func runConsign(runtime *effect.Runtime) {
@@ -34,9 +35,9 @@ func runConsign(runtime *effect.Runtime) {
 	// again: a carrier that always refused would loop, which is what the
 	// disposition means.
 	offered := 0
-	carrier := func(consign.Shipment) effect.Effect[effect.Unit, amqp10.Fault, consign.Outcome] {
+	carrier := func(consign.Shipment) collecting[consign.Outcome] {
 		return effect.For[effect.Unit, amqp10.Fault]().
-			Suspend(func() effect.Effect[effect.Unit, amqp10.Fault, consign.Outcome] {
+			Suspend(func() collecting[consign.Outcome] {
 				offered++
 				if offered > 1 {
 					return effect.For[effect.Unit, amqp10.Fault]().
@@ -50,19 +51,20 @@ func runConsign(runtime *effect.Runtime) {
 			})
 	}
 
-	program := amqp10.Send[effect.Unit](sender, amqp10.Message{
-		Body: []byte(`{"reference":"not a uuid","carrier":"","weight":0}`),
-	}).
-		FlatMap(func(effect.Unit) effect.Effect[effect.Unit, amqp10.Fault, effect.Unit] {
-			return consign.Hand(sender, consign.Shipment{
-				Reference: "8f14e45f-ceea-467a-a4fb-1a9c73d0f2b1",
-				Carrier:   "overland",
-				Weight:    12.5,
-			})
-		}).
-		FlatMap(func(effect.Unit) effect.Effect[effect.Unit, amqp10.Fault, []consign.Shipment] {
-			return effect.RunCollect(consign.Collect(receiver, carrier).TakeStream(1))
-		})
+	// Direct style: three things in order, which as FlatMaps read inside-out
+	// with the last nested deepest. No defer in the body, which is the
+	// condition for using it.
+	program := direct.Run(func(bind *consigning) []consign.Shipment {
+		direct.Bind(bind, amqp10.Send[effect.Unit](sender, amqp10.Message{
+			Body: []byte(`{"reference":"not a uuid","carrier":"","weight":0}`),
+		}))
+		direct.Bind(bind, consign.Hand(sender, consign.Shipment{
+			Reference: "8f14e45f-ceea-467a-a4fb-1a9c73d0f2b1",
+			Carrier:   "overland",
+			Weight:    12.5,
+		}))
+		return direct.Bind(bind, effect.RunCollect(consign.Collect(receiver, carrier).TakeStream(1)))
+	})
 
 	exit := runtime.Run(context.Background(), effect.Unit{}, program)
 	collected, succeeded := exit.Value()
@@ -80,3 +82,7 @@ func runConsign(runtime *effect.Runtime) {
 			modification.Change.Tried, modification.Change.Elsewhere)
 	}
 }
+
+// The channel this scenario works in, and the binder it binds with.
+type collecting[A any] = effect.Effect[effect.Unit, amqp10.Fault, A]
+type consigning = direct.Binder[effect.Unit, amqp10.Fault]

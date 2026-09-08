@@ -17,6 +17,7 @@ import (
 	"github.com/mbauer83/effect-golang-web/amqp091/inprocess"
 	"github.com/mbauer83/effect-golang-web/examples/dispatch"
 	"github.com/mbauer83/effect-golang/effect"
+	"github.com/mbauer83/effect-golang/experimental/direct"
 )
 
 var errWarehouseBusy = errors.New("the warehouse is busy")
@@ -27,9 +28,9 @@ func runDispatch(runtime *effect.Runtime) {
 
 	// Refuses once, then packs: an order sent back is offered again, which is
 	// what requeueing means.
-	packing := func(dispatch.Order) effect.Effect[effect.Unit, amqp091.Fault, effect.Unit] {
+	packing := func(dispatch.Order) shipping[effect.Unit] {
 		return effect.For[effect.Unit, amqp091.Fault]().
-			Suspend(func() effect.Effect[effect.Unit, amqp091.Fault, effect.Unit] {
+			Suspend(func() shipping[effect.Unit] {
 				packed++
 				if packed == 1 {
 					return effect.For[effect.Unit, amqp091.Fault]().
@@ -39,24 +40,25 @@ func runDispatch(runtime *effect.Runtime) {
 			})
 	}
 
-	program := dispatch.Prepare(broker).
-		FlatMap(func(effect.Unit) effect.Effect[effect.Unit, amqp091.Fault, effect.Unit] {
-			// A body nothing can read, so the discard is shown rather than
-			// described.
-			return amqp091.Publish[effect.Unit](broker,
-				amqp091.Target{Exchange: dispatch.Orders, Key: dispatch.Placed},
-				amqp091.Message{Body: []byte(`{"reference":"not a uuid"}`)})
-		}).
-		FlatMap(func(effect.Unit) effect.Effect[effect.Unit, amqp091.Fault, effect.Unit] {
-			return dispatch.Place(broker, dispatch.Order{
-				Reference: "8f14e45f-ceea-467a-a4fb-1a9c73d0f2b1",
-				Item:      "lamp",
-				Quantity:  2,
-			})
-		}).
-		FlatMap(func(effect.Unit) effect.Effect[effect.Unit, amqp091.Fault, []dispatch.Order] {
-			return effect.RunCollect(dispatch.Ship(broker, packing).TakeStream(1))
-		})
+	// Direct style. Four things happen in order, and as FlatMaps that read
+	// inside-out: the last step was nested deepest and each closure existed
+	// only to say "then". The body holds no defer, which is the condition --
+	// in direct style a defer runs on an ordinary domain failure and not only
+	// on a panic.
+	program := direct.Run(func(bind *dispatching) []dispatch.Order {
+		direct.Bind(bind, dispatch.Prepare(broker))
+		// A body nothing can read, so the discard is shown rather than
+		// described.
+		direct.Bind(bind, amqp091.Publish[effect.Unit](broker,
+			amqp091.Target{Exchange: dispatch.Orders, Key: dispatch.Placed},
+			amqp091.Message{Body: []byte(`{"reference":"not a uuid"}`)}))
+		direct.Bind(bind, dispatch.Place(broker, dispatch.Order{
+			Reference: "8f14e45f-ceea-467a-a4fb-1a9c73d0f2b1",
+			Item:      "lamp",
+			Quantity:  2,
+		}))
+		return direct.Bind(bind, effect.RunCollect(dispatch.Ship(broker, packing).TakeStream(1)))
+	})
 
 	exit := runtime.Run(context.Background(), effect.Unit{}, program)
 	shipped, succeeded := exit.Value()
@@ -70,3 +72,8 @@ func runDispatch(runtime *effect.Runtime) {
 		fmt.Printf("  %s x%d (%s)\n", order.Item, order.Quantity, order.Reference)
 	}
 }
+
+// The channel this scenario works in, and the binder it binds with, named so a
+// signature says what it is rather than repeating itself.
+type shipping[A any] = effect.Effect[effect.Unit, amqp091.Fault, A]
+type dispatching = direct.Binder[effect.Unit, amqp091.Fault]

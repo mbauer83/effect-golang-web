@@ -18,6 +18,7 @@ import (
 	"github.com/mbauer83/effect-golang-schema/schema/dynamic"
 	"github.com/mbauer83/effect-golang-web/amqp10"
 	"github.com/mbauer83/effect-golang/effect"
+	"github.com/mbauer83/effect-golang/experimental/direct"
 )
 
 // Shipment is one consignment.
@@ -131,16 +132,23 @@ func collecting(
 	received amqp10.Received[Shipment],
 	carrier func(Shipment) consigning[Outcome],
 ) consigning[effect.Chunk[Shipment]] {
-	shipment, err := received.Read()
-	if err != nil {
-		return amqp10.Reject[effect.Unit](received, "the shipment cannot be read: "+err.Error()).
-			As(effect.ChunkOf[Shipment]())
-	}
-	return carrier(shipment).
-		FlatMap(func(outcome Outcome) consigning[effect.Chunk[Shipment]] {
-			return settled(received, shipment, outcome)
-		})
+	// Direct style: offer it, then settle it according to what came back. As a
+	// FlatMap the settling was nested inside the offering, which is the wrong
+	// way round for something that happens after it.
+	return direct.Run(func(bind *settling) effect.Chunk[Shipment] {
+		shipment, err := received.Read()
+		if err != nil {
+			return direct.Bind(bind, amqp10.Reject[effect.Unit](received,
+				"the shipment cannot be read: "+err.Error()).As(effect.ChunkOf[Shipment]()))
+		}
+		outcome := direct.Bind(bind, carrier(shipment))
+		return direct.Bind(bind, settled(received, shipment, outcome))
+	})
 }
+
+// settling is the binder this program binds in. No defer in the body, which is
+// the condition for direct style.
+type settling = direct.Binder[effect.Unit, amqp10.Fault]
 
 // settled turns the carrier's answer into the disposition that says it.
 func settled(
