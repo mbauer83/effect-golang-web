@@ -869,6 +869,82 @@ declared order as the argument order, which is a mapping nobody wrote down.
 Per-dialect rendering that **refuses** what a dialect cannot express rather than
 approximating it, as every other projection here refuses rather than guesses.
 
+## 7.2 Prior art: a previous attempt at exactly this
+
+`up2parts-aggregate-schema` (TypeScript, over Zod) is a working attempt at the
+versioned-declaration idea, and it converges on the design above from a
+different direction. It also stops short of DDL: it emits JSON Schema and
+OpenAPI component artifacts to files, and there is no `CREATE TABLE` anywhere in
+it. Three of its decisions are additions to what is recorded above, and one of
+its difficulties is a warning.
+
+### The aggregate, not the table, is the unit
+
+`defineEntity` marks a nested schema as an entity with its own identity. So one
+declaration describes an aggregate root *and* the entities under it, and
+`getCreateSchema(version, withNestedEntities)` decides whether a derived shape
+reaches into them.
+
+That changes the DDL problem materially: an aggregate is **several tables with
+foreign keys**, not one table, and the derived create shape for an aggregate is
+not the same thing as the insert shape for its root table. Nothing recorded in
+7.1 accounted for that, and a `Table`-per-declaration design would have got it
+wrong.
+
+### Identity is a fully-qualified name plus a version
+
+A schema is identified by an FQDN and a version, not by a Go package path or a
+struct name. That is what a registry needs, and it is what makes a declaration a
+contract between services rather than a detail of one program -- the same reason
+a protobuf service carries its fully-qualified name here.
+
+### Three markers, arrived at independently
+
+`markAsId`, `markAsComputed` and `defineEntity` are the whole extra vocabulary,
+added for the create/update derivation rather than for DDL. They are almost
+exactly the annotations DDL needs, and almost exactly Effect's
+`Model.GeneratedByDb` and `Sensitive`. Three sources converging on the same
+short list is the strongest evidence available that the list is right.
+
+### Migrations: adjacent steps, composed
+
+Each version carries a schema, an `upMigration` from the previous version and a
+`downMigration` to it. `buildMigration` finds the direction by index and folds
+the intervening functions; `buildAllMigrations` materialises the whole
+version-by-version matrix.
+
+So **N-1 functions are written and every one of the N-squared pairs is derived**
+-- which is Cambria's lens composition, arrived at without it. It is also the
+answer to the objection raised in 7.1 about writing the target twice: only the
+steps are authored. Each version's declaration is still written out beside its
+step there, so the Cambria refinement -- derive the declaration from the chain
+and materialise it -- remains available and is still worth taking.
+
+### The warning: where the type-level work ran out
+
+`CreateType<Type, ComputedFieldPathArrays<...>, NestedEntityPathArrays<...>,
+IncludeNested, IdFieldPathArrays<...>>` computes the derived shape by extracting
+field *paths* at the type level. It carries a `@ts-expect-error`. The
+machinery was at the edge of what TypeScript could check, in a language with
+mapped types, conditional types and template literal types.
+
+Go has none of those, so this approach is not merely harder here -- it is
+unavailable. That is not a problem, because it is unnecessary: in this module a
+description is **already data** (`structure.Node`), so deriving a create or
+update shape is a pure function over a tree rather than a type-level
+computation. Where a Go type per variant is wanted, `schemagen` already writes
+the Go types a description implies, with a drift test. The escape hatch becomes
+a generator.
+
+The same applies to the migration matrix. `buildAllMigrations` builds it at
+runtime behind erased signatures; in Go the N-squared compositions would be
+**generated**: deterministic, checked-in, fully typed, gofmt-formatted -- which
+is what this project's rule on generation permits, and N-squared mechanical
+compositions of hand-written steps is what "demonstrated repetition" means. Each
+step stays typed as `func(FromVersion) ToVersion`; only the registry that holds
+steps of differing types needs a seam, and that is one named boundary of the
+kind this module already has four of.
+
 # 8. Implementation sequence
 
 ```text
