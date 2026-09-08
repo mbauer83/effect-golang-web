@@ -32,6 +32,63 @@ below. A hand-written schema stays the honest path: everything the generator
 emits is one of these calls, so the two are interchangeable and there is one
 thing to learn rather than two.
 
+## Describing a shape with no Go type
+
+`Schema[A]` moves a Go value in and out of a format. A description written
+before the type it will become exists — or loaded from elsewhere, or read back
+out of another schema — has no `A`, and it is still worth validating,
+transcoding, inspecting and composing.
+
+It is the same vocabulary, minus the accessors:
+
+```go
+var Book = schema.Record("Book",
+    schema.DocumentedMember("what the book is called",
+        schema.MemberOf("title", schema.MinLength(schema.Text(), 1))),
+    schema.MemberOf("pages", schema.AtMost(schema.AtLeast(schema.Int(), 1), 20000)),
+    schema.OptionalMemberOf("subtitle", schema.Text()),
+    schema.MemberOf("id", schema.UUID()),
+)   // Schema[dynamic.Value]
+```
+
+`Record` is `Struct` without the getters and setters — which are the only part
+of a field declaration that needs the Go type, so leaving them out is exactly
+the difference between *describing* a shape and *binding* one. `Choice` and
+`AlternativeOf` do the same for a union. `Dynamic(node)` is the general door: a
+typed schema's `Structure()` passed through it is usable without its type.
+
+Everything else is unchanged, because a `Schema` never cared what `A` was:
+
+```go
+schema.Validate(Book)              // reports a mistake in it
+schema.DecodeJSON(Book, document)  // validates and yields a dynamic.Value
+schema.EncodeJSON(Book, value)     // writes it back
+schema.List(Book)                  // composes with typed schemas
+jsonschema.Project(Book.Structure())  // publishes exactly as a typed one does
+```
+
+`dynamic.Value` is a sealed sum of nine cases — the twelve calls of a `Sink`
+seen from the other side, which is why a format needs to learn nothing new to
+carry one. A struct, a string-keyed mapping and a union all appear as
+`dynamic.Object`, because that is what all three are on the wire; which one a
+value is meant to be is the description's business, not the value's.
+
+`ToDynamic` and `FromDynamic` cross between a typed value and a described one,
+so the two ways of using this package meet.
+
+### What a description can and cannot enforce
+
+It enforces **what it records**: a bound, a length, a pattern, an item count,
+optionality, and the shape itself. That is what recording constraints in the
+description was for — the rules survive without the Go type that stated them,
+and the typed and described paths are tested to reach the same verdict.
+
+It cannot enforce a rule that could only be code. `Email()` and `URI()` parse,
+and a parse is not a keyword, so a description alone annotates and no more.
+`UUID()`, `URL()` and `Hostname()` recorded their expressions, so those *are*
+enforced. Saying so plainly beats a described path that silently admits what the
+typed path refuses.
+
 ## Deriving one
 
 A struct's fields and a schema for it say the same thing twice, and the second

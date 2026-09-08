@@ -193,7 +193,40 @@ document is compiled by an external JSON Schema 2020-12 validator and checked to
 accept every document the codec writes and refuse every one it refuses. The
 validator is a test dependency only.
 
-## 3.4 Derivation is generation, and runs one way
+## 3.4 A schema does not need a Go type
+
+ADDED after the first generator: `Schema[A]` works when there is no `A`.
+
+A description written before the type it will become exists, or loaded from
+elsewhere, has no Go type and is still worth validating, transcoding,
+inspecting and composing -- and generating a struct from a description is
+worthless if the description cannot first be trusted. So the adaptation is the
+one ZIO Schema makes with DynamicValue and Effect's Schema makes by being
+AST-first: a universal value representation, and the same vocabulary over it.
+
+`Record` is `Struct` without the getters and setters, which are the only part
+of a field declaration that needs the type; `Choice` is the same for a union;
+`Dynamic(node)` is the general door, so a typed schema's own description is
+usable without its type. Nothing else changes, because a Schema never cared
+what A was: the same Validate, the same codecs, the same projections, the same
+combinators.
+
+`dynamic.Value` is a sealed sum of nine cases -- the Sink's twelve calls seen
+from the other side, so a format learns nothing new to carry one. A struct, a
+mapping and a union all appear as an object, because that is what all three are
+on the wire; which one a value is meant to be is the description's business.
+Giving them three near-identical cases would record the same fact twice, and it
+would break the sink-and-source bridge that `ToDynamic` and `FromDynamic` are
+built from.
+
+What a description enforces is what it records, which is the second dividend of
+recording constraints and of recording a format's expression beside its name.
+A rule that could only be code -- an address, a URI -- annotates and no more.
+The typed and described paths are tested to reach the same verdict on the same
+value, because a generated struct that accepted what its description refused
+would be the one bug this whole arrangement exists to prevent.
+
+## 3.5 Derivation is generation, and runs one way
 
 Go has neither Scala's implicit derivation nor TypeScript's mapped types, so a
 schema for a struct is written rather than summoned. Three ways existed to
@@ -390,7 +423,7 @@ optional fields, unions, refinements and recursion; a public `structure` package
 a projection walks; a JSON codec over `encoding/json/jsontext`; the JSON Schema
 2020-12 projection with shared components; `examples/catalog` as a complete
 program; and the pair test above. Derivation and the remaining projections stay
-deferred as 3.4 records.
+deferred as 3.5 records.
 
 Step 2 delivered: Request and Response over net/http's own types, Handler as a
 description, an Adapter that interprets one as an http.Handler, and a server
