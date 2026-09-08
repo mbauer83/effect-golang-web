@@ -7,7 +7,7 @@ package web
 import (
 	"errors"
 
-	"github.com/mbauer83/effect-golang-web/schema/structure"
+	"github.com/mbauer83/effect-golang-schema/schema/structure"
 	"github.com/mbauer83/effect-golang/effect"
 )
 

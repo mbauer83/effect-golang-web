@@ -3,7 +3,7 @@ package web
 import (
 	"errors"
 
-	"github.com/mbauer83/effect-golang-web/schema"
+	"github.com/mbauer83/effect-golang-schema/schema"
 )
 
 // Entity reads the request body as JSON, described by a schema.

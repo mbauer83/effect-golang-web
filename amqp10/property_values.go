@@ -23,7 +23,7 @@ import (
 
 	broker "github.com/Azure/go-amqp"
 
-	"github.com/mbauer83/effect-golang-web/schema/dynamic"
+	"github.com/mbauer83/effect-golang-schema/schema/dynamic"
 )
 
 // Properties is the application-property map an object makes.

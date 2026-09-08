@@ -1,5 +1,9 @@
-// Command webdemo runs the example scenarios against live capabilities,
+// Command webdemo runs the transport examples against live capabilities,
 // including a real server on a real socket.
+//
+// The description examples are in effect-golang-schema's own command, and the
+// database ones in effect-golang-sql's: each module demonstrates what it is
+// responsible for.
 //
 // It exists so the examples are demonstrably runnable programs and not only
 // test fixtures. Each scenario is also composed by an end-to-end test, so the
@@ -14,45 +18,23 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/mbauer83/effect-golang-web/examples/bookstore"
-	"github.com/mbauer83/effect-golang-web/examples/catalog"
 	"github.com/mbauer83/effect-golang/effect"
 )
 
-const document = `{
-  "name": "shelf one",
-  "books": [
-    {"title": "Zionomicon", "authors": ["John A. De Goes", "Adam Fraser"],
-     "pages": 632, "subtitle": "A field guide",
-     "availability": {"inStock": {"count": 3}}},
-    {"title": "Out of Print", "authors": [], "pages": 120,
-     "availability": {"discontinued": {}}}
-  ]
-}`
-
 func main() {
-	workspace, err := os.MkdirTemp("", "webdemo")
-	if err != nil {
-		fail(err)
-	}
-	defer os.RemoveAll(workspace)
-
 	runtime, err := effect.NewRuntime(effect.WithDebugTracking())
 	if err != nil {
 		fail(err)
 	}
 	defer reportShutdown(runtime)
 
-	runCatalog(runtime, workspace)
 	runBookstore(runtime)
 	runDispatch(runtime)
 	runConsign(runtime)
 	runQuoting(runtime)
-	runWarehouse()
-	runEvolving()
 }
 
 // runBookstore starts the HTTP program on a port the operating system chooses,
@@ -130,30 +112,6 @@ func report(what string, response *http.Response) {
 		fail(err)
 	}
 	fmt.Printf("  %-24s %d %s\n", what, response.StatusCode, strings.TrimSpace(string(body)))
-}
-
-func runCatalog(runtime *effect.Runtime, workspace string) {
-	inputPath := filepath.Join(workspace, "catalogue.json")
-	if err := os.WriteFile(inputPath, []byte(document), 0o600); err != nil {
-		fail(err)
-	}
-	contractPath := filepath.Join(workspace, "contract.json")
-
-	program := catalog.Program(inputPath, filepath.Join(workspace, "normalised.json"), contractPath)
-	exit := runtime.Run(context.Background(), effect.Unit{}, program)
-
-	report, succeeded := exit.Value()
-	if !succeeded {
-		fail(fmt.Errorf("catalogue: %v", exit))
-	}
-	fmt.Printf("catalogue: %d books, %d shelved, components %v\n",
-		report.Books, report.Shelved, report.Components)
-
-	contract, err := os.ReadFile(contractPath)
-	if err != nil {
-		fail(err)
-	}
-	fmt.Printf("published contract:\n%s\n", contract)
 }
 
 func reportShutdown(runtime *effect.Runtime) {

@@ -16,9 +16,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mbauer83/effect-golang-schema/schema/dynamic"
 	"github.com/mbauer83/effect-golang-web/amqp091"
 	"github.com/mbauer83/effect-golang-web/examples/dispatch"
-	"github.com/mbauer83/effect-golang-web/schema/dynamic"
 	"github.com/mbauer83/effect-golang/effect"
 )
 

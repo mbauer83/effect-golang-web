@@ -20,7 +20,7 @@ import (
 
 	broker "github.com/rabbitmq/amqp091-go"
 
-	"github.com/mbauer83/effect-golang-web/schema/dynamic"
+	"github.com/mbauer83/effect-golang-schema/schema/dynamic"
 )
 
 // Table is the field table an object makes.

@@ -9,21 +9,18 @@ Nothing here is finished yet. What exists, and what is planned, is below.
 
 | Area | State |
 |---|---|
-| [Schema](docs/reference/schema.md) | usable: shapes, sums (both taggings), constraints, formats, JSON, JSON Schema, descriptions with no Go type, generation from a description |
 | [HTTP core: request, response, handler, server](docs/reference/web.md) | usable |
 | [Routing: matching, dispatch, middleware](docs/reference/web.md) | usable |
 | [Typed endpoints](docs/reference/web.md) | usable |
 | [OpenAPI generation](docs/reference/openapi.md) | usable |
 | [WebSockets](docs/reference/websocket.md) | usable |
-| [SQL](docs/reference/sql.md) | usable |
 | [AMQP 0-9-1](docs/reference/amqp091.md) | usable; the adapter is verified against a broker in CI only |
 | [AMQP 1.0](docs/reference/amqp10.md) | usable; the adapter itself unverified against a broker |
-| [protobuf](docs/reference/protobuf.md) | usable: proto3 projection and wire codec |
 | [gRPC](docs/reference/grpc.md) | usable: unary procedures, Connect transport, projected contract |
-| [Derived shapes: create, update, select](docs/reference/variant.md) | usable |
-| [DDL: Postgres, MySQL/MariaDB, SQLite](docs/reference/ddl.md) | usable; the two asked-for dialects are executed in CI only |
-| [Migrations: declared steps, both directions](docs/reference/evolve.md) | usable |
-| [Migrator: ledger, ordering, advisory lock](docs/reference/migrate.md) | usable; no drift check |
+
+Descriptions are [effect-golang-schema](https://github.com/mbauer83/effect-golang-schema);
+tables and migrations are [effect-golang-sql](https://github.com/mbauer83/effect-golang-sql).
+This module is the transports, and depends on both.
 
 The [architecture plan](architecture-plan.md) records the design decisions,
 including which underlying library was chosen for each concern and what was
@@ -32,20 +29,9 @@ rejected.
 ## Layout
 
 ```text
-schema/                     Schema[A]: shapes, codecs, refinement
-  schema/structure/         the description a projection walks
-  schema/dynamic/           the value a description carries when there is no Go type
-  schema/jsonschema/        the JSON Schema 2020-12 projection
-  schema/protobuf/          the proto3 projection and the protobuf wire codec
-  schema/variant/           the create, update and select shapes one description has
-  schema/ddl/               the tables an aggregate is, for three dialects
-  schema/evolve/            the steps between versions, and the values across them
-migrate/                    applying a history to a database, once
-schemagen/                  writes the Go types a description implies
 web/                        Request, Response, Handler, codecs, routes, Server
 openapi/                    the OpenAPI 3.1 projection of a surface
 websocket/                  a conversation over an upgraded connection
-sql/                        statements, rows decoded by a Schema, transactions
 amqp091/                    messages over AMQP 0-9-1, acknowledged explicitly
   amqp091/inprocess/        a broker that runs inside the test that uses it
 amqp10/                     messages over AMQP 1.0, settled by disposition
@@ -53,16 +39,13 @@ amqp10/                     messages over AMQP 1.0, settled by disposition
 grpc/                       unary procedures over the gRPC wire protocol
 examples/bookstore/         a complete HTTP program on the web core
 examples/tally/             a websocket conversation, with shared state
-examples/library/           a repository over the database port, driver-free
 examples/dispatch/          a producer and a consumer over the broker port
 examples/consign/           the four dispositions AMQP 1.0 settles a message by
 examples/quoting/           a gRPC service, and the .proto file it implies
-examples/warehouse/         an aggregate, the tables it becomes, and its history
-examples/catalog/           one schema three ways, sequenced in direct style
-examples/inventory/         Go types generated from a description
 examples/cmd/webdemo/       the examples as a runnable command
 test/unit/                  behaviour of the public API
 test/acceptance/            the example programs, end to end
+test/architecture/          the claims about this module's shape
 docs/                       reference, how-to, explanation
 architecture-plan.md        design decisions and the implementation sequence
 ```
@@ -87,9 +70,9 @@ alternatives are in the [architecture plan](architecture-plan.md).
 | AMQP 1.0 | `github.com/Azure/go-amqp` (a different protocol, a separate package) |
 | protobuf | `google.golang.org/protobuf` |
 | gRPC transport | pluggable behind a port; `connectrpc.com/connect` is the one here |
-| SQL | `database/sql` port and adapter; `modernc.org/sqlite` in tests |
+| protobuf projection | effect-golang-schema; the reference implementation in tests only |
 | OpenAPI | emitted from our own model; `kin-openapi` in tests only |
-| JSON Schema validation | `santhosh-tekuri/jsonschema/v6`, in tests only |
+| h2c, for gRPC over plain TCP | `golang.org/x/net`, in tests only |
 
 No third-party dependency is needed to use the HTTP core, and a transport's
 dependency stays inside that transport's package.
@@ -101,15 +84,30 @@ go run ./examples/cmd/webdemo
 ```
 
 `examples/bookstore` serves a small collection over JSON on a port the operating
-system chooses, and `examples/catalog` loads a catalogue document, writes it back normalised, and
-publishes the JSON Schema contract that says what it accepts — three uses of one
-description. `test/acceptance` composes the same program, so the example and its
-test cannot drift apart.
+system chooses; `examples/quoting` answers a gRPC procedure and prints the
+`.proto` file it implies; `examples/dispatch` and `examples/consign` are a
+producer and a consumer over each AMQP protocol. `test/acceptance` composes the
+same programs, so an example and its test cannot drift apart.
 
-## Building
+The description examples are in
+[effect-golang-schema](https://github.com/mbauer83/effect-golang-schema)'s own
+command, and the database ones in
+[effect-golang-sql](https://github.com/mbauer83/effect-golang-sql)'s: each
+module demonstrates what it is responsible for.
 
-`effect-golang` is not published yet, so `go.mod` resolves it from the working
-copy beside this one. Replace that directive with a version requirement once it
-is tagged.
+## Development
 
-Go 1.27 is required, by the runtime and by `encoding/json/v2`.
+None of the three modules below this one is published yet, so `go.mod` resolves
+them from sibling working copies:
+
+```text
+workspace/
+  effect-golang/            the runtime
+  effect-golang-schema/     descriptions
+  effect-golang-sql/        tables and migrations, on those
+  effect-golang-web/        this module, on both
+```
+
+A `replace` is ignored by anything that depends on *this* module, so it is a
+development arrangement and not a distribution one. Replace all three with
+version requirements once they are tagged.

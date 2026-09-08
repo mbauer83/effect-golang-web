@@ -10,8 +10,8 @@
 package dispatch
 
 import (
+	"github.com/mbauer83/effect-golang-schema/schema"
 	"github.com/mbauer83/effect-golang-web/amqp091"
-	"github.com/mbauer83/effect-golang-web/schema"
 	"github.com/mbauer83/effect-golang/effect"
 )
 

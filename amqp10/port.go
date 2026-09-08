@@ -9,7 +9,7 @@ package amqp10
 import (
 	"context"
 
-	"github.com/mbauer83/effect-golang-web/schema/dynamic"
+	"github.com/mbauer83/effect-golang-schema/schema/dynamic"
 )
 
 // Sending is a link to a node that accepts messages.

@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/mbauer83/effect-golang-web/schema/jsonschema"
+	"github.com/mbauer83/effect-golang-schema/schema/jsonschema"
 	"github.com/mbauer83/effect-golang-web/web"
 )
 

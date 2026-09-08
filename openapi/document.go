@@ -12,7 +12,7 @@
 // produce the same bytes.
 package openapi
 
-import "github.com/mbauer83/effect-golang-web/schema/jsonschema"
+import "github.com/mbauer83/effect-golang-schema/schema/jsonschema"
 
 // Info is what a document says about the API as a whole. Title and Version are
 // required by the specification.

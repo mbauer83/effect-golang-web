@@ -18,7 +18,6 @@ import (
 
 	"github.com/mbauer83/effect-golang-web/examples/quoting"
 	"github.com/mbauer83/effect-golang-web/grpc"
-	"github.com/mbauer83/effect-golang-web/schema/protobuf"
 )
 
 func TestTheContractCompilesAndDeclaresTheService(t *testing.T) {
@@ -174,26 +173,4 @@ func TestAContractNamingAServiceOutsideItsPackageIsRefused(t *testing.T) {
 	if !strings.Contains(err.Error(), "would not be the path this answers at") {
 		t.Fatalf("expected the reason to say so, got %v", err)
 	}
-}
-
-func TestATimestampBringsItsImportOrTheFileWouldNotCompile(t *testing.T) {
-	// google.protobuf.Timestamp is a well-known type and not a keyword: a file
-	// using it without the import does not compile, so the projection has to
-	// add it. The constant is public because a caller assembling a file of its
-	// own needs the same path.
-	document, err := protobuf.Project(manifestSchema.Structure(), "logistics.v1")
-	if err != nil {
-		t.Fatal(err)
-	}
-	found := false
-	for _, imported := range document.Imports {
-		if imported == protobuf.Timestamps {
-			found = true
-		}
-	}
-	if !found {
-		t.Fatalf("expected %q imported, got %v", protobuf.Timestamps, document.Imports)
-	}
-	// Compiled, which is what proves the import is the one protobuf wants.
-	protoCompiled(t, document)
 }

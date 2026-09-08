@@ -1,7 +1,7 @@
 package bookstore
 
 import (
-	"github.com/mbauer83/effect-golang-web/schema"
+	"github.com/mbauer83/effect-golang-schema/schema"
 )
 
 // BookSchema describes Book, binding the Go type to the wire.

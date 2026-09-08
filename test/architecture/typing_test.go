@@ -1,6 +1,6 @@
 package architecture
 
-// Nothing in this module holds a value it cannot name -- with four exceptions,
+// Nothing in this module holds a value it cannot name -- with three exceptions,
 // each on the record and each checked to stay where it says it is.
 
 import (
@@ -27,11 +27,8 @@ import (
 // is a decision on the record rather than a hole someone widened -- and a list
 // that grows is a thing a reviewer sees in the diff.
 var untypedBoundaries = map[string]string{
-	// database/sql scans into a top type and a driver hands one back, because
-	// a driver cannot know what a column holds until it reads it.
-	"sql/driver_values.go": "a driver's values",
-	// An AMQP field table is a set of named values of a dozen kinds, which the
-	// protocol defines and the library represents as map[string]any.
+	// An AMQP 0-9-1 field table is a set of named values of a dozen kinds,
+	// which the protocol defines and the library represents as map[string]any.
 	"amqp091/field_values.go": "a message's headers",
 	// AMQP 1.0's application properties and annotations are the same shape
 	// under a different protocol, with a different set of permitted values.

@@ -3,7 +3,7 @@ package openapi
 import (
 	"encoding/json/jsontext"
 
-	"github.com/mbauer83/effect-golang-web/schema/jsonschema"
+	"github.com/mbauer83/effect-golang-schema/schema/jsonschema"
 )
 
 func writeOperation(encoder *jsontext.Encoder, operation Operation) error {

@@ -1143,6 +1143,50 @@ edges through `ToDynamic` and `FromDynamic`, untyped in the middle, exactly as
 the protobuf codec is. The codegen was a consequence of TypeScript's per-version
 types rather than of the design.
 
+# 7.3 Three modules, not one
+
+The plan was written for one module and that was wrong, though it took building
+the whole of it to see why. The dependency list is the argument: a program that
+only describes its shapes was acquiring a websocket library, two AMQP clients,
+a gRPC transport and three database drivers, and a program serving HTTP was
+acquiring the drivers too.
+
+So:
+
+```text
+effect-golang-schema   descriptions, codecs, projections, generation
+effect-golang-sql      the port, the tables, the steps, the migrator
+effect-golang-web      the transports
+```
+
+Each carries what its own users need and nothing else, and each can make a
+claim the single module could not.
+
+- **schema** carries **no third-party dependency at all**, and an architecture
+  test says so. It also holds no value it cannot name -- no exemptions, where
+  the one module had four.
+- **sql** depends on a port and never on a driver; its one exemption is the
+  driver's values, which is the boundary that has to exist.
+- **web** keeps three exemptions, one per protocol whose contract is untyped.
+
+What was already true made the split cheap: the packages had no cycles and the
+edges were already checked, so the move was mechanical. What it cost was three
+fixtures -- the tests that had shared one description now each declare their
+own -- and three demo commands instead of one, which is better anyway: each
+module demonstrates what it is responsible for.
+
+Two things came out of doing it. `schema/ddl` and `schema/evolve` were never
+schema's business and the split made that obvious: tables and versions are what
+a database does with a description, not part of the description. And the
+dependency test was reading whole files, so a doc comment that *mentioned* a
+sibling package counted as importing it -- which surfaced only when amqp10's
+documentation linked to amqp091. It reads import lines now.
+
+The modules resolve each other through `replace` while none is published. A
+replace is ignored by anything that depends on the module carrying it, so it is
+a development arrangement and not a distribution one, and each README says to
+swap it for a version requirement at tagging time.
+
 # 8. Implementation sequence
 
 ```text

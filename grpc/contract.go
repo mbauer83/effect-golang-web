@@ -13,8 +13,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/mbauer83/effect-golang-web/schema/protobuf"
-	"github.com/mbauer83/effect-golang-web/schema/structure"
+	"github.com/mbauer83/effect-golang-schema/schema/protobuf"
+	"github.com/mbauer83/effect-golang-schema/schema/structure"
 )
 
 // Declaring is a procedure a contract can be projected from.

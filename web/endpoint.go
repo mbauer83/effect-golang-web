@@ -4,7 +4,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/mbauer83/effect-golang-web/schema"
+	"github.com/mbauer83/effect-golang-schema/schema"
 	"github.com/mbauer83/effect-golang/effect"
 )
 

@@ -16,8 +16,8 @@ import (
 
 	broker "github.com/Azure/go-amqp"
 
+	"github.com/mbauer83/effect-golang-schema/schema/dynamic"
 	"github.com/mbauer83/effect-golang-web/amqp10"
-	"github.com/mbauer83/effect-golang-web/schema/dynamic"
 )
 
 func TestEveryKindAPropertyMayHoldSurvivesTheRoundTrip(t *testing.T) {

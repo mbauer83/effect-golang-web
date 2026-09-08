@@ -14,9 +14,9 @@ package consign
 import (
 	"strconv"
 
+	"github.com/mbauer83/effect-golang-schema/schema"
+	"github.com/mbauer83/effect-golang-schema/schema/dynamic"
 	"github.com/mbauer83/effect-golang-web/amqp10"
-	"github.com/mbauer83/effect-golang-web/schema"
-	"github.com/mbauer83/effect-golang-web/schema/dynamic"
 	"github.com/mbauer83/effect-golang/effect"
 )
 

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mbauer83/effect-golang-web/schema"
+	"github.com/mbauer83/effect-golang-schema/schema"
 	"github.com/mbauer83/effect-golang-web/web"
 	"github.com/mbauer83/effect-golang/effect"
 )

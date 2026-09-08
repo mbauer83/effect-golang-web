@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/mbauer83/effect-golang-web/schema"
+	"github.com/mbauer83/effect-golang-schema/schema"
 )
 
 // Response is what a handler produces.

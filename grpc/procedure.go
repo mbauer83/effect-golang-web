@@ -5,8 +5,8 @@ package grpc
 import (
 	"strings"
 
-	"github.com/mbauer83/effect-golang-web/schema"
-	"github.com/mbauer83/effect-golang-web/schema/structure"
+	"github.com/mbauer83/effect-golang-schema/schema"
+	"github.com/mbauer83/effect-golang-schema/schema/structure"
 )
 
 // Procedure is one unary procedure of a service.

@@ -9,9 +9,9 @@ package acceptance
 import (
 	"testing"
 
+	"github.com/mbauer83/effect-golang-schema/schema/dynamic"
 	"github.com/mbauer83/effect-golang-web/amqp10"
 	"github.com/mbauer83/effect-golang-web/examples/consign"
-	"github.com/mbauer83/effect-golang-web/schema/dynamic"
 	"github.com/mbauer83/effect-golang/effect"
 )
 

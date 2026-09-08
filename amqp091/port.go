@@ -10,7 +10,7 @@ package amqp091
 import (
 	"context"
 
-	"github.com/mbauer83/effect-golang-web/schema/dynamic"
+	"github.com/mbauer83/effect-golang-schema/schema/dynamic"
 )
 
 // Publishing sends messages.

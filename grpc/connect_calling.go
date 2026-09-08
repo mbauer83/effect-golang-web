@@ -9,7 +9,7 @@ import (
 
 	rpc "connectrpc.com/connect"
 
-	"github.com/mbauer83/effect-golang-web/schema/protobuf"
+	"github.com/mbauer83/effect-golang-schema/schema/protobuf"
 	"github.com/mbauer83/effect-golang/effect"
 )
 

@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mbauer83/effect-golang-web/schema/jsonschema"
+	"github.com/mbauer83/effect-golang-schema/schema/jsonschema"
 )
 
 // Version is the specification this projection emits.

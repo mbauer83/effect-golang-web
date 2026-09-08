@@ -12,8 +12,8 @@ package quoting
 import (
 	"errors"
 
+	"github.com/mbauer83/effect-golang-schema/schema"
 	"github.com/mbauer83/effect-golang-web/grpc"
-	"github.com/mbauer83/effect-golang-web/schema"
 	"github.com/mbauer83/effect-golang/effect"
 )
 

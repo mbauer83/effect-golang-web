@@ -13,9 +13,9 @@ import (
 
 	kin "github.com/getkin/kin-openapi/openapi3"
 
+	"github.com/mbauer83/effect-golang-schema/schema"
+	"github.com/mbauer83/effect-golang-schema/schema/jsonschema"
 	"github.com/mbauer83/effect-golang-web/openapi"
-	"github.com/mbauer83/effect-golang-web/schema"
-	"github.com/mbauer83/effect-golang-web/schema/jsonschema"
 	"github.com/mbauer83/effect-golang-web/web"
 	"github.com/mbauer83/effect-golang/effect"
 )

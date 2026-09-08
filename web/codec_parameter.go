@@ -5,7 +5,7 @@ import (
 	"net/textproto"
 	"strings"
 
-	"github.com/mbauer83/effect-golang-web/schema"
+	"github.com/mbauer83/effect-golang-schema/schema"
 )
 
 // PathParam reads a captured segment of the request path.

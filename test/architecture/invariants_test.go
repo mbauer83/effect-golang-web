@@ -11,70 +11,100 @@ import (
 // knows nothing about a transport, and no transport knows about another. That
 // is what keeps a caller who wants only the HTTP core from acquiring an AMQP
 // dependency.
+// A transport knows the core and no other transport; a projection knows the
+// declaration and never the other way round.
+//
+// The description, the tables and the migrations are other modules now, so the
+// edges to them are enforced by the compiler rather than by this: nothing here
+// can import effect-golang-sql without go.mod saying so, and effect-golang-sql
+// cannot import this at all.
 var forbiddenImports = map[string][]string{
-	"schema": {
-		// A generator reads a description; a description knows nothing about
-		// the generator that will read it.
-		"effect-golang-web/schemagen",
-		"effect-golang-web/web",
-		"effect-golang-web/websocket",
-		"effect-golang-web/amqp",
-		"effect-golang-web/grpc",
-		"effect-golang-web/sql",
-		"effect-golang-web/schema/jsonschema",
-	},
-	"schema/structure": {
-		"effect-golang-web/schema\"",
-		"effect-golang-web/web",
-	},
-	"websocket": {
-		// A transport knows the core and no other transport.
-		"effect-golang-web/amqp",
-		"effect-golang-web/grpc",
-		"effect-golang-web/sql",
-		"effect-golang-web/openapi",
-	},
 	"web": {
 		// A projection depends on the declaration, never the other way round.
 		"effect-golang-web/openapi",
 		"effect-golang-web/websocket",
-		"effect-golang-web/amqp",
+		"effect-golang-web/amqp091",
+		"effect-golang-web/amqp10",
 		"effect-golang-web/grpc",
-		"effect-golang-web/sql",
-	},
-	"schemagen": {
-		"effect-golang-web/web",
-		"effect-golang-web/openapi",
+		// A database is not this module's business at all. The edge is here as
+		// well as in go.mod because go.mod would happily let a transport reach
+		// for one, and a transport that did would make this module unusable
+		// without a driver.
+		"effect-golang-sql",
 	},
 	"openapi": {
 		"effect-golang-web/websocket",
-		"effect-golang-web/amqp",
+		"effect-golang-web/amqp091",
+		"effect-golang-web/amqp10",
 		"effect-golang-web/grpc",
-		"effect-golang-web/sql",
 	},
-	"schema/jsonschema": {
-		// A projection walks the description. Reaching for the codec package
-		// would let one projection depend on how another format encodes.
-		"effect-golang-web/schema\"",
-		"effect-golang-web/web",
-		"effect-golang-web/websocket",
-		"effect-golang-web/amqp",
+	"websocket": {
+		"effect-golang-web/openapi",
+		"effect-golang-web/amqp091",
+		"effect-golang-web/amqp10",
 		"effect-golang-web/grpc",
-		"effect-golang-web/sql",
+	},
+	"amqp091": {
+		"effect-golang-web/web",
+		"effect-golang-web/openapi",
+		"effect-golang-web/websocket",
+		"effect-golang-web/amqp10",
+		"effect-golang-web/grpc",
+	},
+	"amqp10": {
+		"effect-golang-web/web",
+		"effect-golang-web/openapi",
+		"effect-golang-web/websocket",
+		"effect-golang-web/amqp091",
+		"effect-golang-web/grpc",
+	},
+	"grpc": {
+		"effect-golang-web/openapi",
+		"effect-golang-web/websocket",
+		"effect-golang-web/amqp091",
+		"effect-golang-web/amqp10",
 	},
 }
 
 func TestPackagesDependOnlyInward(t *testing.T) {
 	for directory, banned := range forbiddenImports {
 		for _, path := range sourcesIn(t, directory) {
-			source := readSource(t, path)
-			for _, importPath := range banned {
-				if strings.Contains(source, importPath) {
-					t.Errorf("%s imports %q, which points outward", display(t, path), importPath)
+			for _, line := range strings.Split(readSource(t, path), "\n") {
+				held, isImport := imported(line)
+				if !isImport {
+					continue
+				}
+				for _, forbidden := range banned {
+					if strings.Contains(held, forbidden) {
+						t.Errorf("%s imports %q, which points outward",
+							display(t, path), held)
+					}
 				}
 			}
 		}
 	}
+}
+
+// imported is the path an import line names.
+//
+// Only an import line, because a doc comment may perfectly well *mention*
+// another package -- a link to the sibling protocol, say -- and the earlier
+// version of this test read the whole file and would have called that a
+// dependency.
+func imported(line string) (string, bool) {
+	trimmed := strings.TrimSpace(line)
+	if strings.HasPrefix(trimmed, "//") {
+		return "", false
+	}
+	start := strings.Index(trimmed, `"`)
+	if start < 0 || !strings.HasSuffix(trimmed, `"`) {
+		return "", false
+	}
+	held := strings.Trim(trimmed[start:], `"`)
+	if !strings.Contains(held, "/") && !strings.Contains(held, ".") {
+		return "", false
+	}
+	return held, true
 }
 
 // The HTTP core must be usable without acquiring anyone else's dependency, so
@@ -84,7 +114,6 @@ var thirdPartyAllowedIn = map[string]bool{
 	"amqp091":   true,
 	"amqp10":    true,
 	"grpc":      true,
-	"sql":       true,
 }
 
 func TestOnlyATransportCarriesItsOwnDependency(t *testing.T) {
