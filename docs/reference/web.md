@@ -199,8 +199,8 @@ a declaration mistake reported by `ValidateCodec`.
 
 An endpoint declares what a route accepts and returns; its handler is separate.
 That is what makes three things possible from one value — dispatch, a published
-document, and eventually a typed client — where a route carrying only a function
-could give none of them.
+document, and a client — where a route carrying only a function could give none
+of them.
 
 ```go
 web.Handle(
@@ -228,6 +228,49 @@ application.
 path does not capture — a mistyped name would otherwise be a rejection on every
 request, found in production. The other direction is allowed: a pattern often
 needs a variable segment the handler has no use for.
+
+## Calling a server
+
+```go
+client := web.Dial(http.DefaultClient, "http://host:8080")
+
+web.Fetch[R](client, "GET", "/books", web.Requesting{})        // Effect[R, Fault, Received]
+web.Call[R](client, FindBook, web.Requesting{                  // Effect[R, Fault, Book]
+    Path: map[string]string{"title": "Zionomicon"},
+})
+sending, err := web.Carrying(web.Requesting{}, BookSchema, book)
+```
+
+`Dial` takes the `http.Client` rather than replacing it. TLS, proxies, pooling,
+redirects, timeouts and HTTP/2 stay where they already work, which is the same
+division [`grpc.Dial`](grpc.md) makes: how a deployment reaches a peer is not a
+property of a call.
+
+**`Fetch` reads the entity and closes the body inside the effect**, so there is
+no open response for a caller to forget. Cancellation, retry and observation
+come from the interpretation and not from here — the context is the runtime's,
+so `Retry` and a `Schedule` compose over a call as they do over anything.
+
+**`Call` takes the endpoint and needs nothing the declaration already says.**
+The method, the path pattern, the status and the response shape all come from
+the same value the server dispatches with, and the response is decoded through
+the very schema it was encoded through. `Requesting.Path` fills the captured
+segments by name; a capture with nothing to fill it is refused *before anything
+is sent*, because the alternative is sending the literal `{title}`, getting a
+404, and looking at the wrong end of your own mistake.
+
+A status the endpoint did not declare becomes a `Fault` carrying a `Refusal`
+with the status and the entity, reachable with `errors.As`. `Failing` documents
+a status on the serving side; on this side it is the answer that arrived instead
+of the one promised, and the body usually says why.
+
+**The request side is explicit, and that is a real limit.** A `Codec` reads a
+request into an `In`, and reading is not invertible — `Convert` takes one
+function, so a struct a handler received cannot be turned back into the parts it
+came from. So a caller fills the captures, the query and the entity itself;
+what the endpoint contributes is everything that has exactly one answer. Making
+codecs invertible would let `Call` take an `In` directly, and it would mean an
+inverse on every `Convert` — worth doing when a caller wants it, not before.
 
 ## Matching
 
@@ -280,7 +323,18 @@ handler is a description, middleware composes with retries, races and timeouts
 rather than sitting outside them. `Transform` is the narrower form for a wrapper
 that only needs to see the response.
 
-## What is not here yet
+## Deliberately absent
 
-OpenAPI generation is the next step, projected from `Declarations()`. WebSockets,
-SQL, AMQP and gRPC follow.
+**A response read as a stream.** `Fetch` reads the entity whole. Streaming one
+needs a scope to own the body and a `Stream` to pull it, which is a shape worth
+settling against a caller rather than guessing at.
+
+**Invertible request codecs**, for the reason the calling section gives.
+
+**Publisher-side content negotiation.** One media type per entity, declared.
+A route that answered three depending on `Accept` would need three schemas and
+three descriptions, and nothing has asked for it.
+
+[OpenAPI generation](openapi.md), [WebSockets](websocket.md),
+[AMQP 0-9-1](amqp091.md), [AMQP 1.0](amqp10.md) and [gRPC](grpc.md) are their
+own references.

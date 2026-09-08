@@ -80,6 +80,9 @@ func runBookstore(runtime *effect.Runtime) {
 	report(base+"/books/Missing", get(base+"/books/Missing"))
 	report(base+"/openapi.json", get(base+"/openapi.json"))
 
+	// And the same server, called through the declarations it serves.
+	runCalling(runtime, base)
+
 	stop()
 	<-stopped
 

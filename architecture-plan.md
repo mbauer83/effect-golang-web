@@ -459,8 +459,18 @@ Endpoint[In, E, Out]     what the route accepts, returns and can fail with
 ```
 
 Separating them is what makes three things possible from one value: dispatch, an
-OpenAPI document, and eventually a typed client. A route that carried only a
-function could give none of them.
+OpenAPI document, and a client. A route that carried only a function could give
+none of them.
+
+**ADDED**: the client is `web.Dial`, `web.Fetch` and `web.Call`, and it delivers
+the response half of "typed client" rather than both halves. `Output` now holds
+a decoder beside its encoder, so `Call` reads a response through the same schema
+the server wrote it with, and takes the method, path pattern and expected status
+from the declaration. The request half is not derivable: a `Codec` reads a
+request into an `In` and `Convert` takes one function, so a struct a handler
+received cannot be turned back into the parts it came from. Inverting the codec
+family would let `Call` take an `In`, at the cost of an inverse on every
+`Convert` -- which is a bill to present when a caller wants it and not before.
 
 ## 4.5 Matching is a tree, and ambiguity is an error
 

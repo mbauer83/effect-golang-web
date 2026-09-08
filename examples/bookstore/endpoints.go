@@ -73,32 +73,43 @@ func publishing(contract []byte) web.Route[effect.Unit, Fault] {
 	)
 }
 
+// The three declarations, as values.
+//
+// Exported because a declaration is not only the server's. It dispatches a
+// request, it projects into the contract above, and a client calls it -- which
+// is the whole reason an Endpoint is separate from its handler, and is only
+// demonstrable if the same value is reachable from both sides.
+var (
+	// ListBooks reads the catalogue.
+	ListBooks = web.GET("/books", web.Nothing(),
+		web.Returns(http.StatusOK, CatalogueSchema)).
+		Summary("List the catalogue").
+		Describe("Every entry, in the order the store holds them.")
+
+	// AddBook adds one, identified by its title.
+	AddBook = web.POST("/books", web.Entity(BookSchema),
+		web.Returns(http.StatusCreated, BookSchema)).
+		Summary("Add a book").
+		Describe("The entity is the book to add; its title identifies it.").
+		Failing(http.StatusConflict, "the store already holds that title")
+
+	// FindBook reads one by title.
+	FindBook = web.GET("/books/{title}",
+		web.PathParam("title", schema.Text()).Documented("the title to look for"),
+		web.Returns(http.StatusOK, BookSchema)).
+		Summary("Find a book by title").
+		Failing(http.StatusNotFound, "no book with that title is held")
+)
+
 func listBooks(store *Store) web.Route[effect.Unit, Fault] {
-	return web.Handle(
-		web.GET("/books", web.Nothing(), web.Returns(http.StatusOK, CatalogueSchema)).
-			Summary("List the catalogue").
-			Describe("Every entry, in the order the store holds them."),
-		func(effect.Unit) storeEffect[[]Book] { return store.All() },
-	)
+	return web.Handle(ListBooks, func(effect.Unit) storeEffect[[]Book] { return store.All() })
 }
 
 func addBook(store *Store) web.Route[effect.Unit, Fault] {
-	return web.Handle(
-		web.POST("/books", web.Entity(BookSchema), web.Returns(http.StatusCreated, BookSchema)).
-			Summary("Add a book").
-			Describe("The entity is the book to add; its title identifies it.").
-			Failing(http.StatusConflict, "the store already holds that title"),
-		func(book Book) storeEffect[Book] { return store.Add(book).As(book) },
-	)
+	return web.Handle(AddBook,
+		func(book Book) storeEffect[Book] { return store.Add(book).As(book) })
 }
 
 func findBook(store *Store) web.Route[effect.Unit, Fault] {
-	return web.Handle(
-		web.GET("/books/{title}",
-			web.PathParam("title", schema.Text()).Documented("the title to look for"),
-			web.Returns(http.StatusOK, BookSchema)).
-			Summary("Find a book by title").
-			Failing(http.StatusNotFound, "no book with that title is held"),
-		store.Find,
-	)
+	return web.Handle(FindBook, store.Find)
 }

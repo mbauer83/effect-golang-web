@@ -12,6 +12,7 @@ Nothing here is finished yet. What exists, and what is planned, is below.
 | [HTTP core: request, response, handler, server](docs/reference/web.md) | usable |
 | [Routing: matching, dispatch, middleware](docs/reference/web.md) | usable |
 | [Typed endpoints](docs/reference/web.md) | usable |
+| [HTTP client](docs/reference/web.md) | usable: a request/response client, and a call typed by the endpoint's declared response |
 | [OpenAPI generation](docs/reference/openapi.md) | usable |
 | [WebSockets](docs/reference/websocket.md) | usable |
 | [AMQP 0-9-1](docs/reference/amqp091.md) | usable; the adapter is verified against a broker in CI only |
@@ -29,7 +30,7 @@ rejected.
 ## Layout
 
 ```text
-web/                        Request, Response, Handler, codecs, routes, Server
+web/                        Request, Response, Handler, codecs, routes, Server, Client
 openapi/                    the OpenAPI 3.1 projection of a surface
 websocket/                  a conversation over an upgraded connection
 amqp091/                    messages over AMQP 0-9-1, acknowledged explicitly
