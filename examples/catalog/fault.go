@@ -1,7 +1,5 @@
 package catalog
 
-import "errors"
-
 // Fault is what this program can fail with. It is one type rather than a
 // structural union of an I/O failure and a schema failure because that is what
 // an application boundary wants: a caller decides what to do about a stage, and
@@ -21,6 +19,3 @@ func (fault Fault) Error() string {
 func (fault Fault) Unwrap() error {
 	return fault.Err
 }
-
-// errBlankBook is the domain rule the page-count refinement enforces.
-var errBlankBook = errors.New("a book has at least one page")

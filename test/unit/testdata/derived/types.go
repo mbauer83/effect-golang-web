@@ -26,6 +26,17 @@ type Record struct {
 	Nested   Inner              `json:"nested"`
 	Deep     []Inner            `json:"deep"`
 	Address  url.URL            `json:"address" schema:"use=addressSchema"`
+	// Bounded carries what a struct field cannot: which numbers are admitted.
+	Bounded int `json:"bounded" schema:"min=1,max=10"`
+	// Excluding uses the exclusive bounds.
+	Excluding float64 `json:"excluding" schema:"above=0,below=1"`
+	// Sized is constrained by length, and by a pattern carrying a comma of its
+	// own inside braces -- which is why items are not split naively.
+	Sized string `json:"sized" schema:"minLength=2,maxLength=8,pattern=^[a-z]{2,8}$"`
+	// Shaped carries a format, which replaces the shape a string would have.
+	Shaped string `json:"shaped" schema:"format=uuid"`
+	// Counted is constrained by how many elements it may carry.
+	Counted []string `json:"counted" schema:"minItems=1,maxItems=4"`
 	Ignored  string             `json:"ignored" schema:"-"`
 	hidden   string
 }

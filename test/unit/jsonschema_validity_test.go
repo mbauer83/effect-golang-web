@@ -182,3 +182,60 @@ func TestTheEmittedDocumentRefusesNullWhereTheCodecWould(t *testing.T) {
 		t.Error("the codec admits null in a field that is not nullable")
 	}
 }
+
+func TestConstraintsBecomeTheKeywordsThatSayTheSameThing(t *testing.T) {
+	// The projection and the codec must agree about a bound as they agree about
+	// a shape, so the validator is asked about both sides of it.
+	type constrained struct {
+		Code  string
+		Pages int
+		Tags  []string
+	}
+	bounded := schema.Struct[constrained]("Reading",
+		schema.FieldOf("code", schema.Matching(schema.MaxLength(schema.Text(), 7), `^[A-Z]{2}-[0-9]{4}$`),
+			func(value constrained) string { return value.Code },
+			func(value *constrained, code string) { value.Code = code }),
+		schema.FieldOf("pages", schema.AtMost(schema.AtLeast(schema.Int(), 1), 100),
+			func(value constrained) int { return value.Pages },
+			func(value *constrained, pages int) { value.Pages = pages }),
+		schema.FieldOf("tags", schema.MinItems(schema.List(schema.Text()), 1),
+			func(value constrained) []string { return value.Tags },
+			func(value *constrained, tags []string) { value.Tags = tags }),
+	)
+
+	rendered, err := jsonschema.Project(bounded.Structure()).Render()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, keyword := range []string{
+		`"maxLength":7`, `"pattern":"^[A-Z]{2}-[0-9]{4}$"`,
+		`"minimum":1`, `"maximum":100`, `"minItems":1`,
+	} {
+		if !strings.Contains(string(rendered), keyword) {
+			t.Errorf("expected %s in the document:\n%s", keyword, rendered)
+		}
+	}
+
+	emitted := compiled(t, bounded.Structure())
+	admitted := `{"code":"AB-1234","pages":50,"tags":["one"]}`
+	if err := emitted.Validate(instance(t, admitted)); err != nil {
+		t.Errorf("the projection refuses what the codec admits: %v", err)
+	}
+	if _, err := schema.DecodeJSON(bounded, []byte(admitted)); err != nil {
+		t.Errorf("the codec refuses what the projection admits: %v", err)
+	}
+
+	for description, document := range map[string]string{
+		"a code that does not match":   `{"code":"ab-1234","pages":1,"tags":["one"]}`,
+		"a page count below the bound": `{"code":"AB-1234","pages":0,"tags":["one"]}`,
+		"a page count above the bound": `{"code":"AB-1234","pages":101,"tags":["one"]}`,
+		"no tags at all":               `{"code":"AB-1234","pages":1,"tags":[]}`,
+	} {
+		if err := emitted.Validate(instance(t, document)); err == nil {
+			t.Errorf("the projection admits %s, which the codec refuses", description)
+		}
+		if _, err := schema.DecodeJSON(bounded, []byte(document)); err == nil {
+			t.Errorf("the codec admits %s, which the projection refuses", description)
+		}
+	}
+}

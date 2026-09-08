@@ -100,6 +100,20 @@ Node = Scalar(kind) | Object(fields) | Sequence(element) | Mapping(key, value)
 shape, and because it is not the same thing as an optional field: a nullable
 value is present and null, an optional field is not there at all.
 
+ADDED during implementation: a `Scalar` and a `Sequence` also carry
+`Constraints`, from a sealed vocabulary of nine -- inclusive and exclusive
+bounds, string lengths, a pattern, item counts. A kind says a value is a number;
+a constraint says which numbers, and a description that could not say so would
+leave every projection describing a wider type than the codec accepts.
+
+The vocabulary is small on purpose. A constraint earns a place in the
+description only if more than one projection can carry it; anything narrower is
+a refinement, which every projection describes as the shape underneath it. Each
+constraint is its own combinator rather than one generic `Constrained`, because
+measuring a value is type-dependent -- a number is compared, a string is
+counted, a list is counted differently -- and a generic one would have to take a
+measuring function nobody wants to write.
+
 `Reference` exists for two reasons at once: recursive types terminate, and
 OpenAPI wants `$ref` rather than an inlined copy at every use.
 
@@ -194,6 +208,13 @@ Derivation runs one way only. A Go struct cannot be derived from a schema,
 because Go cannot compute a type from a value; the struct is the source of
 truth and the schema follows it. The other direction would need a source of
 truth outside Go, which is a different project.
+
+A struct field carries a type and a name, so the tag carries the same
+constraint vocabulary the combinators do: `min`, `max`, `above`, `below`,
+`minLength`, `maxLength`, `pattern`, `minItems`, `maxItems`, `format`. Items
+are comma-separated except inside braces, brackets or parentheses, because a
+pattern carries commas of its own. A constraint written on a type it cannot
+apply to is refused rather than emitted.
 
 Generation did not become the only usable path. Everything the generator emits
 is a call a person could have written, so the two remain interchangeable, and

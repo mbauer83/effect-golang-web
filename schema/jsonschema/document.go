@@ -36,6 +36,26 @@ type Node struct {
 	// OneOf describes a choice: a union's variants, or a nullable shape and
 	// null.
 	OneOf []Node
+
+	// Bounds are the constraints the shape carries.
+	Bounds Bounds
+}
+
+// Bounds are the keywords that narrow which values of a type are admitted.
+//
+// A nil field is a keyword the shape does not carry, which is different from
+// one carrying a zero: a minimum of nothing and a minimum of zero are not the
+// same statement.
+type Bounds struct {
+	Minimum          *float64
+	Maximum          *float64
+	ExclusiveMinimum *float64
+	ExclusiveMaximum *float64
+	MinLength        *int
+	MaxLength        *int
+	Pattern          string
+	MinItems         *int
+	MaxItems         *int
 }
 
 // Property is one named member of an object schema.

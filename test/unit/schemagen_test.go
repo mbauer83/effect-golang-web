@@ -76,6 +76,15 @@ func TestGenerationRefusesWhatItCannotDescribe(t *testing.T) {
 		// A union's alternatives are not in the interface's declaration.
 		"notastruct": "is not a struct",
 		"nomarks":    "declares no type marked",
+		// A constraint written on a type it cannot apply to would compile into
+		// nothing sensible, so the generator explains rather than emitting it.
+		"wrongconstraint": "minLength applies to a string",
+		"wrongformat":     "a format applies to a string",
+		// A vocabulary is a vocabulary: an item outside it is a typo, and
+		// guessing which one was meant is not the generator's business.
+		"unknownitem":   "is not one of",
+		"notanumber":    "min takes a number",
+		"valuelessitem": "has no value",
 	}
 	for fixture, reason := range cases {
 		_, err := schemagen.Generate(filepath.Join(fixtures, fixture))

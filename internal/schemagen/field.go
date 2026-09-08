@@ -20,7 +20,11 @@ func describeField(field *ast.Field, files *token.FileSet) ([]structField, error
 	}
 
 	tag := fieldTag(field)
-	if tag.Get("schema") == "-" {
+	asked, err := readOptions(tag)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", where(files, field.Pos()), err)
+	}
+	if asked.skip {
 		return nil, nil
 	}
 
@@ -29,7 +33,7 @@ func describeField(field *ast.Field, files *token.FileSet) ([]structField, error
 		if !name.IsExported() {
 			continue
 		}
-		described, err := fieldOf(name.Name, field, tag, files)
+		described, err := fieldOf(name.Name, field, tag, asked, files)
 		if err != nil {
 			return nil, err
 		}
@@ -42,6 +46,7 @@ func fieldOf(
 	name string,
 	field *ast.Field,
 	tag reflect.StructTag,
+	asked options,
 	files *token.FileSet,
 ) (structField, error) {
 	wire, optional := wireName(name, tag)
@@ -65,16 +70,54 @@ func fieldOf(
 		described.element = source(files, pointed.X)
 	}
 
-	if used := tag.Get("schema"); strings.HasPrefix(used, "use=") {
-		described.shape = strings.TrimPrefix(used, "use=")
-		return described, nil
-	}
-	shape, err := shapeOf(described.element, field, files)
+	shape, err := shapeAsked(described.element, asked, field, files)
 	if err != nil {
 		return structField{}, err
 	}
 	described.shape = shape
 	return described, nil
+}
+
+// shapeAsked builds the field's shape: what the tag names, or what the type
+// implies, narrowed by whatever constraints the tag carries.
+func shapeAsked(
+	goType string,
+	asked options,
+	field *ast.Field,
+	files *token.FileSet,
+) (string, error) {
+	shape := asked.use
+	if shape == "" {
+		derived, err := baseShape(goType, asked.format, field, files)
+		if err != nil {
+			return "", err
+		}
+		shape = derived
+	}
+	constrained, err := constrain(shape, goType, asked.constraints)
+	if err != nil {
+		return "", fmt.Errorf("%s: %w", where(files, field.Pos()), err)
+	}
+	return constrained, nil
+}
+
+// baseShape is the shape the type implies. A format applies to a string only:
+// it is a refinement of what the text means, and the other kinds already carry
+// the one their wire form has.
+func baseShape(
+	goType string,
+	format string,
+	field *ast.Field,
+	files *token.FileSet,
+) (string, error) {
+	if format == "" {
+		return shapeOf(goType, field, files)
+	}
+	if goType != "string" {
+		return "", fmt.Errorf("%s: a format applies to a string, and this field is %s",
+			where(files, field.Pos()), goType)
+	}
+	return "schema.Formatted(" + strconv.Quote(format) + ")", nil
 }
 
 // wireName is what a document calls the field, and whether it may be absent.

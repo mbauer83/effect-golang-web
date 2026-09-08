@@ -1,7 +1,6 @@
 package bookstore
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/mbauer83/effect-golang-web/web"
@@ -53,5 +52,3 @@ func StatusFor(fault Fault) web.Response {
 		return web.Empty(http.StatusInternalServerError)
 	}
 }
-
-var errBlankBook = errors.New("a book has at least one page")

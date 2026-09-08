@@ -6,6 +6,7 @@ package unit
 // one -- a compact type description -- to hold that claim up.
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 
@@ -136,5 +137,52 @@ func TestEveryScalarKindHasAName(t *testing.T) {
 		if name := kind.String(); name == "" || strings.HasPrefix(name, "Kind(") {
 			t.Errorf("kind %d has no name, got %q", kind, name)
 		}
+	}
+}
+
+func TestAConstraintIsReadableByAWalkerOutsideThisModule(t *testing.T) {
+	// A projection has to be able to see a bound, or it describes a wider type
+	// than the codec accepts. The vocabulary is sealed, so a walker switches
+	// over it and knows it has covered everything.
+	code := schema.Matching(schema.MinLength(schema.Text(), 2), `^[a-z]{2,8}$`)
+	shape, isScalar := code.Structure().(structure.Scalar)
+	if !isScalar {
+		t.Fatalf("expected a scalar, got %#v", code.Structure())
+	}
+
+	narrowed := []string{}
+	for _, one := range shape.Constraints {
+		var constraint structure.Constraint = one
+		narrowed = append(narrowed, describeConstraint(constraint))
+	}
+	if got := strings.Join(narrowed, ", "); got != "at least 2 characters, matching ^[a-z]{2,8}$" {
+		t.Fatalf("unexpected description: %s", got)
+	}
+}
+
+// describeConstraint is what a projection outside this module writes: a switch
+// over the sealed vocabulary, with no privileged access to any of it.
+func describeConstraint(constraint structure.Constraint) string {
+	switch narrowed := constraint.(type) {
+	case structure.AtLeast:
+		return "at least " + strconv.FormatFloat(narrowed.Value, 'g', -1, 64)
+	case structure.AtMost:
+		return "at most " + strconv.FormatFloat(narrowed.Value, 'g', -1, 64)
+	case structure.Above:
+		return "above " + strconv.FormatFloat(narrowed.Value, 'g', -1, 64)
+	case structure.Below:
+		return "below " + strconv.FormatFloat(narrowed.Value, 'g', -1, 64)
+	case structure.MinLength:
+		return "at least " + strconv.Itoa(narrowed.Value) + " characters"
+	case structure.MaxLength:
+		return "at most " + strconv.Itoa(narrowed.Value) + " characters"
+	case structure.Pattern:
+		return "matching " + narrowed.Expression
+	case structure.MinItems:
+		return "at least " + strconv.Itoa(narrowed.Value) + " items"
+	case structure.MaxItems:
+		return "at most " + strconv.Itoa(narrowed.Value) + " items"
+	default:
+		return "?"
 	}
 }

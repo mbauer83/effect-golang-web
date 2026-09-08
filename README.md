@@ -9,7 +9,7 @@ Nothing here is finished yet. What exists, and what is planned, is below.
 
 | Area | State |
 |---|---|
-| [Schema](docs/reference/schema.md) | usable: shapes, sums, refinement, JSON, JSON Schema, generation from a struct |
+| [Schema](docs/reference/schema.md) | usable: shapes, sums, constraints, refinement, JSON, JSON Schema, generation from a struct |
 | [HTTP core: request, response, handler, server](docs/reference/web.md) | usable |
 | [Routing: matching, dispatch, middleware](docs/reference/web.md) | usable |
 | [Typed endpoints](docs/reference/web.md) | usable |

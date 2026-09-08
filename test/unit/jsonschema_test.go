@@ -217,3 +217,30 @@ func TestAVariantsDocumentationReachesItsAlternative(t *testing.T) {
 		t.Fatalf("expected the variant's prose carried through, got %#v", component.OneOf[0])
 	}
 }
+
+func TestTheDocumentModelCarriesBoundsAsTypedFields(t *testing.T) {
+	// The document is a typed model, not a map of a top type: a consumer reads
+	// a bound without re-discovering how it was written.
+	component := jsonschema.Project(
+		schema.Struct[reading]("Reading",
+			schema.FieldOf("pages", schema.AtMost(schema.AtLeast(schema.Int(), 1), 100),
+				func(value reading) int { return value.Pages },
+				func(value *reading, pages int) { value.Pages = pages }),
+		).Structure(),
+	).Components["Reading"]
+
+	var bounds jsonschema.Bounds = component.Properties[0].Schema.Bounds
+	if bounds.Minimum == nil || *bounds.Minimum != 1 {
+		t.Fatalf("expected the lower bound, got %#v", bounds.Minimum)
+	}
+	if bounds.Maximum == nil || *bounds.Maximum != 100 {
+		t.Fatalf("expected the upper bound, got %#v", bounds.Maximum)
+	}
+	// A keyword the shape does not carry is absent rather than zero: a minimum
+	// of nothing and a minimum of zero are not the same statement.
+	if bounds.MinLength != nil || bounds.Pattern != "" {
+		t.Fatalf("expected the unused keywords absent, got %#v", bounds)
+	}
+}
+
+type reading struct{ Pages int }

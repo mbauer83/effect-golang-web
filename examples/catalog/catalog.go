@@ -29,11 +29,11 @@ type Catalog struct {
 //schema:generate
 type Book struct {
 	// Title is what the book is called.
-	Title string `json:"title"`
+	Title string `json:"title" schema:"minLength=1"`
 	// Authors are credited in the order the book credits them.
 	Authors []string `json:"authors"`
 	// Pages is how many pages the book has, and there is at least one.
-	Pages int `json:"pages" schema:"use=pagesSchema"`
+	Pages int `json:"pages" schema:"min=1,max=20000"`
 	// Subtitle is absent for a book that has none.
 	Subtitle *string `json:"subtitle,omitempty"`
 	// Availability is whether the book can be had.

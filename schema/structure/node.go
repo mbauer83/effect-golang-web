@@ -60,6 +60,10 @@ type Node interface {
 type Scalar struct {
 	Kind   Kind
 	Format string
+	// Constraints narrow which values of the kind are admitted, in the order
+	// they were declared. A projection that has keywords for them emits them;
+	// one that has none describes the kind alone, which is still true.
+	Constraints []Constraint
 }
 
 // Object is a fixed set of named fields.
@@ -83,6 +87,8 @@ type Field struct {
 // Sequence is an ordered, variable-length list.
 type Sequence struct {
 	Element Node
+	// Constraints narrow how many elements are admitted.
+	Constraints []Constraint
 }
 
 // Mapping is a variable set of keys of one shape to values of another.

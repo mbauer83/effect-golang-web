@@ -12,6 +12,7 @@ require (
 )
 
 require (
+	github.com/coder/websocket v1.8.15 // indirect
 	github.com/go-openapi/jsonpointer v0.22.5 // indirect
 	github.com/go-openapi/swag/jsonname v0.25.5 // indirect
 	github.com/kr/pretty v0.3.1 // indirect

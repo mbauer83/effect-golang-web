@@ -76,7 +76,7 @@ func (projection *projector) node(node structure.Node) Node {
 		return projection.object(shape)
 	case structure.Sequence:
 		element := projection.node(shape.Element)
-		return Node{Type: "array", Items: &element}
+		return Node{Type: "array", Items: &element, Bounds: bounds(shape.Constraints)}
 	case structure.Mapping:
 		value := projection.node(shape.Value)
 		return Node{Type: "object", Values: &value}
@@ -97,18 +97,51 @@ func (projection *projector) node(node structure.Node) Node {
 }
 
 func scalarNode(shape structure.Scalar) Node {
+	described := Node{Format: shape.Format, Bounds: bounds(shape.Constraints)}
 	switch shape.Kind {
 	case structure.Integer:
-		return Node{Type: "integer", Format: shape.Format}
+		described.Type = "integer"
 	case structure.Number:
-		return Node{Type: "number", Format: shape.Format}
+		described.Type = "number"
 	case structure.Boolean:
-		return Node{Type: "boolean"}
+		described.Type = "boolean"
+		described.Format = ""
 	default:
 		// Text, Bytes and Timestamp are all strings on the wire; their format
 		// is what tells them apart, and the schema already set it.
-		return Node{Type: "string", Format: shape.Format}
+		described.Type = "string"
 	}
+	return described
+}
+
+// bounds translates the constraint vocabulary into the keywords that say the
+// same thing. A constraint with no keyword would be silently dropped, so the
+// switch is exhaustive over a sealed set for exactly that reason.
+func bounds(constraints []structure.Constraint) Bounds {
+	described := Bounds{}
+	for _, constraint := range constraints {
+		switch narrowed := constraint.(type) {
+		case structure.AtLeast:
+			described.Minimum = &narrowed.Value
+		case structure.AtMost:
+			described.Maximum = &narrowed.Value
+		case structure.Above:
+			described.ExclusiveMinimum = &narrowed.Value
+		case structure.Below:
+			described.ExclusiveMaximum = &narrowed.Value
+		case structure.MinLength:
+			described.MinLength = &narrowed.Value
+		case structure.MaxLength:
+			described.MaxLength = &narrowed.Value
+		case structure.Pattern:
+			described.Pattern = narrowed.Expression
+		case structure.MinItems:
+			described.MinItems = &narrowed.Value
+		case structure.MaxItems:
+			described.MaxItems = &narrowed.Value
+		}
+	}
+	return described
 }
 
 func (projection *projector) object(shape structure.Object) Node {

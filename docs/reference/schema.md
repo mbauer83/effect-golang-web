@@ -72,6 +72,38 @@ with the structs it came from, so it cannot drift.
 | a named type `N` in the package | `NSchema` |
 | the first paragraph of a doc comment | the prose a projection publishes |
 
+A struct field carries a type and a name. Everything else a schema says — a
+bound, a length, a pattern, a format — has nowhere to live but the tag, so the
+tag carries the same vocabulary the [constraint](#constraints) combinators do:
+
+| Tag item | Becomes | Applies to |
+|---|---|---|
+| `min=N`, `max=N` | `AtLeast`, `AtMost` | a number |
+| `above=N`, `below=N` | `Above`, `Below` | a number |
+| `minLength=N`, `maxLength=N` | `MinLength`, `MaxLength` | a string |
+| `pattern=RE` | `Matching` | a string |
+| `minItems=N`, `maxItems=N` | `MinItems`, `MaxItems` | a list |
+| `format=X` | `Formatted` | a string |
+
+```go
+//schema:generate
+type Reading struct {
+    Code  string   `json:"code" schema:"pattern=^[A-Z]{2}-[0-9]{4}$"`
+    Pages int      `json:"pages" schema:"min=1,max=20000"`
+    Tags  []string `json:"tags" schema:"minItems=1,maxItems=8"`
+}
+```
+
+Items are separated by commas, **except inside braces, brackets or
+parentheses** — `[a-z]{2,8}` carries a comma of its own, and splitting on it
+would cut the pattern in half. Constraints are applied in the order written, so
+the tag and the generated code read the same way.
+
+A constraint written on a type it cannot apply to is refused rather than
+emitted: `minLength` on an `int` would compile into nothing sensible, and an
+explanation beats handing the reader a compile error. A constraint on a list
+applies to the list; to constrain its elements, describe the element with `use=`.
+
 Three things it refuses rather than guesses:
 
 - **`omitempty` on a non-pointer.** A zero value is not absence; the schema
@@ -145,6 +177,42 @@ On decode, an unknown variant is **refused** — unlike an unknown field, which 
 skipped. There is no value to build without it, so tolerating one would produce
 a zero value the document never named. Two variants named at once, or none, are
 refused for the same reason.
+
+## Constraints
+
+A kind says a value is a number; a constraint says which numbers.
+
+```go
+pages := schema.AtMost(schema.AtLeast(schema.Int(), 1), 20000)
+code  := schema.Matching(schema.Text(), `^[A-Z]{2}-[0-9]{4}$`)
+tags  := schema.MinItems(schema.List(schema.Text()), 1)
+```
+
+| Combinator | Narrows |
+|---|---|
+| `AtLeast`, `AtMost` | a number, inclusively |
+| `Above`, `Below` | a number, exclusively |
+| `MinLength`, `MaxLength` | a string, in **characters** rather than bytes |
+| `Matching(pattern)` | a string, by a Go (RE2) regular expression |
+| `MinItems`, `MaxItems` | how many elements a list carries |
+
+One declaration does two jobs: it refuses a value and it appears in the
+published contract. A constraint that only did the first would leave a client to
+discover the rule by being rejected.
+
+Checking happens on **encode as well as decode**. A value this program built
+that breaks its own constraint is a mistake here, and finding it at the boundary
+beats sending it.
+
+A refusal names the bound — `schema: is less than 1 at pages` — because a client
+that is only told "invalid" cannot fix its request. A pattern that does not
+compile, and a constraint on a shape with nowhere to put it (an object, a
+union), are declaration mistakes reported by `Validate`.
+
+The vocabulary is deliberately small: a constraint earns a place in the
+description only if more than one projection can carry it. Anything narrower
+belongs in a refinement below, which every projection describes as the shape
+underneath it.
 
 ## Refinement and domain types
 
@@ -224,6 +292,11 @@ the cost of expressing recursion at all.
 package is public because a projection is an extension point rather than a fixed
 set — one to Avro, to a migration or to a form renderer is written the same way
 as the built-in ones, with no privileged access.
+
+A constraint becomes the keyword that says the same thing — `minimum`,
+`maximum`, `exclusiveMinimum`, `exclusiveMaximum`, `minLength`, `maxLength`,
+`pattern`, `minItems`, `maxItems` — and that agreement is measured with the
+external validator, on every case, in both directions.
 
 `jsonschema.Project` produces JSON Schema 2020-12, the dialect OpenAPI 3.1 uses,
 and `Render` declares it so a validator need not be told which one to apply.

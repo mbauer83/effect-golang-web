@@ -107,6 +107,9 @@ func writeMembers(encoder *jsontext.Encoder, node Node) error {
 			return err
 		}
 	}
+	if err := writeBounds(encoder, node.Bounds); err != nil {
+		return err
+	}
 	if err := writeProperties(encoder, node); err != nil {
 		return err
 	}
