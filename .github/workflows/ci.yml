@@ -11,25 +11,11 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      # effect-golang is not published yet, so go.mod resolves it from a sibling
-      # working copy. CI reproduces that layout rather than carrying a second
-      # replace directive that would drift from the local one. Replace both with
-      # a version requirement once the runtime is tagged.
+      # One checkout. go.mod requires the modules below this one by version, so
+      # this job resolves them the way anyone depending on this module does --
+      # which is the point of running it: a green run says the published
+      # dependencies are enough to build and test this commit.
       - uses: actions/checkout@v5
-        with:
-          path: effect-golang-web
-      - uses: actions/checkout@v5
-        with:
-          repository: mbauer83/effect-golang
-          path: effect-golang
-      - uses: actions/checkout@v5
-        with:
-          repository: mbauer83/effect-golang-schema
-          path: effect-golang-schema
-      - uses: actions/checkout@v5
-        with:
-          repository: mbauer83/effect-golang-sql
-          path: effect-golang-sql
 
       - uses: actions/setup-go@v6
         with:
@@ -37,7 +23,6 @@ jobs:
           check-latest: true
 
       - name: Formatting
-        working-directory: effect-golang-web
         run: |
           unformatted="$(gofmt -l .)"
           if [ -n "$unformatted" ]; then
@@ -47,11 +32,9 @@ jobs:
           fi
 
       - name: Build
-        working-directory: effect-golang-web
         run: go build ./...
 
       - name: Vet
-        working-directory: effect-golang-web
         run: go vet ./...
 
       # Unit, acceptance and architecture suites, plus the runnable examples in
@@ -59,27 +42,23 @@ jobs:
       # run always reflects the commit it ran on. -coverpkg is needed because
       # the suites live outside the packages they exercise.
       - name: Test
-        working-directory: effect-golang-web
         run: go test -count=1 -coverpkg=./... ./...
 
       # Correctness under concurrency is not established by ordinary tests
       # passing, and the transports to come are concurrent by nature.
       - name: Race
-        working-directory: effect-golang-web
         run: go test -race -count=1 ./...
 
       # Generated code is checked in, so a description changed without a
       # regeneration is caught here as well as by the drift test -- this step
       # also fails if a go:generate directive itself has stopped working.
       - name: Generated code
-        working-directory: effect-golang-web
         run: |
           go generate ./...
           git diff --exit-code
 
       # The examples must remain runnable programs, not only test fixtures.
       - name: Examples
-        working-directory: effect-golang-web
         run: go run ./examples/cmd/webdemo
 
   # The AMQP adapters are the one part of this module that ordinary tests
@@ -106,20 +85,6 @@ jobs:
           --health-retries 10
     steps:
       - uses: actions/checkout@v5
-        with:
-          path: effect-golang-web
-      - uses: actions/checkout@v5
-        with:
-          repository: mbauer83/effect-golang
-          path: effect-golang
-      - uses: actions/checkout@v5
-        with:
-          repository: mbauer83/effect-golang-schema
-          path: effect-golang-schema
-      - uses: actions/checkout@v5
-        with:
-          repository: mbauer83/effect-golang-sql
-          path: effect-golang-sql
 
       - uses: actions/setup-go@v6
         with:
@@ -129,7 +94,6 @@ jobs:
       # -run selects them by name so the job says what it established rather
       # than running the whole suite again with one variable set.
       - name: AMQP 0-9-1 against a broker
-        working-directory: effect-golang-web
         env:
           EFFECT_GOLANG_AMQP_URL: amqp://guest:guest@127.0.0.1:5672/
         run: >-

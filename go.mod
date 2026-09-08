@@ -13,8 +13,8 @@ require (
 	github.com/bufbuild/protocompile v0.14.1
 	github.com/coder/websocket v1.8.15
 	github.com/getkin/kin-openapi v0.149.0
-	github.com/mbauer83/effect-golang v0.0.0
-	github.com/mbauer83/effect-golang-schema v0.0.0
+	github.com/mbauer83/effect-golang v0.1.0
+	github.com/mbauer83/effect-golang-schema v0.1.0
 	github.com/rabbitmq/amqp091-go v1.14.0
 	golang.org/x/net v0.58.0
 	google.golang.org/protobuf v1.36.12
@@ -31,12 +31,10 @@ require (
 	golang.org/x/text v0.41.0 // indirect
 )
 
-// None of the three is published yet, so all are resolved from sibling working
-// copies. A replace is ignored by anything that depends on *this* module, so it
-// is a development arrangement and not a distribution one: replace all three
-// with version requirements once they are tagged.
-replace (
-	github.com/mbauer83/effect-golang => ../effect-golang
-	github.com/mbauer83/effect-golang-schema => ../effect-golang-schema
-	github.com/mbauer83/effect-golang-sql => ../effect-golang-sql
-)
+// Every module of effect-golang is versioned together and released in
+// dependency order, so a version here is a version that exists. While several
+// are being worked on at once, the go.work above this directory resolves them
+// to the working copies beside each other -- which is what a workspace is for,
+// and what a `replace` was being misused for before: a replace is ignored by
+// anything that depends on the module carrying it, so it said nothing to a
+// consumer and only ever described one person's layout.
