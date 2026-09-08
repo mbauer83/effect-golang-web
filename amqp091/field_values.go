@@ -28,7 +28,9 @@ import (
 // Public because the two conversions are the boundary, and a boundary that
 // cannot be tested from outside the package is a boundary nobody has checked.
 // Its signature says map[string]any rather than the library's named type, so
-// nothing above this package acquires the dependency by calling it.
+// nothing above this package acquires the dependency by calling it. A nested
+// table inside it is the named type, because the library will not accept
+// anything else; a caller reading one back uses Headers rather than looking.
 func Table(named dynamic.Object) (map[string]any, error) {
 	if len(named.Fields) == 0 {
 		return nil, nil
@@ -61,7 +63,16 @@ func fieldOf(value dynamic.Value) (any, error) {
 	case dynamic.Timestamp:
 		return held.Value, nil
 	case dynamic.Object:
-		return Table(held)
+		// The library's named type and not the map underneath it: its
+		// validator switches on the exact type, so a nested map[string]any is
+		// refused at publish with "value map[string]interface {} not
+		// supported". The top-level map converts implicitly on the way in,
+		// which is why only the nesting has to say so.
+		nested, err := Table(held)
+		if err != nil {
+			return nil, err
+		}
+		return broker.Table(nested), nil
 	case dynamic.List:
 		return fieldsOf(held)
 	default:

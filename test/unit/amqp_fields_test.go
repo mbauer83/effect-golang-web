@@ -15,6 +15,8 @@ import (
 	"testing"
 	"time"
 
+	broker "github.com/rabbitmq/amqp091-go"
+
 	"github.com/mbauer83/effect-golang-schema/schema/dynamic"
 	"github.com/mbauer83/effect-golang-web/amqp091"
 )
@@ -42,6 +44,13 @@ func TestEveryKindAHeaderMayHoldSurvivesTheRoundTrip(t *testing.T) {
 	table, err := amqp091.Table(named)
 	if err != nil {
 		t.Fatal(err)
+	}
+	// The library's own validator, because the round trip below is this
+	// module checking itself: Headers reads a nested table whichever Go type
+	// carries it, so a table the protocol would refuse round-trips perfectly
+	// and only a broker says otherwise. This is what a broker would say.
+	if err := broker.Table(table).Validate(); err != nil {
+		t.Fatalf("the table is not one the protocol accepts: %v", err)
 	}
 	read, err := amqp091.Headers(table)
 	if err != nil {
