@@ -3,6 +3,7 @@ module github.com/mbauer83/effect-golang-web
 go 1.27.0
 
 require (
+	github.com/coder/websocket v1.8.15
 	github.com/getkin/kin-openapi v0.149.0
 	github.com/mbauer83/effect-golang v0.0.0
 	// A JSON Schema validator, used only by the tests: the projection is
@@ -12,7 +13,6 @@ require (
 )
 
 require (
-	github.com/coder/websocket v1.8.15 // indirect
 	github.com/go-openapi/jsonpointer v0.22.5 // indirect
 	github.com/go-openapi/swag/jsonname v0.25.5 // indirect
 	github.com/kr/pretty v0.3.1 // indirect

@@ -71,6 +71,27 @@ func (adapter Adapter[R, E]) WithReport(report func(context.Context, error)) Ada
 	return adapter
 }
 
+// Interpret runs an effect the way this boundary runs a handler, and records
+// what it could not answer with.
+//
+// It is what a transport that takes over the connection needs. A websocket or
+// an event stream answers with no response at all -- the exchange continues
+// after the upgrade -- so such a transport cannot go through Handler, and it
+// still wants the runtime, the environment and the reporting that the boundary
+// owns.
+//
+// Anything but a plain interruption is reported, because a conversation that
+// ended in a failure or a defect is something the operator wants to know about
+// and there is no client left to tell.
+func (adapter Adapter[R, E]) Interpret(ctx context.Context, fx effect.Effect[R, E, effect.Unit]) {
+	exit := adapter.runtime.Run(ctx, adapter.environment, fx)
+	cause, failed := exit.Cause()
+	if !failed || cause.IsInterruptedOnly() {
+		return
+	}
+	adapter.report(ctx, errors.New("web: the exchange ended badly: "+cause.String()))
+}
+
 // Handler interprets one handler as an http.Handler.
 func (adapter Adapter[R, E]) Handler(handler Handler[R, E]) http.Handler {
 	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {

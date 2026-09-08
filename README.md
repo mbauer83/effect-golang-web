@@ -14,7 +14,7 @@ Nothing here is finished yet. What exists, and what is planned, is below.
 | [Routing: matching, dispatch, middleware](docs/reference/web.md) | usable |
 | [Typed endpoints](docs/reference/web.md) | usable |
 | [OpenAPI generation](docs/reference/openapi.md) | usable |
-| WebSockets | planned |
+| [WebSockets](docs/reference/websocket.md) | usable |
 | SQL | planned |
 | AMQP | planned |
 | gRPC and protobuf | planned |
@@ -33,7 +33,9 @@ schema/                     Schema[A]: shapes, codecs, refinement
 schemagen/                  writes the Go types a description implies
 web/                        Request, Response, Handler, codecs, routes, Server
 openapi/                    the OpenAPI 3.1 projection of a surface
+websocket/                  a conversation over an upgraded connection
 examples/bookstore/         a complete HTTP program on the web core
+examples/tally/             a websocket conversation, with shared state
 examples/catalog/           a complete program using one schema three ways
 examples/inventory/         Go types generated from a description
 examples/cmd/webdemo/       the examples as a runnable command

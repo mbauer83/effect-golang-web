@@ -28,6 +28,13 @@ var forbiddenImports = map[string][]string{
 		"effect-golang-web/schema\"",
 		"effect-golang-web/web",
 	},
+	"websocket": {
+		// A transport knows the core and no other transport.
+		"effect-golang-web/amqp",
+		"effect-golang-web/grpc",
+		"effect-golang-web/sql",
+		"effect-golang-web/openapi",
+	},
 	"web": {
 		// A projection depends on the declaration, never the other way round.
 		"effect-golang-web/openapi",

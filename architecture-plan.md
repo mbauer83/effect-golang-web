@@ -494,9 +494,32 @@ messages are encoded by a Schema
 cancellation closes the connection through scope closure
 ```
 
-**WebSocket.** A conversation is a `Stream` of inbound frames and a sink for
+**WebSocket.** A conversation is a `Stream` of inbound messages and a sink for
 outbound ones. The upgrade happens inside a scope, so a closed scope closes the
 socket.
+
+DONE, with three things settled by building it:
+
+- `Accept` takes the **boundary**, not a handler's return. A conversation
+  answers with no response, so there is nothing for a `Handler` to return, and
+  the runtime, environment and reporting it needs are the boundary's. That is
+  what `Adapter.Interpret` exists for, and a transport that takes over the
+  connection is the only thing that needs it.
+- A websocket endpoint is mounted as a route (`web.Upgrading`), so it is
+  dispatched and documented by the same tree. Its declaration says what is true
+  of the HTTP part -- a GET answering 101 with no entity -- and stops, because
+  the protocol after the upgrade is not something an OpenAPI document can
+  describe.
+- The scope's release **says goodbye** rather than closing abruptly. A peer told
+  the conversation is over ends its stream and reports nothing; a peer whose
+  connection vanishes must treat that as the failure it usually is. The first
+  version closed abruptly and reported every normal departure as a fault, which
+  the reporting test caught.
+
+A message the schema refuses fails the stream, deliberately: a conversation is
+stateful, so a peer that said something unreadable has said something about the
+whole exchange. `Inbound` is there for a conversation that would rather skip
+one.
 
 **AMQP.** A channel is a scoped resource; a consumer is a `Stream`; publishing
 is an effect. Acknowledgement is explicit, because at-least-once delivery is a
@@ -526,7 +549,7 @@ Prepared statements are the default, per the project's standards.
 2. web core: Request, Response, Handler, net/http interoperability, Server  DONE
 3. codecs, Endpoint, route matching and dispatch, middleware  DONE
 4. OpenAPI generation  DONE
-5. websocket
+5. websocket  DONE
 6. sql
 7. amqp
 8. grpc
