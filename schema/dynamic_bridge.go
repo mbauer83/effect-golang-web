@@ -127,14 +127,44 @@ func (source *dynamicSource) Text() (string, error) {
 	return held.Value, err
 }
 
+// Integer accepts a number whose value is whole as well as an integer.
+//
+// A buffered value came from a format that had to guess which of the two a
+// number was, and JSON does not distinguish them; the schema does, and it is
+// the schema that is asking.
 func (source *dynamicSource) Integer() (int64, error) {
-	held, err := taken[dynamic.Integer](source, "a whole number")
-	return held.Value, err
+	value, err := source.take()
+	if err != nil {
+		return 0, err
+	}
+	switch held := value.(type) {
+	case dynamic.Integer:
+		return held.Value, nil
+	case dynamic.Number:
+		if whole := int64(held.Value); float64(whole) == held.Value {
+			return whole, nil
+		}
+		return 0, fail("expected a whole number", nil)
+	default:
+		return 0, fail("expected a whole number", nil)
+	}
 }
 
+// Number accepts an integer as well as a number, for the reason Integer
+// accepts a whole number.
 func (source *dynamicSource) Number() (float64, error) {
-	held, err := taken[dynamic.Number](source, "a number")
-	return held.Value, err
+	value, err := source.take()
+	if err != nil {
+		return 0, err
+	}
+	switch held := value.(type) {
+	case dynamic.Number:
+		return held.Value, nil
+	case dynamic.Integer:
+		return float64(held.Value), nil
+	default:
+		return 0, fail("expected a number", nil)
+	}
 }
 
 func (source *dynamicSource) Boolean() (bool, error) {
@@ -196,6 +226,12 @@ func (source *dynamicSource) ReadList(decode func() error) error {
 func (source *dynamicSource) Skip() error {
 	_, err := source.take()
 	return err
+}
+
+// Buffer hands over the whole value, which for this source costs nothing: it
+// is already a value.
+func (source *dynamicSource) Buffer() (dynamic.Value, error) {
+	return source.take()
 }
 
 // taken reads the next value and checks it is the case the schema asked for.

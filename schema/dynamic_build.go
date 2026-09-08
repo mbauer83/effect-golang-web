@@ -51,6 +51,10 @@ func dynamicUnion(shape structure.Union) Schema[dynamic.Value] {
 		variants = append(variants,
 			DescribedVariant(alternative.Name, Dynamic(alternative.Node)).Documented(alternative.Doc))
 	}
+	if shape.Discriminator != "" {
+		return OneOfBy[dynamic.Value](shape.Name, shape.Discriminator, variants...).
+			Documented(shape.Doc)
+	}
 	return OneOf[dynamic.Value](shape.Name, variants...).Documented(shape.Doc)
 }
 

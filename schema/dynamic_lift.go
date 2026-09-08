@@ -21,22 +21,33 @@ func fromText(value dynamic.Value) (string, error) {
 
 func toInteger(value int64) (dynamic.Value, error) { return dynamic.Integer{Value: value}, nil }
 
+// fromInteger accepts a number whose value is whole, because a buffered value
+// came from a format that had to guess which of the two a number was.
 func fromInteger(value dynamic.Value) (int64, error) {
-	held, is := value.(dynamic.Integer)
-	if !is {
+	switch held := value.(type) {
+	case dynamic.Integer:
+		return held.Value, nil
+	case dynamic.Number:
+		if whole := int64(held.Value); float64(whole) == held.Value {
+			return whole, nil
+		}
+		return 0, fail("is not a whole number", nil)
+	default:
 		return 0, fail("is not a whole number", nil)
 	}
-	return held.Value, nil
 }
 
 func toNumber(value float64) (dynamic.Value, error) { return dynamic.Number{Value: value}, nil }
 
 func fromNumber(value dynamic.Value) (float64, error) {
-	held, is := value.(dynamic.Number)
-	if !is {
+	switch held := value.(type) {
+	case dynamic.Number:
+		return held.Value, nil
+	case dynamic.Integer:
+		return float64(held.Value), nil
+	default:
 		return 0, fail("is not a number", nil)
 	}
-	return held.Value, nil
 }
 
 func toBoolean(value bool) (dynamic.Value, error) { return dynamic.Boolean{Value: value}, nil }

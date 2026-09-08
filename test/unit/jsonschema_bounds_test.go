@@ -106,3 +106,88 @@ func TestAFormatReachesTheDocumentAsAnnotationAndAsRule(t *testing.T) {
 		t.Error("the codec admits what the projection refuses")
 	}
 }
+
+func TestATaggedUnionProjectsAsTheWireFormItWrites(t *testing.T) {
+	// Each alternative is the variant's own shape and the field that names it,
+	// which is what allOf is for: the variant is a component, and a reference
+	// has nothing to add a property to. The const is what validates.
+	rendered, err := jsonschema.Project(toleranceSchema.Structure()).Render()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, expected := range []string{
+		`"allOf"`, `"$ref":"#/$defs/ISO2768"`, `"const":"iso2768"`,
+		`"discriminator":{"propertyName":"type"}`,
+	} {
+		if !strings.Contains(string(rendered), expected) {
+			t.Errorf("expected %s in the document:\n%s", expected, rendered)
+		}
+	}
+}
+
+func TestTheEmittedTaggedUnionAgreesWithTheCodec(t *testing.T) {
+	emitted := compiled(t, toleranceSchema.Structure())
+
+	admitted := map[string]string{
+		"a variant and its field": `{"type":"iso2768","grade":"medium"}`,
+		"the field written last":  `{"grade":"medium","type":"iso2768"}`,
+		"the other variant":       `{"type":"iso10800","class":3}`,
+	}
+	for description, document := range admitted {
+		if err := emitted.Validate(instance(t, document)); err != nil {
+			t.Errorf("the projection refuses %s: %v", description, err)
+		}
+		if _, err := schema.DecodeJSON(toleranceSchema, []byte(document)); err != nil {
+			t.Errorf("the codec refuses %s: %v", description, err)
+		}
+	}
+
+	refused := map[string]string{
+		"no naming field":           `{"grade":"medium"}`,
+		"a name no variant has":     `{"type":"iso286","grade":"medium"}`,
+		"a field the variant lacks": `{"type":"iso2768","class":3}`,
+	}
+	for description, document := range refused {
+		if err := emitted.Validate(instance(t, document)); err == nil {
+			t.Errorf("the projection admits %s, which the codec refuses", description)
+		}
+		if _, err := schema.DecodeJSON(toleranceSchema, []byte(document)); err == nil {
+			t.Errorf("the codec admits %s, which the projection refuses", description)
+		}
+	}
+}
+
+func TestADescribedTaggedUnionBehavesTheSame(t *testing.T) {
+	// The field is part of the description, so a schema used without its Go
+	// type reads and writes the same wire form.
+	described := schema.Dynamic(toleranceSchema.Structure())
+	document := `{"grade":"medium","type":"iso2768"}`
+
+	value, err := schema.DecodeJSON(described, []byte(document))
+	if err != nil {
+		t.Fatal(err)
+	}
+	written, err := schema.EncodeJSON(described, value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.TrimSpace(string(written)); got != `{"type":"iso2768","grade":"medium"}` {
+		t.Fatalf("unexpected document: %s", got)
+	}
+}
+
+func TestAConstantIsCarriedAsATypedFieldOfTheDocument(t *testing.T) {
+	// The document is a typed model, so a consumer reads the value pinning a
+	// variant to its name without parsing anything.
+	// A named union is a component, and the root refers to it.
+	alternatives := jsonschema.Project(toleranceSchema.Structure()).
+		Components["Tolerance"].OneOf
+	if len(alternatives) != 2 {
+		t.Fatalf("expected one alternative per variant, got %#v", alternatives)
+	}
+	naming := alternatives[0].AllOf[1]
+	var pinned string = naming.Properties[0].Schema.Const
+	if pinned != "iso2768" {
+		t.Fatalf("expected the variant's name pinned, got %q", pinned)
+	}
+}

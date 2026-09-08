@@ -36,6 +36,18 @@ type Node struct {
 	// OneOf describes a choice: a union's variants, or a nullable shape and
 	// null.
 	OneOf []Node
+	// AllOf describes a shape that is several at once, which is how a variant
+	// of a union told apart by a field is written: the variant's own shape,
+	// and the field that names it.
+	AllOf []Node
+	// Const is the one value the shape admits, which is what pins a
+	// discriminating field to its variant's name.
+	Const string
+	// Discriminator names the field that says which variant a value is. It is
+	// an OpenAPI keyword that JSON Schema ignores, emitted because the same
+	// projection serves both and a generator on the other side wants it; the
+	// const in each variant is what actually validates.
+	Discriminator string
 
 	// Bounds are the constraints the shape carries.
 	Bounds Bounds

@@ -94,6 +94,9 @@ func zeroSchemaError[A any]() error {
 	return fail(fmt.Sprintf("the zero Schema[%T] has no codec", missing), nil)
 }
 
+// errUnreadableValue reports a document position where no value begins.
+var errUnreadableValue = errors.New("no value begins here")
+
 // listIndex names a position for a failure path, so a rejected element reads as
 // "items.3" rather than as the whole list.
 func listIndex(index int) string {

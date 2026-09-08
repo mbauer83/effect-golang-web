@@ -102,10 +102,17 @@ type Mapping struct {
 }
 
 // Union is a choice between named variants.
+//
+// Discriminator says where the chosen variant's name is written. Empty means
+// the variant names the object's single member -- {"circle": {...}} -- and a
+// field name means the name is that field of the variant's own object --
+// {"type": "circle", "radius": 2}. The two are different wire forms of one
+// idea, and a projection has to know which, so the description says.
 type Union struct {
-	Name     string
-	Doc      string
-	Variants []Variant
+	Name          string
+	Doc           string
+	Discriminator string
+	Variants      []Variant
 }
 
 // Variant is one alternative of a union.

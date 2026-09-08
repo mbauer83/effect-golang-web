@@ -254,13 +254,43 @@ The wire form names the chosen variant as the object's single member:
 {"circle": {"radius": 2}}
 ```
 
-The alternative REST idiom — a discriminator field beside the variant's own
-fields — is **not** available, and the reason is structural rather than a
-preference. A value passes through a token stream in one pass, so a decoder that
-met the fields before the discriminator would have to buffer the object or
-rewind to know what it had been reading. Naming the variant as the key means the
-selection always arrives first. The same objection applies to an envelope with
-separate tag and payload members, whose order a producer is free to choose.
+### Told apart by a field
+
+The other REST idiom names the variant in a field of the variant's own object:
+
+```go
+var toleranceSchema = schema.OneOfBy[Tolerance]("Tolerance", "type",
+    schema.VariantOf("iso2768", iso2768Schema, narrow, widen),
+    schema.VariantOf("iso10800", iso10800Schema, narrow, widen),
+)
+```
+
+```json
+{"type": "iso2768", "grade": "medium"}
+```
+
+The union writes the field; a variant's Go type does not carry it, because
+which variant a value is, is the type it is. A variant that declares a field of
+that name is a declaration mistake — one of the two would win, and which is not
+something to leave to chance — and every variant must be an object, because a
+field inside one is where the name goes.
+
+This form costs more than `OneOf`, and the cost is worth knowing. The name may
+arrive **after** the fields whose meaning it settles, and a producer is free to
+put it anywhere, so a decoder has to read the whole object before it knows what
+it read. That is a power a streaming source does not have, so it is asked for
+rather than assumed:
+
+```go
+type Buffering interface {
+    Buffer() (dynamic.Value, error)
+}
+```
+
+JSON implements it, and so does the universal representation. A format that
+streams its input does not, and decoding a `OneOfBy` through one is refused with
+that reason rather than half-done. `OneOf` needs nothing of the sort, which is
+why it remains the one to reach for when nothing external dictates the wire.
 
 Variants are tried in declared order on encode, so a narrower variant belongs
 before a wider one that would also match. A value no variant holds is reported

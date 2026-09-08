@@ -1,6 +1,10 @@
 package schema
 
-import "time"
+import (
+	"time"
+
+	"github.com/mbauer83/effect-golang-web/schema/dynamic"
+)
 
 // A schema drives encoding and pulls decoding, so a format implements these two
 // contracts once and can then handle every schema. There is no intermediate
@@ -61,4 +65,21 @@ type Source interface {
 	// Skip discards the next value, whatever shape it has. It is how a decoder
 	// tolerates a field it does not know.
 	Skip() error
+}
+
+// Buffering is implemented by a source that can read a whole value without
+// being told its shape.
+//
+// It is an optional capability rather than part of Source, because reading
+// without a schema is a different power from reading with one and most of this
+// package deliberately has only the second. A format built over a document --
+// JSON, or the universal representation itself -- can do it; one that streams
+// its input cannot.
+//
+// One thing needs it: a union whose variants are told apart by a field inside
+// them. The name may arrive after the fields it selects the meaning of, so
+// there is nothing to do but read the object first and look. A format that
+// cannot says so, rather than a schema pretending the ordering is guaranteed.
+type Buffering interface {
+	Buffer() (dynamic.Value, error)
 }

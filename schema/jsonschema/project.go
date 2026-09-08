@@ -131,6 +131,9 @@ func (projection *projector) inlineObject(shape structure.Object) Node {
 
 func (projection *projector) union(shape structure.Union) Node {
 	describe := func() Node {
+		if shape.Discriminator != "" {
+			return projection.tagged(shape)
+		}
 		described := Node{Description: shape.Doc}
 		for _, variant := range shape.Variants {
 			// A union names the chosen variant as the single member of an
@@ -166,6 +169,31 @@ func (projection *projector) union(shape structure.Union) Node {
 	delete(projection.visiting, shape.Name)
 	projection.components[shape.Name] = described
 	return Node{Ref: projection.pointer(shape.Name)}
+}
+
+// tagged describes a union whose variants are told apart by a field.
+//
+// Each alternative is the variant's own shape and the field that names it,
+// which is what allOf is for: the variant may be a component, and a reference
+// has nothing to add a property to. The const in each is what validates; the
+// discriminator beside them is an annotation for a reader that understands one.
+func (projection *projector) tagged(shape structure.Union) Node {
+	described := Node{Description: shape.Doc, Discriminator: shape.Discriminator}
+	for _, variant := range shape.Variants {
+		naming := Node{
+			Type:     "object",
+			Required: []string{shape.Discriminator},
+			Properties: []Property{{
+				Name:   shape.Discriminator,
+				Schema: Node{Type: "string", Const: variant.Name},
+			}},
+		}
+		described.OneOf = append(described.OneOf, Node{
+			Description: variant.Doc,
+			AllOf:       []Node{projection.node(variant.Node), naming},
+		})
+	}
+	return described
 }
 
 func (projection *projector) reference0(shape structure.Reference) Node {

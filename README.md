@@ -9,7 +9,7 @@ Nothing here is finished yet. What exists, and what is planned, is below.
 
 | Area | State |
 |---|---|
-| [Schema](docs/reference/schema.md) | usable: shapes, sums, constraints, formats, JSON, JSON Schema, descriptions with no Go type, generation from a description |
+| [Schema](docs/reference/schema.md) | usable: shapes, sums (both taggings), constraints, formats, JSON, JSON Schema, descriptions with no Go type, generation from a description |
 | [HTTP core: request, response, handler, server](docs/reference/web.md) | usable |
 | [Routing: matching, dispatch, middleware](docs/reference/web.md) | usable |
 | [Typed endpoints](docs/reference/web.md) | usable |

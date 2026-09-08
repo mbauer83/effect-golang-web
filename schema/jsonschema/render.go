@@ -102,6 +102,7 @@ func writeMembers(encoder *jsontext.Encoder, node Node) error {
 	for _, member := range []struct{ name, value string }{
 		{"format", node.Format},
 		{"description", node.Description},
+		{"const", node.Const},
 	} {
 		if err := writeString(encoder, member.name, member.value); err != nil {
 			return err
@@ -119,7 +120,13 @@ func writeMembers(encoder *jsontext.Encoder, node Node) error {
 	if err := writeChild(encoder, "additionalProperties", node.Values); err != nil {
 		return err
 	}
-	return writeVariants(encoder, node)
+	if err := writeVariants(encoder, node); err != nil {
+		return err
+	}
+	if err := writeMembersOf(encoder, "allOf", node.AllOf); err != nil {
+		return err
+	}
+	return writeDiscriminator(encoder, node.Discriminator)
 }
 
 func writeType(encoder *jsontext.Encoder, node Node) error {

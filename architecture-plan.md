@@ -177,7 +177,7 @@ delivers fields in document order and a struct schema declares them in its own,
 so the object decoder dispatches on field name rather than reading positionally,
 skips unknown fields, and reports missing required ones.
 
-## 3.3 A union names its variant as the key
+## 3.3 A union names its variant as the key, or in one
 
 ADDED during implementation, as a consequence of 3.2 that was not visible until
 the sink existed.
@@ -190,15 +190,21 @@ internally tagged   {"kind": "circle", "radius": 2}
 enveloped           {"kind": "circle", "value": {"radius": 2}}
 ```
 
-The internally tagged form is the common REST idiom and it is the one this
-design cannot have. A value passes through a token stream in one pass, so a
-decoder that met `radius` before `kind` would have to buffer the object or
-rewind to learn what it had been reading. The enveloped form fails for the same
-reason at one remove: a producer is free to write `value` before `kind`.
+The externally tagged form has the selection arrive first by construction, so
+it is what `OneOf` writes, and it needs nothing of the format.
 
-The externally tagged form has the selection arrive first by construction, so it
-is what `OneOf` writes. This is a real cost of 3.2 and belongs recorded next to
-it rather than presented as a preference.
+CORRECTED once the universal representation existed: the internally tagged form
+is available too, as `OneOfBy`, and the earlier "cannot" was about a missing
+mechanism rather than about the design. A decoder does have to read the whole
+object before it knows what it read -- the name may arrive after the fields
+whose meaning it settles -- so that power is asked of the format through an
+optional `Buffering` capability rather than assumed. JSON has it; a streaming
+source does not and says so. The enveloped form is still absent, because it
+buys nothing the other two do not.
+
+The cost is real and stays visible: `OneOf` streams, `OneOfBy` materialises one
+object per value. Which to use is usually decided by whoever owns the wire, and
+where nobody does, `OneOf` is the cheaper answer.
 
 Two decoding asymmetries follow, and both are deliberate:
 
@@ -207,8 +213,11 @@ Two decoding asymmetries follow, and both are deliberate:
 - an unknown **variant** is refused, because there is no value to build without
   it, and tolerating one would yield a zero value the document never named.
 
-The projection must agree with the codec, so a union projects as a `oneOf` of
-single-member objects. That agreement is MEASURED, not asserted: the emitted
+The projection must agree with the codec, so an externally tagged union
+projects as a `oneOf` of single-member objects, and an internally tagged one as
+a `oneOf` of `allOf`s -- the variant's shape and the field pinned to its name
+with `const` -- because a variant is a component and a `$ref` has nothing to
+add a property to. That agreement is MEASURED, not asserted: the emitted
 document is compiled by an external JSON Schema 2020-12 validator and checked to
 accept every document the codec writes and refuse every one it refuses. The
 validator is a test dependency only.
