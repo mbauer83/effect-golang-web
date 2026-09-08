@@ -108,6 +108,14 @@ idempotent at the broker: a declaration matching what is there succeeds, and one
 that contradicts it is refused, which is the broker telling you two programs
 disagree about a name and worth hearing at start-up.
 
+A queue's `Access` is `Shared` unless it says otherwise — any connection may
+consume from it, which is what a queue named in a topology is for. `Owned`
+restricts it to the connection that declared it and has the broker delete it
+when that connection closes: a reply queue, or one instance's own subscription.
+It is also the way to ask for a queue that needs no keeping, because a broker
+may refuse one that is neither `Lasting` nor `Owned` — RabbitMQ 4 does, having
+deprecated transient non-exclusive queues.
+
 ## The port, and the two untyped functions
 
 `Publishing`, `Consuming`, `Declaring` and `Deliveries` are the whole port.

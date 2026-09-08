@@ -64,7 +64,7 @@ func (channel *Channel) DeclareExchange(_ context.Context, exchange Exchange) er
 // DeclareQueue states one queue.
 func (channel *Channel) DeclareQueue(_ context.Context, queue Queue) error {
 	_, err := channel.channel.QueueDeclare(queue.Name,
-		queue.Durability == Lasting, false, false, false, nil)
+		queue.Durability == Lasting, false, queue.Access == Owned, false, nil)
 	return err
 }
 

@@ -126,10 +126,28 @@ type Exchange struct {
 	Durability Durability
 }
 
+// Access is who may read a queue.
+type Access uint8
+
+const (
+	// Shared lets any connection consume from the queue, which is what a queue
+	// named in a topology is for.
+	Shared Access = iota
+	// Owned restricts it to the connection that declared it, and the broker
+	// deletes it when that connection closes -- a reply queue, or one
+	// instance's own subscription.
+	//
+	// It is also how a queue says it needs no keeping: a broker may refuse one
+	// that is neither Lasting nor Owned, because a queue nothing persists and
+	// nobody owns is one it cannot account for. RabbitMQ 4 does.
+	Owned
+)
+
 // Queue is a place messages wait.
 type Queue struct {
 	Name       string
 	Durability Durability
+	Access     Access
 }
 
 // Binding is an exchange sending a queue the messages that match a key.

@@ -26,7 +26,10 @@ import (
 // runs the work.
 //
 // The topology is named for the test run, so two runs against the same broker
-// do not share queues -- and it is Transient, so the broker forgets it.
+// do not share queues -- and the queue is this connection's own, so the broker
+// forgets it when the connection closes. Transient alone will not do: RabbitMQ
+// 4 refuses a queue that is neither durable nor exclusive, which is a thing
+// only a real broker says and therefore a thing only this job finds.
 func brokered[A any](
 	t *testing.T,
 	work func(*amqp091.Channel, amqp091.Topology) dispatching[A],
@@ -77,7 +80,9 @@ func temporary(name string) amqp091.Topology {
 		Exchanges: []amqp091.Exchange{
 			{Name: exchange, Routing: amqp091.Direct, Durability: amqp091.Transient},
 		},
-		Queues: []amqp091.Queue{{Name: queue, Durability: amqp091.Transient}},
+		Queues: []amqp091.Queue{
+			{Name: queue, Durability: amqp091.Transient, Access: amqp091.Owned},
+		},
 		Bindings: []amqp091.Binding{
 			{Exchange: exchange, Queue: queue, Key: dispatch.Placed},
 		},
