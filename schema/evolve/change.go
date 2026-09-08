@@ -82,7 +82,8 @@ var (
 		"a field that is neither optional nor defaulted has no value for the rows that " +
 			"already exist: make it optional, or give it a default")
 	errNotAnObject   = errors.New("a version is a set of named fields, and this one has none")
-	errNoVersions    = errors.New("a history starts at a version")
+	errNoVersionName = errors.New("a version has a name")
+	errVersionTwice  = errors.New("this history already has a version of that name")
 	errNoSuchVersion = errors.New("this history has no such version")
 	errNoShape       = errors.New("a change of shape says what the new shape is")
 	errNoChanges     = errors.New(

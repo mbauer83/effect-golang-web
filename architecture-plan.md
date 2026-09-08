@@ -1004,15 +1004,64 @@ a default before one is written, with the same remedy a key needs -- bound the
 text, which makes it a varchar. That is the third defect of exactly this shape,
 and all three were caught by looking at the output.
 
-Two things are not built and are named in the reference rather than left to be
-discovered. The **drift check** -- assert the live database matches the
-declaration at N before applying N to N+1 -- which is what keeps determinism
-while still noticing that somebody altered production by hand. And **splits and
-merges**, one column becoming two or two becoming one, which need a value
-function in both directions and are the escape hatch the closed set deliberately
-does not yet have. Nothing here runs migrations either: these are statements and
-a function, and applying them in order exactly once across several processes is a
-migrator.
+### 7.1.4 Named versions, computed values, and a migrator
+
+Three things were asked for after the first cut, and each was a real gap.
+
+**Versions are named, not numbered.** A position renumbers every later version
+whenever one is inserted, and gives a document tagged "2.1.0" nothing to match
+against but a convention -- where a name is what the document, the service that
+wrote it and the service that reads it already agree on. No scheme is imposed:
+"1.0.0" and "logistics.Pallet.v2" are both names and the order is the
+declaration's. `Of(name).Starting(version, node)` rather than three strings in
+one call, because two of them would have been adjacent and easy to swap.
+
+**The fifth change.** The four derive their own value migration because moving a
+member needs no function; computing one does, and there is no deriving it. So
+`Rewritten` carries the two directions and the statements, the latter **by
+dialect name** -- there is no dialect-neutral way to say "the part before the
+dash", and a description that imported a projection to find out would have the
+layering backwards.
+
+Its shape was wrong once and a test caught it. The first version had one list of
+structural changes and ran the statements after all of them, so a split read a
+column that had already been dropped -- and SQLite, whose double quotes fall
+back to string literals when an identifier does not resolve, silently produced
+the word "reference" as data. It is two lists now, `Adding` and `Dropping`, with
+the move between them: a computation needs both ends present, and two lists make
+that unmakeable rather than something an author has to remember. Going back
+reverses both lists and both directions.
+
+**A migrator.** `migrate` keeps a ledger of one row per aggregate -- not one per
+step, because a step is derived from code and what a database has to remember is
+where it got to, which is also what keeps a history editable. Everything happens
+in one transaction: the lock, the read, the statements, and each version's
+record.
+
+What that is worth differs by dialect and the difference is stated rather than
+smoothed over. Postgres and SQLite have transactional DDL, so a failure leaves
+the database at the version it started from. MySQL commits as it goes and
+cannot; what it offers is the lock held throughout and a ledger saying which
+step finished last, so a second run continues rather than restarting. That is
+also why each version is recorded separately rather than once at the end.
+
+Coordination is one advisory lock and deliberately nothing more. Postgres's is
+transaction-scoped so the database frees it; MySQL's is session-scoped, which
+turns out to be necessary rather than unfortunate, since its DDL commits would
+free a transaction-scoped one at the first ALTER. The key is a hash written out
+rather than taken from `hash/fnv`, because two instances hashing the same name
+differently would take two locks and both proceed.
+
+A neuter found a redundant branch and it went: stepping from a version to itself
+is a path of one and a loop that runs no times, so the "already there" special
+case said what the general path already said, through a branch nobody could see
+fail.
+
+**The drift check is still not built**, and it is now the only thing recorded
+here that is not: nothing asserts the live database matches the declaration at
+the recorded version, so a schema altered by hand is one this will migrate from
+a state it does not describe. That is the one thing declarative diffing does
+better.
 
 ## 7.2 Prior art: a previous attempt at exactly this
 

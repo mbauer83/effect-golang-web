@@ -133,7 +133,7 @@ func migrated(t *testing.T, dialect ddl.Dialect, variable string, driver string)
 		t.Skipf("set %s to run this against a real %s", variable, dialect.Name())
 	}
 
-	first, err := warehouse.Pallets.At(1)
+	first, err := warehouse.Pallets.At("1.0.0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,7 +145,7 @@ func migrated(t *testing.T, dialect ddl.Dialect, variable string, driver string)
 	if err != nil {
 		t.Fatal(err)
 	}
-	alter, err := ddl.Alter(dialect, warehouse.Pallets, 1, 2)
+	alter, err := ddl.Alter(dialect, warehouse.Pallets, "1.0.0", "1.1.0")
 	if err != nil {
 		t.Fatal(err)
 	}

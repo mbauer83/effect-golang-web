@@ -22,8 +22,9 @@ var crateV1 = schema.Struct[dynamic.Value]("Crate",
 
 // crates is the history: one declaration and two steps, and versions two and
 // three are derived from them.
-var crates = evolve.From("logistics.v1.Crate", crateV1.Structure()).
-	Then(
+var crates = evolve.Of("logistics.Crate").
+	Starting("1.0.0", crateV1.Structure()).
+	Then("1.1.0",
 		evolve.Renamed{From: "depot", To: "warehouse"},
 		evolve.Added{Field: structure.Field{
 			Name:    "handling",
@@ -31,27 +32,32 @@ var crates = evolve.From("logistics.v1.Crate", crateV1.Structure()).
 			Default: structure.DefaultTo{Value: dynamic.OfText("standard")},
 		}},
 	).
-	Then(evolve.Removed{Name: "legacyCode"})
+	Then("2.0.0", evolve.Removed{Name: "legacyCode"})
 
 func TestALaterVersionIsDerivedRatherThanDeclaredTwice(t *testing.T) {
 	if err := crates.Fault(); err != nil {
 		t.Fatal(err)
 	}
-	if crates.Latest() != 3 {
-		t.Fatalf("expected three versions, got %d", crates.Latest())
+	if crates.Latest() != "2.0.0" {
+		t.Fatalf("expected the last declared version, got %q", crates.Latest())
+	}
+	// Named and ordered, so a document tagged "1.1.0" has something to match
+	// against rather than a position somebody has to know.
+	if got := strings.Join(crates.Versions(), ","); got != "1.0.0,1.1.0,2.0.0" {
+		t.Fatalf("unexpected versions: %s", got)
 	}
 
 	// Version one is what was written.
-	first, err := crates.At(1)
+	first, err := crates.At("1.0.0")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got := named(t, first); strings.Join(got, ",") != "id,depot,legacyCode" {
-		t.Fatalf("unexpected version 1: %v", got)
+		t.Fatalf("unexpected 1.0.0: %v", got)
 	}
 
 	// Version two is the steps applied, and there was nothing to write it in.
-	second, err := crates.At(2)
+	second, err := crates.At("1.1.0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,20 +65,20 @@ func TestALaterVersionIsDerivedRatherThanDeclaredTwice(t *testing.T) {
 	// matters because every statement built from this takes its argument order
 	// from here.
 	if got := named(t, second); strings.Join(got, ",") != "id,warehouse,legacyCode,handling" {
-		t.Fatalf("unexpected version 2: %v", got)
+		t.Fatalf("unexpected 1.1.0: %v", got)
 	}
 
-	third, err := crates.At(3)
+	third, err := crates.At("2.0.0")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got := named(t, third); strings.Join(got, ",") != "id,warehouse,handling" {
-		t.Fatalf("unexpected version 3: %v", got)
+		t.Fatalf("unexpected 2.0.0: %v", got)
 	}
 }
 
 func TestAValueIsCarriedForwardAcrossSeveralVersions(t *testing.T) {
-	// One to three in one call: N-1 declared steps answer every pair, because
+	// 1.0.0 to 2.0.0 in one call, across two evolutions: N-1 declared steps answer every pair, because
 	// the changes compose.
 	var held dynamic.Value = dynamic.Object{Fields: []dynamic.Field{
 		{Name: "id", Value: dynamic.OfInteger(7)},
@@ -80,7 +86,7 @@ func TestAValueIsCarriedForwardAcrossSeveralVersions(t *testing.T) {
 		{Name: "legacyCode", Value: dynamic.OfText("XK-9")},
 	}}
 
-	moved, err := crates.Migrate(1, 3, held)
+	moved, err := crates.Migrate("1.0.0", "2.0.0", held)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,10 +114,10 @@ func TestAValueIsCarriedForwardAcrossSeveralVersions(t *testing.T) {
 
 	// What comes out satisfies the version it was migrated to, which is the
 	// claim that matters: the target's own schema reads it.
-	shape := schema.Dynamic(mustAt(t, crates, 3))
+	shape := schema.Dynamic(mustAt(t, crates, "2.0.0"))
 	written, err := schema.EncodeJSON(shape, moved)
 	if err != nil {
-		t.Fatalf("the migrated value does not satisfy version 3: %v", err)
+		t.Fatalf("the migrated value does not satisfy 2.0.0: %v", err)
 	}
 	if !strings.Contains(string(written), `"warehouse":"Kiel"`) {
 		t.Errorf("unexpected document: %s", written)
@@ -127,7 +133,7 @@ func TestAValueIsCarriedBackAndSaysWhatItCannotRestore(t *testing.T) {
 		{Name: "handling", Value: dynamic.OfText("fragile")},
 	}}
 
-	moved, err := crates.Migrate(3, 1, held)
+	moved, err := crates.Migrate("2.0.0", "1.0.0", held)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,7 +158,7 @@ func TestAValueIsCarriedBackAndSaysWhatItCannotRestore(t *testing.T) {
 	// renamed one field and added another has to remove the addition before
 	// undoing the rename, or the inverse would look for a field under a name
 	// it no longer has.
-	back, err := crates.Between(3, 1)
+	back, err := crates.Between("2.0.0", "1.0.0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -181,7 +187,7 @@ func TestAValueIsCarriedBackAndSaysWhatItCannotRestore(t *testing.T) {
 }
 
 func TestTheSameVersionIsNoChangeAtAll(t *testing.T) {
-	changes, err := crates.Between(2, 2)
+	changes, err := crates.Between("1.1.0", "1.1.0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -190,7 +196,7 @@ func TestTheSameVersionIsNoChangeAtAll(t *testing.T) {
 	}
 }
 
-func mustAt(t *testing.T, history evolve.History, version int) structure.Node {
+func mustAt(t *testing.T, history evolve.History, version string) structure.Node {
 	t.Helper()
 	node, err := history.At(version)
 	if err != nil {

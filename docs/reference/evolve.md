@@ -4,21 +4,36 @@
 values with it. `ddl.Alter` turns the same steps into statements.
 
 ```go
-var Pallets = evolve.From("logistics.v1.Pallet", PalletSchema.Structure()).
-    Then(
+var Pallets = evolve.Of("logistics.Pallet").
+    Starting("1.0.0", PalletSchema.Structure()).
+    Then("1.1.0",
         evolve.Renamed{From: "warehouse", To: "site"},
         evolve.Added{Field: structure.Field{
             Name:    "handling",
-            Node:    schema.MinLength(schema.Text(), 1).Structure(),
+            Node:    schema.MaxLength(schema.Text(), 32).Structure(),
             Default: structure.DefaultTo{Value: dynamic.OfText("standard")},
         }},
-    )
+    ).
+    Then("2.0.0", …)
 
-Pallets.At(2)                                   // the derived description
-Pallets.Migrate(1, 2, value)                    // the value, carried
-ddl.Alter(ddl.Postgres, Pallets, 1, 2)          // the statements
-ddl.Alter(ddl.Postgres, Pallets, 2, 1)          // and back
+Pallets.Versions()                                    // in declared order
+Pallets.At("2.0.0")                                   // the derived description
+Pallets.Migrate("1.0.0", "2.0.0", value)              // the value, carried
+ddl.Alter(ddl.Postgres, Pallets, "1.0.0", "2.0.0")    // the statements
+ddl.Alter(ddl.Postgres, Pallets, "2.0.0", "1.0.0")    // and back
 ```
+
+## Versions are named, not numbered
+
+A position would renumber every later version whenever one was inserted, and it
+would give a document tagged `2.1.0` nothing to match against but a convention —
+where a name is what the document, the service that wrote it and the service
+that reads it already agree on.
+
+No scheme is imposed: `1.0.0` and `logistics.Pallet.v2` are both names, and the
+order is the order they are declared in. `Versions()` hands that order back, and
+a name used twice is refused, because two versions of one name is two things a
+document tagged with it could mean.
 
 ## Declared, not diffed
 
@@ -88,6 +103,54 @@ as the [protobuf](protobuf.md) codec is. So there is nothing to generate and
 nothing to erase, and folding a handful of changes costs less than remembering
 the answer.
 
+## The fifth change: when values have to be computed
+
+The four derive their own value migration, because moving a member needs no
+function. **Computing** one does — a field split into two, two merged into one,
+a count that was text becoming a number, metres becoming millimetres — and
+there is no deriving that. So `Rewritten` carries the how:
+
+```go
+var splittingTheReference = evolve.Rewritten{
+    Doing: "splitting the reference into a prefix and a serial",
+    // What has to exist before the values move.
+    Adding: []evolve.Change{
+        evolve.Added{Field: …prefix…}, evolve.Added{Field: …serial…},
+    },
+    // What goes once they have.
+    Dropping: []evolve.Change{evolve.Removed{Name: "reference"}},
+    Forward: evolve.Rewrite{
+        Value: splitReference,
+        Statements: map[string][]string{
+            "postgres": {`update "Pallet" set "prefix" = split_part("reference", '-', 1), …`},
+            "mysql":    {"update `Pallet` set `prefix` = substring_index(`reference`, '-', 1), …"},
+            "sqlite":   {`update "Pallet" set "prefix" = substr("reference", 1, instr(…) - 1), …`},
+        },
+    },
+    Back: evolve.Rewrite{Value: joinReference, Statements: …},
+}
+```
+
+**Two structural lists, not one.** A computation needs both ends present while
+it runs: the targets have to exist before the values move, and the sources
+cannot go until after. The first version of this had one list and ran the
+statements last — so the split read a column that had already been dropped, and
+SQLite silently treated `"reference"` as a *string literal* because the
+identifier no longer resolved. Two lists make that unmakeable rather than
+something an author has to remember. Going back reverses both lists and both
+directions, so the same declaration reads correctly either way.
+
+**The statements are per dialect**, by name, because there is no dialect-neutral
+way to say "the part before the dash" — Postgres has `split_part`, MySQL
+`substring_index`, SQLite `substr` with `instr`. A change with nothing to say
+for the dialect being projected is refused rather than half-applied. And the
+package takes dialect *names* rather than a `Dialect`, because a description
+that imported a projection would have the layering backwards.
+
+**`Back` may be empty**, which says the change cannot be undone — averaging two
+columns into one loses which was which — and a migration that would need to go
+back through it says so rather than doing half of it.
+
 ## What a down migration cannot do
 
 **Invent data.** Dropping a column loses what was in it, so putting the column
@@ -143,14 +206,16 @@ is a change to that entity's description, so it has a history of its own — a s
 that silently reached into a child would be one whose effect depended on where
 the change happened to be written.
 
+## Running them: see `migrate`
+
+`evolve` says what changed and `ddl` says how to spell it; neither touches a
+database or remembers anything. [`migrate`](migrate.md) is the part that does —
+the ledger, the ordering, the lock, and running twice being running once.
+
 ## Scope
 
-- The **verification step** described above is not built.
-- **Splits and merges** — one column becoming two, two becoming one — are not in
-  the closed set. They need a value function in both directions, which is the
-  escape hatch this deliberately does not yet have.
-- Nothing runs migrations. These are statements and a function; applying them in
-  order, recording which have been applied, and doing it once across several
-  processes is a migrator, and is not here.
+- The **drift check** described above is not built.
+- A **merge** is expressible with `Rewritten` and is not demonstrated; the
+  example splits.
 
 [`examples/warehouse`](../../examples/warehouse/history.go) is the history.

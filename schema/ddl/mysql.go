@@ -161,3 +161,6 @@ func (mysql) MayDefault(scalar structure.Scalar) error {
 	}
 	return nil
 }
+
+// IndexBelongsToTable: an index belongs to a table here.
+func (mysql) IndexBelongsToTable() bool { return true }

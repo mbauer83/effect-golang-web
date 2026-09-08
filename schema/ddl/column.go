@@ -120,7 +120,7 @@ func childTables(
 	identity structure.Field,
 	field structure.Field,
 ) ([]Table, error) {
-	entity, nested := entityBehind(field.Node)
+	entity, nested := structure.EntityBehind(field.Node)
 	if !nested {
 		return nil, nil
 	}
@@ -129,11 +129,13 @@ func childTables(
 		return nil, err
 	}
 
+	_, many := field.Node.(structure.Sequence)
 	above := parent{
-		table:  root.Name,
-		column: root.Name + "_" + identity.Name,
-		kind:   kind,
-		target: identity.Name,
+		table:     root.Name,
+		column:    root.Name + "_" + identity.Name,
+		kind:      kind,
+		target:    identity.Name,
+		atMostOne: !many,
 	}
 	tables, err := derived(dialect, entity, &above)
 	if err != nil {
@@ -175,28 +177,6 @@ func positioned(dialect Dialect, table *Table) error {
 
 // positionColumn is what an ordered child's position is called.
 const positionColumn = "position"
-
-// entityBehind is the entity a field carries, through whatever wraps it.
-func entityBehind(node structure.Node) (structure.Object, bool) {
-	switch held := node.(type) {
-	case structure.Object:
-		return held, held.IsEntity()
-	case structure.Reference:
-		held2, isObject := object(held)
-		return held2, isObject && held2.IsEntity()
-	case structure.Sequence:
-		return entityBehind(held.Element)
-	case structure.Nullable:
-		return entityBehind(held.Inner)
-	case structure.Mapping:
-		// A map of entities would need a column for the key, and the
-		// description does not say what to call it. Refusing is better than
-		// inventing a name that would then be part of the schema forever.
-		return structure.Object{}, false
-	default:
-		return structure.Object{}, false
-	}
-}
 
 // object is the object a node is, following references.
 func object(node structure.Node) (structure.Object, bool) {

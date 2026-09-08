@@ -109,3 +109,6 @@ func (sqlite) Retype() (RetypeForm, error) { return 0, errNoRetype }
 
 // MayDefault accepts any of them: this dialect puts a default on any column.
 func (sqlite) MayDefault(structure.Scalar) error { return nil }
+
+// IndexBelongsToTable: an index belongs to the schema here.
+func (sqlite) IndexBelongsToTable() bool { return false }

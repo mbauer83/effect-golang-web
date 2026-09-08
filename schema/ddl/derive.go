@@ -34,6 +34,9 @@ type parent struct {
 	column string
 	kind   string
 	target string
+	// atMostOne says the parent may have at most one of these, which is what
+	// a relation that is not a list says and what the index then enforces.
+	atMostOne bool
 }
 
 func derived(dialect Dialect, root structure.Object, above *parent) ([]Table, error) {
@@ -46,7 +49,7 @@ func derived(dialect Dialect, root structure.Object, above *parent) ([]Table, er
 	children := []structure.Field{}
 
 	for _, field := range root.Fields {
-		if _, nested := entityBehind(field.Node); nested {
+		if _, nested := structure.EntityBehind(field.Node); nested {
 			children = append(children, field)
 			continue
 		}
@@ -81,6 +84,11 @@ func derived(dialect Dialect, root structure.Object, above *parent) ([]Table, er
 
 // reference gives a child the column that points at its parent, and the index
 // that makes looking children up by parent something other than a scan.
+//
+// The index is unique when the parent may have at most one of these, which is
+// what a relation that is not a list says. Without that nothing would enforce
+// it and the description would be making a claim the schema did not keep --
+// and it is what makes a change of cardinality a change of this index.
 func reference(table *Table, above parent, root structure.Object) error {
 	if _, taken := columnNamed(*table, above.column); taken {
 		return fmt.Errorf(
@@ -101,6 +109,7 @@ func reference(table *Table, above parent, root structure.Object) error {
 	table.Indexes = append(table.Indexes, Index{
 		Name:    table.Name + "_" + above.column,
 		Columns: []string{above.column},
+		Unique:  above.atMostOne,
 	})
 	return nil
 }

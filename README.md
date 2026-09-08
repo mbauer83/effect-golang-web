@@ -22,7 +22,8 @@ Nothing here is finished yet. What exists, and what is planned, is below.
 | [gRPC](docs/reference/grpc.md) | usable: unary procedures, Connect transport, projected contract |
 | [Derived shapes: create, update, select](docs/reference/variant.md) | usable |
 | [DDL: Postgres, MySQL/MariaDB, SQLite](docs/reference/ddl.md) | usable; the two asked-for dialects are executed in CI only |
-| [Migrations: declared steps, both directions](docs/reference/evolve.md) | usable; no migrator and no drift check |
+| [Migrations: declared steps, both directions](docs/reference/evolve.md) | usable |
+| [Migrator: ledger, ordering, advisory lock](docs/reference/migrate.md) | usable; no drift check |
 
 The [architecture plan](architecture-plan.md) records the design decisions,
 including which underlying library was chosen for each concern and what was
@@ -39,6 +40,7 @@ schema/                     Schema[A]: shapes, codecs, refinement
   schema/variant/           the create, update and select shapes one description has
   schema/ddl/               the tables an aggregate is, for three dialects
   schema/evolve/            the steps between versions, and the values across them
+migrate/                    applying a history to a database, once
 schemagen/                  writes the Go types a description implies
 web/                        Request, Response, Handler, codecs, routes, Server
 openapi/                    the OpenAPI 3.1 projection of a surface

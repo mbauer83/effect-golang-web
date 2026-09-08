@@ -52,7 +52,7 @@ func keptField(
 		return structure.Field{}, false, nil
 	}
 
-	entity, nested := entityBehind(field.Node)
+	entity, nested := entityCollected(field.Node)
 	if nested && !keeping.reachIntoEntities {
 		return structure.Field{}, false, nil
 	}
@@ -116,12 +116,20 @@ func rewrapped(node structure.Node, inner structure.Node) (structure.Node, error
 	}
 }
 
-// entityBehind is the entity a field carries, through whatever wraps it.
+// entityCollected is the entity a field carries, through whatever wraps it,
+// including a map.
 //
-// A field is an entity's if the object it reaches has an identity of its own --
-// through a list, a nullable or a map, because a thing in a collection is still
-// a thing.
-func entityBehind(node structure.Node) (structure.Object, bool) {
+// Deliberately not structure.EntityBehind, and the difference is the map. That
+// one answers the storage question -- does this field get a table -- and a map
+// of entities does not, because its key would need somewhere of its own to live
+// and the description does not name it. This answers a different question:
+// whether the caller creates these separately. A map of entities is still a map
+// of things with identities, so a create shape leaves them out for the same
+// reason a list of them is left out.
+//
+// Two questions that agree about everything except a map, so they are two
+// functions rather than one with a flag.
+func entityCollected(node structure.Node) (structure.Object, bool) {
 	switch held := node.(type) {
 	case structure.Object:
 		return held, held.IsEntity()
@@ -129,11 +137,11 @@ func entityBehind(node structure.Node) (structure.Object, bool) {
 		object, isObject := resolved(held)
 		return object, isObject && object.IsEntity()
 	case structure.Sequence:
-		return entityBehind(held.Element)
+		return entityCollected(held.Element)
 	case structure.Nullable:
-		return entityBehind(held.Inner)
+		return entityCollected(held.Inner)
 	case structure.Mapping:
-		return entityBehind(held.Value)
+		return entityCollected(held.Value)
 	default:
 		return structure.Object{}, false
 	}

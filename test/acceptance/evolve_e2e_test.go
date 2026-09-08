@@ -26,7 +26,7 @@ import (
 // work.
 func evolved[A any](
 	t *testing.T,
-	at int,
+	at string,
 	work func(*sql.Connected) building[A],
 ) effect.Exit[sql.Fault, A] {
 	t.Helper()
@@ -58,12 +58,12 @@ func evolved[A any](
 }
 
 func TestADeclaredRenameMovesTheColumnAndKeepsWhatWasInIt(t *testing.T) {
-	statements, err := ddl.Alter(ddl.SQLite, warehouse.Pallets, 1, 2)
+	statements, err := ddl.Alter(ddl.SQLite, warehouse.Pallets, "1.0.0", "1.1.0")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	exit := evolved(t, 1, func(database *sql.Connected) building[warehouse.Sited] {
+	exit := evolved(t, "1.0.0", func(database *sql.Connected) building[warehouse.Sited] {
 		return sql.Execute[effect.Unit](database,
 			`insert into "Pallet" ("reference", "warehouse") values ('P-1', 'Kiel')`).
 			FlatMap(func(sql.Outcome) building[effect.Unit] {
@@ -95,16 +95,16 @@ func TestADeclaredRenameMovesTheColumnAndKeepsWhatWasInIt(t *testing.T) {
 }
 
 func TestTheStatementsGoBackAsWellAsForward(t *testing.T) {
-	forward, err := ddl.Alter(ddl.SQLite, warehouse.Pallets, 1, 2)
+	forward, err := ddl.Alter(ddl.SQLite, warehouse.Pallets, "1.0.0", "1.1.0")
 	if err != nil {
 		t.Fatal(err)
 	}
-	backward, err := ddl.Alter(ddl.SQLite, warehouse.Pallets, 2, 1)
+	backward, err := ddl.Alter(ddl.SQLite, warehouse.Pallets, "1.1.0", "1.0.0")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	exit := evolved(t, 1, func(database *sql.Connected) building[warehouse.Stored] {
+	exit := evolved(t, "1.0.0", func(database *sql.Connected) building[warehouse.Stored] {
 		return sql.Execute[effect.Unit](database,
 			`insert into "Pallet" ("reference", "warehouse") values ('P-2', 'Kiel')`).
 			FlatMap(func(sql.Outcome) building[effect.Unit] {
@@ -139,7 +139,7 @@ func TestTheMigratedValueAndTheMigratedTableAgree(t *testing.T) {
 	// value carried forward in memory is a value the migrated table accepts --
 	// which is the property that would otherwise need two things kept in step
 	// by hand.
-	statements, err := ddl.Alter(ddl.SQLite, warehouse.Pallets, 1, 2)
+	statements, err := ddl.Alter(ddl.SQLite, warehouse.Pallets, "1.0.0", "1.1.0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -147,12 +147,12 @@ func TestTheMigratedValueAndTheMigratedTableAgree(t *testing.T) {
 		{Name: "reference", Value: dynamic.OfText("P-3")},
 		{Name: "warehouse", Value: dynamic.OfText("Bremen")},
 	}}
-	migrated, err := warehouse.Pallets.Migrate(1, 2, held)
+	migrated, err := warehouse.Pallets.Migrate("1.0.0", "1.1.0", held)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	exit := evolved(t, 1, func(database *sql.Connected) building[warehouse.Sited] {
+	exit := evolved(t, "1.0.0", func(database *sql.Connected) building[warehouse.Sited] {
 		return executed(database, statements).
 			FlatMap(func(effect.Unit) building[sql.Outcome] {
 				// Written with the migrated value's own members, in the

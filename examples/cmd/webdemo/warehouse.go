@@ -73,13 +73,13 @@ func runEvolving() {
 	if err := warehouse.Pallets.Fault(); err != nil {
 		fail(err)
 	}
-	fmt.Printf("\nwarehouse: the pallet has %d versions\n", warehouse.Pallets.Latest())
-	for version := 1; version <= warehouse.Pallets.Latest(); version++ {
+	fmt.Printf("\nwarehouse: the pallet's versions, latest %s\n", warehouse.Pallets.Latest())
+	for _, version := range warehouse.Pallets.Versions() {
 		node, err := warehouse.Pallets.At(version)
 		if err != nil {
 			fail(err)
 		}
-		fmt.Printf("  version %d              %s\n", version, fieldsOf(node))
+		fmt.Printf("  %-7s %s\n", version, fieldsOf(node))
 	}
 
 	// A value written under version one, carried to version two. The rename
@@ -89,23 +89,23 @@ func runEvolving() {
 		{Name: "reference", Value: dynamic.OfText("P-1")},
 		{Name: "warehouse", Value: dynamic.OfText("Kiel")},
 	}}
-	carried, err := warehouse.Pallets.Migrate(1, 2, held)
+	carried, err := warehouse.Pallets.Migrate("1.0.0", "3.1.0", held)
 	if err != nil {
 		fail(err)
 	}
-	fmt.Printf("  a value, 1 to 2        %s\n", membersOf(carried))
-	back, err := warehouse.Pallets.Migrate(2, 1, carried)
+	fmt.Printf("  a value, 1.0.0 to 3.1.0  %s\n", membersOf(carried))
+	back, err := warehouse.Pallets.Migrate("3.1.0", "1.0.0", carried)
 	if err != nil {
 		fail(err)
 	}
-	fmt.Printf("  and back, 2 to 1       %s\n", membersOf(back))
+	fmt.Printf("  and back, 3.1.0 to 1.0.0 %s\n", membersOf(back))
 
 	for _, dialect := range []ddl.Dialect{ddl.Postgres, ddl.MySQL} {
-		statements, err := ddl.Alter(dialect, warehouse.Pallets, 1, 2)
+		statements, err := ddl.Alter(dialect, warehouse.Pallets, "1.0.0", "3.1.0")
 		if err != nil {
 			fail(err)
 		}
-		fmt.Printf("\nwarehouse: 1 to 2, in %s\n", dialect.Name())
+		fmt.Printf("\nwarehouse: 1.0.0 to 3.1.0, in %s\n", dialect.Name())
 		for _, statement := range statements {
 			fmt.Println("  " + statement + ";")
 		}

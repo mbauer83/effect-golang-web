@@ -114,3 +114,6 @@ func (postgres) Retype() (RetypeForm, error) { return RetypeTypeOnly, nil }
 
 // MayDefault accepts any of them: this dialect puts a default on any column.
 func (postgres) MayDefault(structure.Scalar) error { return nil }
+
+// IndexBelongsToTable: an index belongs to the schema here.
+func (postgres) IndexBelongsToTable() bool { return false }

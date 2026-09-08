@@ -15,10 +15,17 @@ func (change Added) applied(before structure.Object) (structure.Object, error) {
 	if _, held := fieldNamed(before, change.Field.Name); held {
 		return structure.Object{}, fmt.Errorf("%q: %w", change.Field.Name, errAlreadyThere)
 	}
-	if !change.Field.Optional && change.Field.Default == nil && !change.Field.Computed {
-		// The rows that already exist have no value for it, and a database
-		// will not add such a column to a table that is not empty.
-		return structure.Object{}, fmt.Errorf("%q: %w", change.Field.Name, errUnsupplied)
+	if _, relation := structure.EntityBehind(change.Field.Node); !relation {
+		if !change.Field.Optional && change.Field.Default == nil && !change.Field.Computed {
+			// The rows that already exist have no value for it, and a database
+			// will not add such a column to a table that is not empty.
+			//
+			// A relation is exempt, and not as a favour: what a relation adds
+			// is a table of its own, which starts empty, so no row that
+			// already exists needs anything for it. Every parent simply has
+			// none of the new thing.
+			return structure.Object{}, fmt.Errorf("%q: %w", change.Field.Name, errUnsupplied)
+		}
 	}
 	after := copied(before)
 	after.Fields = append(after.Fields, change.Field)
@@ -56,8 +63,10 @@ func (change Removed) inverse(before structure.Object) (Change, error) {
 	if !held {
 		return nil, fmt.Errorf("%q: %w", change.Name, errUnknownField)
 	}
-	if field.Default == nil && !field.Computed {
-		field.Optional = true
+	if _, relation := structure.EntityBehind(field.Node); !relation {
+		if field.Default == nil && !field.Computed {
+			field.Optional = true
+		}
 	}
 	return Added{Field: field}, nil
 }
@@ -134,4 +143,14 @@ func fieldNamed(object structure.Object, name string) (structure.Field, bool) {
 		}
 	}
 	return structure.Field{}, false
+}
+
+// Apply is the description one change makes of another.
+//
+// Public because a projection walking inside a rewriting needs it: the second
+// of its structural changes is written against the shape the first made, and
+// only this knows what that is. Everything else about a step reaches a
+// projection through Stages.
+func Apply(change Change, before structure.Object) (structure.Object, error) {
+	return change.applied(before)
 }

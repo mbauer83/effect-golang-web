@@ -50,6 +50,10 @@ type Dialect interface {
 	// that shape. MySQL takes none on an unbounded text or blob column, which
 	// is a statement it rejects outright rather than a preference.
 	MayDefault(scalar structure.Scalar) error
+	// IndexBelongsToTable says whether dropping an index has to name the table
+	// it is on. It does in MySQL, where an index belongs to a table, and does
+	// not in Postgres, where it belongs to the schema.
+	IndexBelongsToTable() bool
 	// Text is a string literal in this dialect's own quoting, for a default.
 	Text(value string) string
 }
@@ -147,7 +151,15 @@ var (
 		"this dialect has no unsigned 64-bit integer, and a decimal that held the values " +
 			"would not be an integer: describe it as a signed 64-bit integer, or as text " +
 			"if the range is really needed")
-	errUnresolved       = errors.New("a reference has nothing behind it to make a column from")
+	errUnresolved      = errors.New("a reference has nothing behind it to make a column from")
+	errAcrossTheDivide = errors.New(
+		"a relation becoming a column, or a column becoming a relation, is a table " +
+			"appearing or going as well as a column changing: say it as a removal and " +
+			"an addition, because guessing an order for the two would be guessing which " +
+			"of them was meant")
+	errAnotherEntity = errors.New(
+		"a relation to a different entity is a different table: say it as a removal and " +
+			"an addition")
 	errUnboundedDefault = errors.New(
 		"this dialect takes no default on an unbounded text or blob column and would " +
 			"reject the statement: give the field a maximum length, which makes it a " +

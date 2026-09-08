@@ -209,3 +209,39 @@ func (Mapping) node()   {}
 func (Union) node()     {}
 func (Nullable) node()  {}
 func (Reference) node() {}
+
+// EntityBehind is the entity a node carries, through whatever wraps it, and
+// whether it carries one at all.
+//
+// A field is a *relation* when it does: a thing with an identity of its own,
+// which storage gives a table and which a derived shape treats as something
+// created in its own act. A field that does not is a value, and lives wherever
+// the thing holding it lives.
+//
+// It follows a list and a nullable, because a thing in a collection is still a
+// thing, and a reference, because a name is not a shape. It deliberately does
+// **not** follow a mapping: a map's key would need somewhere of its own to
+// live, and the description does not say what to call it -- so a map of
+// entities is one value rather than a relation, and inventing a name for the
+// key would put it in a schema forever.
+//
+// Here rather than in a projection because three of them ask the same question
+// and one answer is the point: a description says what a field is, and a
+// projection reads it.
+func EntityBehind(node Node) (Object, bool) {
+	switch held := node.(type) {
+	case Object:
+		return held, held.IsEntity()
+	case Reference:
+		if held.Resolve == nil {
+			return Object{}, false
+		}
+		return EntityBehind(held.Resolve())
+	case Sequence:
+		return EntityBehind(held.Element)
+	case Nullable:
+		return EntityBehind(held.Inner)
+	default:
+		return Object{}, false
+	}
+}

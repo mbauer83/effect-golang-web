@@ -26,6 +26,12 @@ func Create(dialect Dialect, node structure.Node) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	return creating(dialect, tables), nil
+}
+
+// creating is the statements that make a set of tables and their indexes, in
+// the order they have to be run.
+func creating(dialect Dialect, tables []Table) []string {
 	statements := make([]string, 0, len(tables)*2)
 	for _, table := range tables {
 		statements = append(statements, table.Create(dialect))
@@ -33,7 +39,7 @@ func Create(dialect Dialect, node structure.Node) ([]string, error) {
 			statements = append(statements, index.Create(dialect, table.Name))
 		}
 	}
-	return statements, nil
+	return statements
 }
 
 // Drop is the statements that remove them, in the order they have to be run:
@@ -130,4 +136,20 @@ func comment(written *strings.Builder, indent string, doc string) {
 	for _, line := range strings.Split(strings.TrimSpace(doc), "\n") {
 		written.WriteString(indent + "-- " + strings.TrimSpace(line) + "\n")
 	}
+}
+
+// addedColumn writes a column being added or restated, without the comments.
+//
+// A comment belongs above a column in a create statement, where somebody reads
+// the schema. In an alter it would be a comment in a migration nobody reads
+// twice, so what is written here is the definition alone.
+func addedColumn(dialect Dialect, column Column) string {
+	written := dialect.Quoted(column.Name) + " " + column.Type
+	if !column.Nullable && !column.Identity {
+		written += " not null"
+	}
+	if column.Default != "" {
+		written += " default " + column.Default
+	}
+	return written
 }

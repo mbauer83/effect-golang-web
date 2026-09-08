@@ -24,8 +24,8 @@ import (
 // the N-squared typed compositions the plan imagined turn out to be
 // unnecessary here.
 func (history History) Migrate(
-	from int,
-	to int,
+	from string,
+	to string,
 	value dynamic.Value,
 ) (dynamic.Value, error) {
 	changes, err := history.Between(from, to)
@@ -40,7 +40,7 @@ func (history History) Migrate(
 	for _, change := range changes {
 		moved, err := carried(change, object)
 		if err != nil {
-			return nil, fmt.Errorf("%s from version %d to %d of %s: %w",
+			return nil, fmt.Errorf("%s from %q to %q of %s: %w",
 				change.describe(), from, to, history.name, err)
 		}
 		object = moved
@@ -57,6 +57,8 @@ func carried(change Change, value dynamic.Object) (dynamic.Object, error) {
 		return dropping(held.Name, value), nil
 	case Renamed:
 		return moving(held, value), nil
+	case Rewritten:
+		return rewriting(held, value)
 	case Retyped:
 		// The shape changed and the value is left as it is. Converting it
 		// would mean guessing how -- a number to a string is a format nobody
@@ -127,4 +129,44 @@ func with(value dynamic.Object, name string, held dynamic.Value) dynamic.Object 
 	after.Fields = append(after.Fields, value.Fields...)
 	after.Fields = append(after.Fields, dynamic.Field{Name: name, Value: held})
 	return after
+}
+
+// rewriting adds, computes, then drops.
+//
+// In that order, because a computation needs both ends present: what it
+// receives has the new members there -- absent or defaulted -- and the old ones
+// still there to compute from, and what it returns has the old ones taken away.
+func rewriting(change Rewritten, value dynamic.Object) (dynamic.Object, error) {
+	moved, err := stepping(change, change.Adding, value)
+	if err != nil {
+		return dynamic.Object{}, err
+	}
+	if change.Forward.Value == nil {
+		// Statements only: the database recomputes and a value in memory has
+		// nothing to recompute from. Saying so beats returning a value that
+		// looks migrated and is not.
+		return dynamic.Object{}, fmt.Errorf("%s: %w", change.describe(), errNoValueRewrite)
+	}
+	written, err := change.Forward.Value(moved)
+	if err != nil {
+		return dynamic.Object{}, fmt.Errorf("%s: %w", change.describe(), err)
+	}
+	// The sources go last, so the computation above had both ends present.
+	return stepping(change, change.Dropping, written)
+}
+
+func stepping(
+	change Rewritten,
+	list []Change,
+	value dynamic.Object,
+) (dynamic.Object, error) {
+	moved := value
+	for _, held := range list {
+		applied, err := carried(held, moved)
+		if err != nil {
+			return dynamic.Object{}, fmt.Errorf("%s: %w", change.describe(), err)
+		}
+		moved = applied
+	}
+	return moved, nil
 }
