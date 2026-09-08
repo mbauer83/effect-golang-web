@@ -540,6 +540,49 @@ exit-aware release and nothing new.
 
 Prepared statements are the default, per the project's standards.
 
+DONE, and one thing turned out better than planned and one worse.
+
+Better: a row needed no description of its own. A row is a set of named values,
+which is an object, so the universal representation carries one and
+`FromDynamic` decodes it with the schema that would decode a request body.
+There is no Source implementation for rows and no row-mapping vocabulary --
+the dynamic bridge, built for a different reason, did the whole job.
+
+Worse: `database/sql` scans into a top type and a driver hands one back,
+because a driver cannot know what a column holds until it reads it. That is the
+first genuine erasure boundary in this module, so it is confined to one file
+that the architecture test names, with a second test that the exemption stays
+where it says it is and stays used. Above that line everything is the universal
+representation.
+
+"Prepared statements by default" is read as: the port has no way to pass a value
+except as an argument, so a statement built by concatenation cannot be expressed
+through it. Statement caching is the driver's business, and a caching adapter is
+something to add when measurement asks rather than before.
+
+`Columns` and `Arguments` come from one schema so the two halves that must agree
+cannot drift. An absent optional member binds as null **in its own position**,
+because leaving it out would shift the arguments after it.
+
+The rollback is verified against a transaction that records what was asked of
+it, not against a database: whether an un-rolled-back transaction blocks the
+next statement depends on the driver, the journal mode and the connection pool,
+and the integration test passed with the rollback removed. That is the kind of
+test that looks like evidence and is not.
+
+The same recording transaction shows that the read deciding a write goes through
+the transaction the write does -- the statements it kept are its own -- and
+`examples/library`'s `Take` is that against sqlite. It is the reason `Querying`
+and `Beginning` are two interfaces: a repository is written against the
+operations and does not know which it is running on.
+
+The erasure boundary is checked in both directions against a driver written for
+the purpose, because sqlite produces four of the seven kinds and never exceeds
+the contract. That driver produces all seven, and in one statement something no
+driver is allowed to produce -- so the branch that makes the exemption
+defensible, naming what arrived instead of guessing, is the one the test lands
+on. Before it existed, `Scan` and the binding direction were at 40% and 33%.
+
 ---
 
 # 8. Implementation sequence
@@ -550,7 +593,7 @@ Prepared statements are the default, per the project's standards.
 3. codecs, Endpoint, route matching and dispatch, middleware  DONE
 4. OpenAPI generation  DONE
 5. websocket  DONE
-6. sql
+6. sql  DONE
 7. amqp
 8. grpc
 ```

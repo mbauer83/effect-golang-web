@@ -15,7 +15,7 @@ Nothing here is finished yet. What exists, and what is planned, is below.
 | [Typed endpoints](docs/reference/web.md) | usable |
 | [OpenAPI generation](docs/reference/openapi.md) | usable |
 | [WebSockets](docs/reference/websocket.md) | usable |
-| SQL | planned |
+| [SQL](docs/reference/sql.md) | usable |
 | AMQP | planned |
 | gRPC and protobuf | planned |
 
@@ -34,8 +34,10 @@ schemagen/                  writes the Go types a description implies
 web/                        Request, Response, Handler, codecs, routes, Server
 openapi/                    the OpenAPI 3.1 projection of a surface
 websocket/                  a conversation over an upgraded connection
+sql/                        statements, rows decoded by a Schema, transactions
 examples/bookstore/         a complete HTTP program on the web core
 examples/tally/             a websocket conversation, with shared state
+examples/library/           a repository over the database port, driver-free
 examples/catalog/           a complete program using one schema three ways
 examples/inventory/         Go types generated from a description
 examples/cmd/webdemo/       the examples as a runnable command
@@ -64,7 +66,7 @@ alternatives are in the [architecture plan](architecture-plan.md).
 | AMQP 0-9-1 | `github.com/rabbitmq/amqp091-go` |
 | protobuf | `google.golang.org/protobuf` |
 | gRPC transport | pluggable; `connectrpc.com/connect` as the reference |
-| SQL | `database/sql` port, `github.com/jackc/pgx/v5` reference adapter |
+| SQL | `database/sql` port and adapter; `modernc.org/sqlite` in tests |
 | OpenAPI | emitted from our own model; `kin-openapi` in tests only |
 | JSON Schema validation | `santhosh-tekuri/jsonschema/v6`, in tests only |
 

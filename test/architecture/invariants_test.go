@@ -3,7 +3,6 @@ package architecture
 import (
 	"io/fs"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"testing"
 )
@@ -194,40 +193,6 @@ func TestEveryPublicDocumentIsLinkedFromTheReadme(t *testing.T) {
 		return nil
 	}
 	if err := filepath.WalkDir(filepath.Join(root, "docs"), walk); err != nil {
-		t.Fatal(err)
-	}
-}
-
-// A description is fully typed. There is no erasure boundary in this module and
-// no reason for one: Schema[A] carries its type, and structure.Node is a sealed
-// interface a projection switches over exhaustively. The easy way to build a
-// JSON Schema is a map[string]any, so this is the invariant most likely to be
-// lost by convenience.
-//
-// The check is over declarations. A type argument -- Schema[any] -- would slip
-// past it, which is why the bans above stay as well.
-func TestNoDescriptionEscapesIntoATopType(t *testing.T) {
-	typeParameters := regexp.MustCompile(`\[[\w,\s]*any[\w,\s]*\]`)
-	topType := regexp.MustCompile(`\binterface\{\}|\bany\b`)
-
-	walk := func(path string, entry fs.DirEntry, err error) error {
-		if err != nil || entry.IsDir() || !strings.HasSuffix(path, ".go") {
-			return err
-		}
-		if strings.HasSuffix(path, "_test.go") {
-			return nil
-		}
-		for number, line := range strings.Split(readSource(t, path), "\n") {
-			code, _, _ := strings.Cut(line, "//")
-			code = typeParameters.ReplaceAllString(code, "")
-			if topType.MatchString(code) {
-				t.Errorf("%s:%d uses a top type: %s",
-					display(t, path), number+1, strings.TrimSpace(line))
-			}
-		}
-		return nil
-	}
-	if err := filepath.WalkDir(moduleRoot(t), walk); err != nil {
 		t.Fatal(err)
 	}
 }

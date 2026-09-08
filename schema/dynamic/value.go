@@ -108,3 +108,26 @@ func (object Object) Only() (Field, bool) {
 	}
 	return object.Fields[0], true
 }
+
+// The constructors below exist because a composite literal reads badly in a
+// list of arguments: dynamic.OfText(title) beside dynamic.OfInteger(count) says
+// what it is, where two braced literals say where their braces are. They are
+// named for the type they make, as FieldOf and VariantOf are.
+
+// OfText makes a text value.
+func OfText(value string) Value { return Text{Value: value} }
+
+// OfInteger makes a whole number.
+func OfInteger(value int64) Value { return Integer{Value: value} }
+
+// OfNumber makes a floating-point number.
+func OfNumber(value float64) Value { return Number{Value: value} }
+
+// OfBoolean makes a boolean.
+func OfBoolean(value bool) Value { return Boolean{Value: value} }
+
+// OfBytes makes a byte string.
+func OfBytes(value []byte) Value { return Bytes{Value: value} }
+
+// OfTimestamp makes an instant.
+func OfTimestamp(value time.Time) Value { return Timestamp{Value: value} }
