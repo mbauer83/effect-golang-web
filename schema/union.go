@@ -12,10 +12,11 @@ import (
 // narrow is a type assertion when A is an interface, which is how Go models a
 // sum, and a discriminator test when A is a struct with a kind field.
 type Variant[A any] struct {
-	name  string
-	doc   string
-	node  structure.Node
-	fault error
+	name   string
+	doc    string
+	node   structure.Node
+	number int
+	fault  error
 	// matches reports whether the value is this alternative, so the name is
 	// written only for the variant that will then write the value. It is the
 	// same separation an optional field makes between presence and encoding.
@@ -63,6 +64,17 @@ func (variant Variant[A]) Documented(doc string) Variant[A] {
 	return variant
 }
 
+// Numbered gives the variant a number, for the same reason a field has one: a
+// union becomes a oneof, and each of its members is numbered.
+func (variant Variant[A]) Numbered(number int) Variant[A] {
+	if number < 1 {
+		variant.fault = fail("a variant number is at least 1", nil)
+		return variant
+	}
+	variant.number = number
+	return variant
+}
+
 // OneOf describes A as a choice between named variants.
 //
 // The wire form names the variant as the single member of an object:
@@ -104,9 +116,10 @@ func describeVariants[A any](variants []Variant[A]) []structure.Variant {
 	described := make([]structure.Variant, 0, len(variants))
 	for _, variant := range variants {
 		described = append(described, structure.Variant{
-			Name: variant.name,
-			Doc:  variant.doc,
-			Node: variant.node,
+			Name:   variant.name,
+			Doc:    variant.doc,
+			Node:   variant.node,
+			Number: variant.number,
 		})
 	}
 	return described

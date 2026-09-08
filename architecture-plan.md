@@ -615,6 +615,44 @@ both.
 **gRPC.** The protobuf codec is a schema projection. The transport sits behind a
 port so Connect and `grpc-go` are both implementable, and neither is baked in.
 
+The projection and the codec are DONE, with four things settled by building
+them.
+
+- Protobuf is the one projection where the **contract is the number and the
+  name**, not the shape: renaming a Go field is safe and renumbering it is not,
+  which is the opposite of every other projection here. So `Numbered` is a
+  modifier on a field and on a variant, and it is required rather than derived
+  from declaration order -- deriving it would reproduce exactly the failure
+  field numbers exist to prevent. An unnamed object is refused for the same
+  reason: a name taken from the field holding it would move when that field
+  was renamed.
+- The precision stops being Go-side detail. Everywhere else a `Kind` is all a
+  format reads; here `int32` and `int64` are different wire types, and widening
+  a schema that said `int32` would change what every other language generates.
+- **This codec is not a Sink and a Source**, and that is the format's
+  requirement. A nested message's length precedes it, so nothing can be written
+  until the whole of it is known; a repeated field may appear under its number
+  more than once and in any order, so nothing can be read in place. A protobuf
+  message is always framed, so there is no streaming to give up -- and what
+  crosses in between is the universal representation, for the reason the SQL
+  package reads a row that way.
+- One correction, and it reversed a decision. The first version refused to
+  substitute proto3's defaults, on the reasoning that an absent field is absent
+  and the description should decide what that means. That is wrong: an ordinary
+  proto3 field writes **no bytes** for its zero, so absent and zero are the
+  same message and there is no reading in which the field was not sent.
+  Refusing to substitute did not defer to the description -- it made proto3
+  undecodable, and the cross-check against the reference implementation failed
+  on a boolean that was merely false. The constraints still apply to the implied
+  zero, which is where a zero gets refused, so nothing was lost by fixing it.
+
+`google.golang.org/protobuf` and `bufbuild/protocompile` are **test**
+dependencies only. The schema layer carries no third-party dependency, and the
+format is a published specification; what the canonical implementation is for
+here is checking that what this emits is what protobuf reads, in both
+directions, against a descriptor produced by this module's own projection. A
+round trip through one codec says only that its two halves agree.
+
 ---
 
 # 7. Database

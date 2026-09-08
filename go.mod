@@ -4,6 +4,12 @@ go 1.27.0
 
 require (
 	github.com/Azure/go-amqp v1.7.0
+	// A protobuf compiler and the reference implementation, used only by the
+	// tests: the proto3 projection is compiled by a real compiler and the wire
+	// codec is checked against the canonical encoder in both directions.
+	// Nothing in the module itself needs either, which is what keeps the
+	// schema layer free of a dependency every user would acquire.
+	github.com/bufbuild/protocompile v0.14.1
 	github.com/coder/websocket v1.8.15
 	github.com/getkin/kin-openapi v0.149.0
 	github.com/mbauer83/effect-golang v0.0.0
@@ -12,6 +18,7 @@ require (
 	// checked against a parser that has never seen this module. Nothing in the
 	// module itself needs it.
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
+	google.golang.org/protobuf v1.36.12
 	modernc.org/sqlite v1.58.0
 )
 
@@ -27,7 +34,7 @@ require (
 	github.com/oasdiff/yaml3 v0.0.14 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/rogpeppe/go-internal v1.16.0 // indirect
-	github.com/stretchr/testify v1.11.1 // indirect
+	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	modernc.org/libc v1.75.6 // indirect

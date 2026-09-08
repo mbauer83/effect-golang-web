@@ -82,10 +82,18 @@ type Object struct {
 
 // Field is one member of an object.
 type Field struct {
-	Name     string
-	Doc      string
-	Node     Node
+	Name string
+	Doc  string
+	Node Node
+	// Optional says the field may be absent.
 	Optional bool
+	// Number is the field's number on a wire that identifies fields by number
+	// rather than by name -- protobuf, principally. Zero means the description
+	// does not state one, and a projection that needs one says so rather than
+	// inventing it: a number is what protobuf's compatibility rests on, and one
+	// derived from declaration order would change when the declaration was
+	// reordered.
+	Number int
 }
 
 // Sequence is an ordered, variable-length list.
@@ -120,6 +128,9 @@ type Variant struct {
 	Name string
 	Doc  string
 	Node Node
+	// Number is the variant's number, for the same reason a Field has one: a
+	// union becomes a oneof, and each of its members is numbered.
+	Number int
 }
 
 // Nullable is a shape a format may carry as null.

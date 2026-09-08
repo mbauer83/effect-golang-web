@@ -18,7 +18,8 @@ Nothing here is finished yet. What exists, and what is planned, is below.
 | [SQL](docs/reference/sql.md) | usable |
 | [AMQP 0-9-1](docs/reference/amqp091.md) | usable; the adapter itself unverified against a broker |
 | [AMQP 1.0](docs/reference/amqp10.md) | usable; the adapter itself unverified against a broker |
-| gRPC and protobuf | planned |
+| [protobuf](docs/reference/protobuf.md) | usable: proto3 projection and wire codec |
+| gRPC | planned |
 
 The [architecture plan](architecture-plan.md) records the design decisions,
 including which underlying library was chosen for each concern and what was
@@ -31,6 +32,7 @@ schema/                     Schema[A]: shapes, codecs, refinement
   schema/structure/         the description a projection walks
   schema/dynamic/           the value a description carries when there is no Go type
   schema/jsonschema/        the JSON Schema 2020-12 projection
+  schema/protobuf/          the proto3 projection and the protobuf wire codec
 schemagen/                  writes the Go types a description implies
 web/                        Request, Response, Handler, codecs, routes, Server
 openapi/                    the OpenAPI 3.1 projection of a surface
