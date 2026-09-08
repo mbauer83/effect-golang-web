@@ -16,7 +16,7 @@ Nothing here is finished yet. What exists, and what is planned, is below.
 | [OpenAPI generation](docs/reference/openapi.md) | usable |
 | [WebSockets](docs/reference/websocket.md) | usable |
 | [SQL](docs/reference/sql.md) | usable |
-| [AMQP 0-9-1](docs/reference/amqp091.md) | usable; the adapter itself unverified against a broker |
+| [AMQP 0-9-1](docs/reference/amqp091.md) | usable; the adapter is verified against a broker in CI only |
 | [AMQP 1.0](docs/reference/amqp10.md) | usable; the adapter itself unverified against a broker |
 | [protobuf](docs/reference/protobuf.md) | usable: proto3 projection and wire codec |
 | [gRPC](docs/reference/grpc.md) | usable: unary procedures, Connect transport, projected contract |

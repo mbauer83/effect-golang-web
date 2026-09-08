@@ -165,5 +165,8 @@ the flags it passes, the field table it writes, and whether cancelling a
 consumer really stops the broker sending.
 
 Those tests **skip** where no broker is reachable, and a skipped test is not
-evidence. [`examples/dispatch`](../../examples/dispatch/dispatch.go) is the
-program.
+evidence — so CI runs them against a RabbitMQ service container, in a job of
+their own. They were written on a machine where no broker was reachable, so
+until a pushed run is green they establish nothing.
+
+[`examples/dispatch`](../../examples/dispatch/dispatch.go) is the program.

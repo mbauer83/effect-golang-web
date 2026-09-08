@@ -73,3 +73,50 @@ jobs:
       - name: Examples
         working-directory: effect-golang-web
         run: go run ./examples/cmd/webdemo
+
+  # The AMQP adapters are the one part of this module that ordinary tests
+  # cannot establish: what the port does is covered against the in-process
+  # broker, but what the adapters themselves do -- the flags they pass, the
+  # field table they write, whether cancelling a consumer really stops the
+  # broker sending -- needs a broker. Those tests skip without an address, and
+  # a skipped test is not evidence, so this job is where the evidence comes
+  # from.
+  #
+  # A separate job, so a broker that will not start blocks this and not the
+  # suite that needs nothing.
+  broker:
+    runs-on: ubuntu-latest
+    services:
+      rabbitmq:
+        image: rabbitmq:4
+        ports:
+          - 5672:5672
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: effect-golang-web
+      - uses: actions/checkout@v5
+        with:
+          repository: mbauer83/effect-golang
+          path: effect-golang
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.27.1'
+          check-latest: true
+
+      # -run selects them by name so the job says what it established rather
+      # than running the whole suite again with one variable set.
+      - name: AMQP 0-9-1 against a broker
+        working-directory: effect-golang-web
+        env:
+          EFFECT_GOLANG_AMQP_URL: amqp://guest:guest@127.0.0.1:5672/
+        run: >-
+          go test -count=1 -v
+          -run 'CrossesARealBroker|StoppingEarlyStopsTheBroker'
+          ./test/acceptance/

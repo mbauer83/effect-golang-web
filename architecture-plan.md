@@ -605,12 +605,19 @@ DONE, with four things settled by building it.
   other did not would split it again. Recorded here because a reviewer seeing
   two near-identical files should know it was considered.
 
-Both AMQP packages are unverified against a real broker. No broker is reachable
-on the machine this was built on and Docker's daemon is not usable there, so
-what the adapters themselves do -- the sections and maps they write, the flags
-they pass, the cancellation and the detached-link ending -- is covered only by
-tests that skip. A skipped test is not evidence, and the README says so for
-both.
+Both AMQP packages were built on a machine with no broker reachable and no
+usable Docker daemon, so what the adapters themselves do -- the sections and
+maps they write, the flags they pass, the cancellation and the detached-link
+ending -- is covered only by tests that skip locally. A skipped test is not
+evidence.
+
+CI now runs the 0-9-1 ones against a RabbitMQ service container, in a job of
+their own so a broker that will not start does not block the suite that needs
+none. That job has never run: it was written where it could not be exercised,
+so until a pushed run is green it establishes nothing either. The 1.0 job is
+not written, because a 1.0 node has no protocol operation to declare it -- the
+address is broker configuration, so the container would need provisioning
+before the test rather than a variable set for it.
 
 **gRPC.** The protobuf codec is a schema projection. The transport sits behind a
 port so Connect and `grpc-go` are both implementable, and neither is baked in.
