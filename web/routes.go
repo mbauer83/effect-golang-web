@@ -58,7 +58,8 @@ func NewRoutesRejecting[R, E any](
 			return Routes[R, E]{}, route.fault
 		}
 		pattern := renderPattern(route.segments)
-		err := assembled.tree.insert(route.segments, route.declaration.Method, route.build(reject), pattern)
+		err := assembled.tree.insert(route.segments, route.declaration.Method,
+			route.build(reject, route.phases), pattern)
 		if err != nil {
 			return Routes[R, E]{}, faulted("assembling routes", err)
 		}
@@ -71,6 +72,21 @@ func NewRoutesRejecting[R, E any](
 // A published document is projected from these.
 func (routes Routes[R, E]) Declarations() []Declaration {
 	return routes.declarations
+}
+
+// DeclarationsOf are what a set of unassembled routes say about themselves.
+//
+// For the routes a caller has but has not assembled yet -- another module's,
+// mounted alongside its own. Anything keyed by route needs them before the
+// surface exists: a metric vocabulary declared from the surface it will
+// measure is a vocabulary that cannot fall behind it, and a route left out of
+// it is a route whose traffic is lumped in with everything undeclared.
+func DeclarationsOf[R, E any](routes ...Route[R, E]) []Declaration {
+	described := make([]Declaration, 0, len(routes))
+	for _, route := range routes {
+		described = append(described, route.Declaration())
+	}
+	return described
 }
 
 // Matched derives a handler from a handler, and is told which route it is
@@ -110,6 +126,45 @@ func (routes Routes[R, E]) Wrapping(each Matched[R, E]) Routes[R, E] {
 	// already accepted; an error here would be a bug in the tree rather than
 	// a caller's mistake, and reporting it as the caller's would be a lie.
 	rebuilt, err := NewRoutesRejecting(routes.reject, wrapped...)
+	if err != nil {
+		return routes
+	}
+	return rebuilt
+}
+
+// Detailing makes every route name the parts of its own work -- decoding,
+// handling, encoding -- so a trace shows them separately.
+//
+// A second setting rather than part of Wrapping, because they answer different
+// questions and cost differently: a route span says which request was slow, and
+// these say which part of it was.
+//
+// The cost is worth stating, because it is larger than it sounds and it was
+// measured rather than guessed: a route answering from memory took 2.04µs and
+// 39 allocations plain, and 5.51µs and 79 detailed. That cost falls inside the
+// route and outside its phases, so a detailed trace of very fast work shows
+// small bars separated by gaps -- and the gaps are the instrumentation.
+//
+// None of it is paid by a surface that leaves this off: the plain figures are
+// what the route cost before the setting existed, to the allocation. Turn it
+// on for work that takes milliseconds; leave it off for work that takes
+// microseconds, which will otherwise tell you about WithSpan rather than about
+// itself.
+//
+//	surface = surface.Detailing().Wrapping(inspect.Observing(costs))
+//
+// Decoding and encoding are the route's work as much as the handler is. A
+// large document to unmarshal is real time, and a trace that showed one bar
+// for all three could not say which of them a slow request spent it in.
+func (routes Routes[R, E]) Detailing() Routes[R, E] {
+	if len(routes.assembled) == 0 {
+		return routes
+	}
+	detailing := make([]Route[R, E], 0, len(routes.assembled))
+	for _, route := range routes.assembled {
+		detailing = append(detailing, route.detailing())
+	}
+	rebuilt, err := NewRoutesRejecting(routes.reject, detailing...)
 	if err != nil {
 		return routes
 	}

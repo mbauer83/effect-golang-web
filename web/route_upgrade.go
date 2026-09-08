@@ -34,9 +34,10 @@ func Upgrading[R, E any](path string, summary string, handler Handler[R, E]) Rou
 			Status:  http.StatusSwitchingProtocols,
 		},
 		segments: segments,
-		// The rejection format is unused: there are no codecs to refuse
-		// anything, because the exchange after the upgrade is not described
-		// here.
-		build: func(func(error) Response) Handler[R, E] { return handler },
+		// The rejection format and the phase names are both unused: there are
+		// no codecs to refuse anything and none to name, because the exchange
+		// after the upgrade is not described here. An upgrade is one span
+		// whatever a surface is detailing, and that is the truth about it.
+		build: func(func(error) Response, phases) Handler[R, E] { return handler },
 	}
 }

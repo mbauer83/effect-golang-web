@@ -462,6 +462,13 @@ Separating them is what makes three things possible from one value: dispatch, an
 OpenAPI document, and a client. A route that carried only a function could give
 none of them.
 
+**ADDED**: `Routes.Detailing` names a route's own phases -- decoding, handling,
+encoding -- as spans. Only this layer knows where the codecs are, so only this
+layer can offer it; a trace that showed one bar for a whole route could not say
+whether a slow request spent its time unmarshalling, working or writing back. A
+setting of its own rather than part of `Wrapping`, because three spans per
+request is not a price to charge a surface that asked for one.
+
 **ADDED**: `Matched` and `Routes.Wrapping` are the seam for a concern that has
 to name the route it is wrapping. `Middleware` wraps the surface and sees only
 the path a client asked for, which is unbounded -- so anything naming a route

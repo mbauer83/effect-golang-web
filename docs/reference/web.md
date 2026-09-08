@@ -344,6 +344,61 @@ handler cost, and a request the codecs refuse never reaches the handler at all.
 It cannot fail. The patterns are the ones that already assembled and a wrapper
 does not change them, so there is nothing left to refuse.
 
+`DeclarationsOf(routes...)` gives the declarations of routes that have not been
+assembled yet — another module's, mounted alongside your own. Anything keyed by
+route needs them before the surface exists, and a route left out of a metric
+vocabulary has its traffic lumped in with everything undeclared.
+
+## Naming a route's own parts
+
+```go
+surface = surface.Detailing().Wrapping(observing)
+```
+
+`Detailing` makes every route span its own phases: `web.PhaseDecoding`,
+`web.PhaseHandling`, `web.PhaseEncoding`. Decoding and encoding are the route's
+work as much as the handler is — a large document to unmarshal is real time —
+and one bar for all three cannot say which of them a slow request spent it in.
+
+A second setting rather than part of `Wrapping`, because they answer different
+questions and cost differently: a route span says which request was slow, and
+these say which part of it was. Three spans per request instead of one is not a
+price to charge a surface that did not ask.
+
+**Declare `PhaseNames()` in any vocabulary keyed by operation.** Three spans per
+request left undeclared are three spans per request in one unnamed bucket,
+which is how the largest thing in an aggregate ends up being `other`.
+
+An upgraded route stays one span whatever the surface details: there are no
+codecs to name, because the exchange after the upgrade is not described here.
+
+### What it costs, measured
+
+On one machine, a route that answers from memory:
+
+| | per request | allocations |
+|---|---|---|
+| not detailing | 2.04µs | 39 |
+| detailing | 5.51µs | 79 |
+
+Three spans cost about 3.5µs and forty allocations, and **that cost falls
+inside the route and outside its phases** — so a detailed trace of very fast
+work shows small phase bars separated by gaps, and the gaps are the
+instrumentation rather than the program. The observer's weight is not the
+cause: the same route measured with one recording observer and with a fan-out
+of five was within two per cent.
+
+**It goes away when the setting is off.** The plain figures above are what the
+route cost before this existed, to the allocation. The body is chosen once at
+assembly rather than branched per request, which is what keeps it so —
+expressing both as the phased one cost 0.26µs and six allocations on the plain
+path, which is the sort of thing a setting has no business charging for.
+
+So: turn it on for work that takes milliseconds, leave it off for work that
+takes microseconds. A handler that reads a file or waits on a database has
+phases worth separating; one that answers from a map is telling you about
+`WithSpan`. `test/unit/web_cost_test.go` is the benchmark.
+
 ## Middleware
 
 ```go
