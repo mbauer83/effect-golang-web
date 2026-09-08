@@ -135,10 +135,20 @@ var ItemSchema = schema.Struct[Item]("Item",
 
 Reading a description needs no parser and no reflection: a description is a Go
 value, and what reads a Go value is a Go program. So generation is a program
-that imports the descriptions — which is also why the descriptions live in their
-own package and are **unexported**. They are input. The application imports the
-generated package and uses `ItemSchema`; two usable schemas for one shape would
-be one too many.
+that imports the descriptions — which is also why they live in their own package
+and are **unexported**. They are input; nothing an application links carries
+them.
+
+`ItemSchema` is not a second copy of the description. It is the description
+*bound to a Go type*, and it is the only thing that can turn a document into an
+`Item` — the description cannot, because it has no `Item` to produce. That is
+the one thing it does not afford, and the whole reason to generate anything.
+
+The relationship is checked in both directions: `ItemSchema.Structure()` is
+`reflect.DeepEqual` to the description it came from, and the two refuse the same
+documents. So a caller who wants the shape *without* the type already has it —
+`schema.Dynamic(ItemSchema.Structure())` — which is why exporting the
+description as well would be the duplicate.
 
 Generation runs one way. A Go struct cannot be derived from a `Schema[A]`,
 because that value names `A` and so `A` must exist for the schema to compile at

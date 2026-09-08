@@ -283,9 +283,19 @@ module, so the compiler checks it, and a drift test regenerates it in process
 and compares.
 
 The descriptions are unexported, and that is the point of the arrangement
-rather than a detail: they are input to generation, so the application imports
-the generated package and uses the typed schema. Two usable schemas for one
-shape would be one too many.
+rather than a detail. The generated `NameSchema` is not a second copy of the
+description: it is the description bound to a Go type, and it is the only thing
+that can turn a document into a `Name` -- the description cannot, having no
+`Name` to produce. That is the one thing it does not afford, and the whole
+reason to generate anything.
+
+The binding also *contains* the description, so `Dynamic(NameSchema.Structure())`
+recovers it: a caller who wants the shape without the type has it from the one
+exported thing, and exporting the description as well would be the duplicate.
+That the two agree is MEASURED rather than argued -- the binding's structure is
+deep-equal to the description it came from, and both refuse the same documents
+-- because a binding that admitted a different shape from the one it was
+generated from is the single bug this arrangement exists to prevent.
 
 ## 3.6 What a generator will not guess
 
