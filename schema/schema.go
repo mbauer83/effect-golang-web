@@ -112,31 +112,34 @@ func faulted[A any](node structure.Node, err error) Schema[A] {
 // describe it once and refer to it thereafter.
 //
 // It applies to an object or a union; naming a scalar or a list has no meaning
-// in the projections and is ignored.
-func Named[A any](name string, inner Schema[A]) Schema[A] {
-	switch shape := inner.node.(type) {
+// in the projections and is ignored. It is a method because it modifies a
+// schema rather than building one, and every modifier here is one -- a reader
+// should not have to remember which of them wrap and which are called on what
+// they change.
+func (schema Schema[A]) Named(name string) Schema[A] {
+	switch shape := schema.node.(type) {
 	case structure.Object:
 		shape.Name = name
-		return of(shape, inner.encode, inner.decode)
+		return of(shape, schema.encode, schema.decode)
 	case structure.Union:
 		shape.Name = name
-		return of(shape, inner.encode, inner.decode)
+		return of(shape, schema.encode, schema.decode)
 	default:
-		return inner
+		return schema
 	}
 }
 
 // Documented attaches prose a projection can carry into its output.
-func Documented[A any](doc string, inner Schema[A]) Schema[A] {
-	switch shape := inner.node.(type) {
+func (schema Schema[A]) Documented(doc string) Schema[A] {
+	switch shape := schema.node.(type) {
 	case structure.Object:
 		shape.Doc = doc
-		return of(shape, inner.encode, inner.decode)
+		return of(shape, schema.encode, schema.decode)
 	case structure.Union:
 		shape.Doc = doc
-		return of(shape, inner.encode, inner.decode)
+		return of(shape, schema.encode, schema.decode)
 	default:
-		return inner
+		return schema
 	}
 }
 

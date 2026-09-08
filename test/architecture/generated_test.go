@@ -6,7 +6,6 @@ package architecture
 // shape.
 
 import (
-	"io/fs"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -14,69 +13,9 @@ import (
 	"testing"
 
 	"github.com/mbauer83/effect-golang-web/examples/inventory/definitions"
-	"github.com/mbauer83/effect-golang-web/internal/schemagen"
+	"github.com/mbauer83/effect-golang-web/schemagen"
 )
 
-func TestGeneratedSchemasMatchTheStructsTheyCameFrom(t *testing.T) {
-	packages := packagesWithGeneratedSchemas(t)
-	if len(packages) == 0 {
-		t.Fatal("no generated schema was found; this check would pass vacuously")
-	}
-
-	for _, directory := range packages {
-		checkedIn, err := os.ReadFile(filepath.Join(directory, schemagen.FileName))
-		if err != nil {
-			t.Fatal(err)
-		}
-		regenerated, err := schemagen.Generate(directory)
-		if err != nil {
-			t.Errorf("%s: %v", display(t, directory), err)
-			continue
-		}
-		if string(regenerated) != string(checkedIn) {
-			t.Errorf("%s is not what its structs imply; run go generate ./...\n%s",
-				filepath.Join(display(t, directory), schemagen.FileName),
-				firstDifference(string(checkedIn), string(regenerated)))
-		}
-	}
-}
-
-func TestGenerationIsDeterministic(t *testing.T) {
-	// The same structs must produce the same bytes, or the drift check above
-	// would fail at random and teach everyone to ignore it.
-	for _, directory := range packagesWithGeneratedSchemas(t) {
-		first, err := schemagen.Generate(directory)
-		if err != nil {
-			t.Fatal(err)
-		}
-		second, err := schemagen.Generate(directory)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if string(first) != string(second) {
-			t.Errorf("%s generated differently twice", display(t, directory))
-		}
-	}
-}
-
-func packagesWithGeneratedSchemas(t *testing.T) []string {
-	t.Helper()
-	directories := []string{}
-	walk := func(path string, entry fs.DirEntry, err error) error {
-		if err != nil || entry.IsDir() || entry.Name() != schemagen.FileName {
-			return err
-		}
-		directories = append(directories, filepath.Dir(path))
-		return nil
-	}
-	if err := filepath.WalkDir(moduleRoot(t), walk); err != nil {
-		t.Fatal(err)
-	}
-	return directories
-}
-
-// firstDifference reports the first line that differs, because a whole file in
-// a failure message is not something anyone reads.
 func firstDifference(checkedIn string, regenerated string) string {
 	was := strings.Split(checkedIn, "\n")
 	is := strings.Split(regenerated, "\n")
@@ -105,7 +44,7 @@ func TestGeneratedBindingsMatchTheDescriptionsTheyCameFrom(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	regenerated, err := schemagen.WriteBindings("inventory", definitions.Described()...)
+	regenerated, err := schemagen.WriteBindings("inventory", definitions.Descriptions()...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,11 +55,11 @@ func TestGeneratedBindingsMatchTheDescriptionsTheyCameFrom(t *testing.T) {
 }
 
 func TestBindingGenerationIsDeterministic(t *testing.T) {
-	first, err := schemagen.WriteBindings("inventory", definitions.Described()...)
+	first, err := schemagen.WriteBindings("inventory", definitions.Descriptions()...)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := schemagen.WriteBindings("inventory", definitions.Described()...)
+	second, err := schemagen.WriteBindings("inventory", definitions.Descriptions()...)
 	if err != nil {
 		t.Fatal(err)
 	}

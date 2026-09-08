@@ -246,10 +246,11 @@ The typed and described paths are tested to reach the same verdict on the same
 value, because a generated struct that accepted what its description refused
 would be the one bug this whole arrangement exists to prevent.
 
-## 3.5 Derivation is generation, and runs both ways
+## 3.5 Derivation is generation, and runs from the description
 
-CORRECTED: it runs both ways, and the earlier claim that a struct could not be
-derived from a schema was wrong about the mechanism.
+CORRECTED twice. The claim that a struct could not be derived from a schema was
+wrong about the mechanism; the answer of doing both directions was wrong about
+the cost.
 
 A Go struct cannot be derived from a `Schema[A]` value, because that value
 names `A` and so `A` must exist for it to compile. But a description that names
@@ -259,15 +260,23 @@ reads it by calling `Structure()`. Generation from a description is therefore a
 program that imports the descriptions and writes the types, which is fifteen
 lines and no toolchain gymnastics.
 
-So both directions exist, and both are right sometimes. A wire shape that
-differs from the domain type wants the struct first; a contract several programs
-share wants the description first. They share the rendering, so a schema
-generated from a struct and one generated from a description are the same code
--- two emitters would drift.
+Generation therefore runs from the description, and only from it. The other
+direction was built first and then removed: reading a struct meant a second
+place to write a constraint -- `schema:"min=1,maxLength=200"` in a backtick
+string -- and a second vocabulary for the same ideas. Two ways to say one thing
+is the cost, and it is not worth a generator for something a person can write
+in six lines.
 
-`examples/catalog` is the first direction and `examples/inventory` the second.
-The generated file in each is compiled as part of the module, so the compiler
-checks it, and a drift test regenerates it in process and compares.
+A Go type you already have still gets a schema: `Struct` and `FieldOf` are
+exactly that, and `examples/catalog` writes one. `examples/inventory` has its
+types generated from descriptions. The generated file is compiled as part of the
+module, so the compiler checks it, and a drift test regenerates it in process
+and compares.
+
+The descriptions are unexported, and that is the point of the arrangement
+rather than a detail: they are input to generation, so the application imports
+the generated package and uses the typed schema. Two usable schemas for one
+shape would be one too many.
 
 ## 3.6 What a generator will not guess
 
@@ -298,20 +307,16 @@ because Go cannot compute a type from a value; the struct is the source of
 truth and the schema follows it. The other direction would need a source of
 truth outside Go, which is a different project.
 
-A struct field carries a type and a name, so the tag carries the same
-constraint vocabulary the combinators do: `min`, `max`, `above`, `below`,
-`minLength`, `maxLength`, `pattern`, `minItems`, `maxItems`, `format`. Items
-are comma-separated except inside braces, brackets or parentheses, because a
-pattern carries commas of its own. A constraint written on a type it cannot
-apply to is refused rather than emitted.
+Everything the generator emits is a call a person could have written, so a
+generated schema and a written one remain interchangeable and there is one
+vocabulary to learn. What it will not do is guess: an anonymous shape has no Go
+type, a union variant that is not an object cannot become one, and a member
+name that cannot be exported is refused rather than mangled.
 
-Generation did not become the only usable path. Everything the generator emits
-is a call a person could have written, so the two remain interchangeable, and
-three things it refuses rather than guesses keep a hand-written schema
-necessary: `omitempty` on a non-pointer, because a zero value is not absence; a
-type the table cannot name, because guessing produces a schema that compiles
-and describes the wrong thing; and a marked type that is not a struct, because
-a union's alternatives are not in an interface's declaration.
+ADDED: every modifier is a method -- `Documented`, `Named`, `Optional` -- and
+not a function that wraps what it changes. A reader should not have to remember
+which of them do which, and the wrapping form read inside-out at exactly the
+places a schema is longest.
 
 ---
 

@@ -11,18 +11,19 @@ import (
 
 	"github.com/mbauer83/effect-golang-web/schema"
 	"github.com/mbauer83/effect-golang-web/schema/dynamic"
+	"github.com/mbauer83/effect-golang-web/schema/structure"
 )
 
 // bookDescription is written before any Go type for it exists. It is Struct
 // without the accessors, which is the only part of a field declaration that
 // needs the type.
-var bookDescription = schema.Record("Book",
-	schema.DocumentedMember("what the book is called",
-		schema.MemberOf("title", schema.MinLength(schema.Text(), 1))),
-	schema.MemberOf("authors", schema.MinItems(schema.List(schema.Text()), 1)),
-	schema.MemberOf("pages", schema.AtMost(schema.AtLeast(schema.Int(), 1), 20000)),
-	schema.OptionalMemberOf("subtitle", schema.Text()),
-	schema.MemberOf("id", schema.UUID()),
+var bookDescription = schema.Struct[dynamic.Value]("Book",
+	schema.Describing("title", schema.MinLength(schema.Text(), 1)).
+		Documented("what the book is called"),
+	schema.Describing("authors", schema.MinItems(schema.List(schema.Text()), 1)),
+	schema.Describing("pages", schema.AtMost(schema.AtLeast(schema.Int(), 1), 20000)),
+	schema.Describing("subtitle", schema.Text()).Optional(),
+	schema.Describing("id", schema.UUID()),
 )
 
 const bookDocument = `{"title":"Zionomicon","authors":["John A. De Goes"],` +
@@ -180,20 +181,47 @@ func TestATypedValueCrossesToADescriptionAndBack(t *testing.T) {
 
 func TestADescriptionsMistakesAreReportedRatherThanPanicking(t *testing.T) {
 	cases := map[string]error{
-		"no members":         schema.Validate(schema.Record("Book")),
-		"a nameless member":  schema.Validate(schema.Record("Book", schema.MemberOf("", schema.Text()))),
-		"two members alike":  schema.Validate(schema.Record("Book", schema.MemberOf("title", schema.Text()), schema.MemberOf("title", schema.Text()))),
-		"an unusable member": schema.Validate(schema.Record("Book", schema.MemberOf("title", schema.Schema[string]{}))),
+		"a nameless member":  schema.Validate(schema.Struct[dynamic.Value]("Book", schema.Describing("", schema.Text()))),
+		"two members alike":  schema.Validate(schema.Struct[dynamic.Value]("Book", schema.Describing("title", schema.Text()), schema.Describing("title", schema.Text()))),
+		"an unusable member": schema.Validate(schema.Struct[dynamic.Value]("Book", schema.Describing("title", schema.Schema[string]{}))),
 		// A faulted schema has a shape as well as a fault, so a description
 		// that took the shape and dropped the fault would look complete.
 		"a member whose schema is faulted": schema.Validate(
-			schema.Record("Book", schema.MemberOf("title", schema.Matching(schema.Text(), `[`)))),
+			schema.Struct[dynamic.Value]("Book", schema.Describing("title", schema.Matching(schema.Text(), `[`)))),
 		"no description":  schema.Validate(schema.Dynamic(nil)),
-		"no alternatives": schema.Validate(schema.Choice("Shape")),
+		"no alternatives": schema.Validate(schema.OneOf[dynamic.Value]("Shape")),
+		// A bound field's getter returns a value and not whether there is one,
+		// so it cannot be made optional after the fact.
+		"a bound field made optional": schema.Validate(schema.Struct[Book]("Book",
+			schema.FieldOf("title", schema.Text(),
+				func(book Book) string { return book.Title },
+				func(book *Book, title string) { book.Title = title }).Optional())),
 	}
 	for mistake, err := range cases {
 		if err == nil {
 			t.Errorf("expected %s to be reported", mistake)
 		}
+	}
+}
+
+func TestPassingADescriptionThroughDynamicLeavesItUnchanged(t *testing.T) {
+	// Dynamic rebuilds the description as combinators to get a codec. What it
+	// must not do is hand back the rebuilt description: the rebuild works in
+	// the wire's two numeric shapes, so a recorded width would be lost and a
+	// generator reading it would emit int64 where the author wrote uint16.
+	original := schema.Uint16().Structure()
+	round := schema.Dynamic(original).Structure()
+
+	before := original.(structure.Scalar)
+	after, isScalar := round.(structure.Scalar)
+	if !isScalar {
+		t.Fatalf("expected a scalar, got %#v", round)
+	}
+	if after.Precision != before.Precision {
+		t.Fatalf("expected the width kept, got %v from %v", after.Precision, before.Precision)
+	}
+	if len(after.Constraints) != len(before.Constraints) {
+		t.Fatalf("expected the constraints kept, got %d of %d",
+			len(after.Constraints), len(before.Constraints))
 	}
 }

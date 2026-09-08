@@ -24,9 +24,6 @@ func writeUnionBinding(written *bytes.Buffer, shape structure.Union) error {
 	fmt.Fprintf(written, "\n// %sSchema describes %s. It is generated from its description.\n",
 		shape.Name, shape.Name)
 	fmt.Fprintf(written, "var %sSchema = ", shape.Name)
-	if shape.Doc != "" {
-		fmt.Fprintf(written, "schema.Documented(%s,\n", strconv.Quote(shape.Doc))
-	}
 	fmt.Fprintf(written, "schema.OneOf[%s](%s,\n", shape.Name, strconv.Quote(shape.Name))
 	for _, variant := range shape.Variants {
 		if err := writeVariant(written, shape.Name, variant); err != nil {
@@ -35,7 +32,7 @@ func writeUnionBinding(written *bytes.Buffer, shape structure.Union) error {
 	}
 	fmt.Fprintf(written, ")")
 	if shape.Doc != "" {
-		fmt.Fprintf(written, ")")
+		fmt.Fprintf(written, ".Documented(%s)", strconv.Quote(shape.Doc))
 	}
 	fmt.Fprintf(written, "\n")
 	return nil
@@ -47,16 +44,13 @@ func writeVariant(written *bytes.Buffer, union string, variant structure.Variant
 		return fmt.Errorf("%s.%s: a variant becomes a Go type, so it is an object",
 			union, variant.Name)
 	}
-	if variant.Doc != "" {
-		fmt.Fprintf(written, "schema.DocumentedVariant(%s,\n", strconv.Quote(variant.Doc))
-	}
 	fmt.Fprintf(written, "schema.VariantOf(%s, %sSchema,\n",
 		strconv.Quote(variant.Name), object.Name)
 	fmt.Fprintf(written, "func(value %s) (%s, bool) { held, is := value.(%s); return held, is },\n",
 		union, object.Name, object.Name)
 	fmt.Fprintf(written, "func(held %s) %s { return held })", object.Name, union)
 	if variant.Doc != "" {
-		fmt.Fprintf(written, ")")
+		fmt.Fprintf(written, ".Documented(%s)", strconv.Quote(variant.Doc))
 	}
 	fmt.Fprintf(written, ",\n")
 	return nil

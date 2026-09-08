@@ -5,18 +5,16 @@ package schema
 // Schema[A] moves a Go value in and out of a format. A description written
 // before the type it will become exists -- or loaded from somewhere else, or
 // read back out of another schema -- has no A, and it is still worth
-// validating, transcoding, inspecting and composing. Dynamic gives it one: the
-// universal representation, which every combinator here already works over
-// because a Schema does not care what A is.
+// validating, transcoding, inspecting and composing. The universal
+// representation is the A it uses instead.
 //
-// Nothing else changes. The same constructors build it, the same codecs read
-// and write it, the same projections describe it, and the same Validate reports
-// a mistake in it. That is the point: one vocabulary, used with a Go type or
-// without one.
+// There is no second codec. Dynamic rebuilds the description out of the same
+// combinators a typed schema is written with, so the two paths cannot disagree
+// about what a shape admits: they are the same path. That is also why every
+// rule the description records is enforced without anything here knowing what
+// the rules are.
 
 import (
-	"strings"
-
 	"github.com/mbauer83/effect-golang-web/schema/dynamic"
 	"github.com/mbauer83/effect-golang-web/schema/structure"
 )
@@ -28,125 +26,145 @@ import (
 // Structure passed through here is usable without its type, and a description
 // assembled by hand or loaded from elsewhere is usable at all.
 //
-// What it can enforce is what the description records. A bound, a length, a
-// pattern and an item count are all there; a rule that could only be code --
-// an address, a URI, a refinement -- annotates and no more, because there was
-// nothing to record. That is the honest limit of describing a shape rather than
-// writing one.
+// What it enforces is what the description records. A bound, a length, a
+// pattern, an item count, a width and the shape itself are all there; a rule
+// that could only be code -- an address, a URI, a refinement -- annotates and
+// no more, because there was nothing to record. That is the honest limit of
+// describing a shape rather than writing one.
 func Dynamic(node structure.Node) Schema[dynamic.Value] {
-	if node == nil {
-		return faulted[dynamic.Value](nil, fail("a description is required", nil))
+	built := dynamicCodec(node)
+	if fault := Validate(built); fault != nil {
+		return faulted[dynamic.Value](node, fault)
 	}
-	return of(
-		node,
-		func(value dynamic.Value, into Sink) error {
-			if value == nil {
-				return fail("is missing", nil)
-			}
-			return encodeDynamic(node, value, into)
-		},
-		func(from Source) (dynamic.Value, error) {
-			return decodeDynamic(node, from)
-		},
-	)
+	// The description is kept exactly as it was given. Rebuilding it produced a
+	// codec, not a new description, and a projection has to see what the author
+	// wrote -- the recorded width included, which the rebuilt wire shape does
+	// not carry.
+	return of(node, built.encode, built.decode)
 }
 
-// Record describes an object with no Go type, which is the shape a generator
-// reads and a loaded description arrives as.
+func dynamicCodec(node structure.Node) Schema[dynamic.Value] {
+	switch shape := node.(type) {
+	case structure.Scalar:
+		return dynamicScalar(shape)
+	case structure.Object:
+		return dynamicObject(shape)
+	case structure.Sequence:
+		return dynamicSequence(shape)
+	case structure.Mapping:
+		return dynamicMapping(shape)
+	case structure.Union:
+		return dynamicUnion(shape)
+	case structure.Nullable:
+		return dynamicNullable(shape)
+	case structure.Reference:
+		return dynamicReference(shape)
+	default:
+		return faulted[dynamic.Value](node, fail("a description is required", nil))
+	}
+}
+
+// Describing declares a field of a description: a name and a shape, and no
+// accessors.
 //
-// It is Struct without the accessors: a struct's getters and setters are the
-// only part of a field declaration that needs the Go type, so leaving them out
-// is exactly the difference between describing a shape and binding one.
-func Record(name string, members ...structure.Field) Schema[dynamic.Value] {
-	node := structure.Object{Name: name, Fields: members}
-	if fault := firstMemberFault(members); fault != nil {
-		return faulted[dynamic.Value](node, fault)
+// The accessors are the only part of a field declaration that needs a Go type,
+// so leaving them out is exactly the difference between describing a shape and
+// binding one. Everything else is the same Field, so the same modifiers apply:
+// Optional and Documented.
+func Describing[B any](name string, shape Schema[B]) Field[dynamic.Value] {
+	described := Dynamic(shape.Structure())
+	if fault := Validate(shape); fault != nil {
+		return Field[dynamic.Value]{name: name, node: shape.Structure(), fault: fault}
 	}
-	return Dynamic(node)
-}
-
-// MemberOf describes one member of a Record, taking its shape from a schema of
-// any type: the shape is what a description needs, and the type is what it does
-// not.
-func MemberOf[B any](name string, shape Schema[B]) structure.Field {
-	return structure.Field{Name: name, Node: describedNode(shape)}
-}
-
-// OptionalMemberOf describes a member that may be absent.
-func OptionalMemberOf[B any](name string, shape Schema[B]) structure.Field {
-	return structure.Field{Name: name, Node: describedNode(shape), Optional: true}
-}
-
-// DocumentedMember attaches prose a projection can carry into its output.
-func DocumentedMember(doc string, member structure.Field) structure.Field {
-	member.Doc = doc
-	return member
-}
-
-// Choice describes a union with no Go type.
-func Choice(name string, alternatives ...structure.Variant) Schema[dynamic.Value] {
-	node := structure.Union{Name: name, Variants: alternatives}
-	if fault := firstAlternativeFault(alternatives); fault != nil {
-		return faulted[dynamic.Value](node, fault)
+	return Field[dynamic.Value]{
+		name:      name,
+		node:      shape.Structure(),
+		fault:     Validate(described),
+		derivable: func(value dynamic.Value) bool { return heldBy(value, name) },
+		encode: func(value dynamic.Value, into Sink) error {
+			held, present := memberOf(value, name)
+			if !present {
+				return fail("required member is missing", nil)
+			}
+			return Encode(described, held, into)
+		},
+		decode: func(target *dynamic.Value, from Source) error {
+			decoded, err := Decode(described, from)
+			if err != nil {
+				return err
+			}
+			*target = withMember(*target, name, decoded)
+			return nil
+		},
 	}
-	return Dynamic(node)
 }
 
-// AlternativeOf describes one alternative of a Choice.
-func AlternativeOf[B any](name string, shape Schema[B]) structure.Variant {
-	return structure.Variant{Name: name, Node: describedNode(shape)}
+// Choosing declares an alternative of a described union: a name and a shape,
+// and no narrowing.
+//
+// A described value carries its own tag -- the chosen variant is the object's
+// single member -- so narrowing to it is reading that name, which needs no Go
+// type either.
+func Choosing[B any](name string, shape Schema[B]) Variant[dynamic.Value] {
+	described := Dynamic(shape.Structure())
+	if fault := Validate(shape); fault != nil {
+		return Variant[dynamic.Value]{name: name, node: shape.Structure(), fault: fault}
+	}
+	return Variant[dynamic.Value]{
+		name:  name,
+		node:  shape.Structure(),
+		fault: Validate(described),
+		matches: func(value dynamic.Value) bool {
+			chosen, only := chosenBy(value)
+			return only && chosen.Name == name
+		},
+		encode: func(value dynamic.Value, into Sink) error {
+			chosen, only := chosenBy(value)
+			if !only || chosen.Name != name {
+				return fail("the value is not the "+name+" variant", nil)
+			}
+			return Encode(described, chosen.Value, into)
+		},
+		decode: func(from Source) (dynamic.Value, error) {
+			decoded, err := Decode(described, from)
+			if err != nil {
+				return nil, err
+			}
+			return dynamic.Object{Fields: []dynamic.Field{{Name: name, Value: decoded}}}, nil
+		},
+	}
 }
 
-// DocumentedAlternative attaches prose a projection can carry into its output.
-func DocumentedAlternative(doc string, alternative structure.Variant) structure.Variant {
-	alternative.Doc = doc
-	return alternative
+// memberOf reads a member of an object, which is where a described field's
+// value lives.
+func memberOf(value dynamic.Value, name string) (dynamic.Value, bool) {
+	object, isObject := value.(dynamic.Object)
+	if !isObject {
+		return nil, false
+	}
+	return object.Member(name)
 }
 
-// describedNode is a schema's shape, or a node that says the schema was
-// unusable -- so a mistake in a member's own schema is reported by the record
-// rather than disappearing into a description that looks complete.
-func describedNode[B any](shape Schema[B]) structure.Node {
-	if Validate(shape) != nil {
-		return nil
-	}
-	return shape.node
+func heldBy(value dynamic.Value, name string) bool {
+	_, present := memberOf(value, name)
+	return present
 }
 
-func firstMemberFault(members []structure.Field) error {
-	if len(members) == 0 {
-		return fail("a record has at least one member", nil)
+// withMember adds a member to the object being built, which starts as nothing
+// because a decoder builds from a zero value.
+func withMember(target dynamic.Value, name string, held dynamic.Value) dynamic.Value {
+	object, isObject := target.(dynamic.Object)
+	if !isObject {
+		object = dynamic.Object{}
 	}
-	seen := make(map[string]bool, len(members))
-	for _, member := range members {
-		switch {
-		case strings.TrimSpace(member.Name) == "":
-			return fail("a member has no name", nil)
-		case seen[member.Name]:
-			return fail("two members are named "+member.Name, nil)
-		case member.Node == nil:
-			return within(member.Name, fail("has no usable shape", nil))
-		}
-		seen[member.Name] = true
-	}
-	return nil
+	object.Fields = append(object.Fields, dynamic.Field{Name: name, Value: held})
+	return object
 }
 
-func firstAlternativeFault(alternatives []structure.Variant) error {
-	if len(alternatives) == 0 {
-		return fail("a union has no variants", nil)
+func chosenBy(value dynamic.Value) (dynamic.Field, bool) {
+	object, isObject := value.(dynamic.Object)
+	if !isObject {
+		return dynamic.Field{}, false
 	}
-	seen := make(map[string]bool, len(alternatives))
-	for _, alternative := range alternatives {
-		switch {
-		case strings.TrimSpace(alternative.Name) == "":
-			return fail("a variant has no name", nil)
-		case seen[alternative.Name]:
-			return fail("two variants are named "+alternative.Name, nil)
-		case alternative.Node == nil:
-			return within(alternative.Name, fail("has no usable shape", nil))
-		}
-		seen[alternative.Name] = true
-	}
-	return nil
+	return object.Only()
 }

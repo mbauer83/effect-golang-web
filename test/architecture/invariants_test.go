@@ -14,6 +14,9 @@ import (
 // dependency.
 var forbiddenImports = map[string][]string{
 	"schema": {
+		// A generator reads a description; a description knows nothing about
+		// the generator that will read it.
+		"effect-golang-web/schemagen",
 		"effect-golang-web/web",
 		"effect-golang-web/websocket",
 		"effect-golang-web/amqp",
@@ -32,6 +35,10 @@ var forbiddenImports = map[string][]string{
 		"effect-golang-web/amqp",
 		"effect-golang-web/grpc",
 		"effect-golang-web/sql",
+	},
+	"schemagen": {
+		"effect-golang-web/web",
+		"effect-golang-web/openapi",
 	},
 	"openapi": {
 		"effect-golang-web/websocket",

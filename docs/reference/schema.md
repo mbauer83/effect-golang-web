@@ -27,10 +27,11 @@ for every arity, and it is how a Go program builds a struct anyway.
 This is more to write than a struct tag. It is also checked by the compiler,
 works when the wire shape differs from the Go shape, and needs no reflection.
 
-It is also what the generator writes for you — see [Deriving one](#deriving-one)
-below. A hand-written schema stays the honest path: everything the generator
-emits is one of these calls, so the two are interchangeable and there is one
-thing to learn rather than two.
+Write a schema this way for a Go type you already have — a domain type with
+methods, one from another package, one whose wire shape differs from its Go
+shape. Where the *description* is the source of truth instead, the struct and
+this schema are both [generated](#generating-the-go-types) from it, and what
+comes out is these same calls: one vocabulary, written or generated.
 
 ## Describing a shape with no Go type
 
@@ -39,23 +40,30 @@ before the type it will become exists — or loaded from elsewhere, or read back
 out of another schema — has no `A`, and it is still worth validating,
 transcoding, inspecting and composing.
 
-It is the same vocabulary, minus the accessors:
+It is the same vocabulary — the same `Struct`, the same `OneOf` — minus the
+accessors:
 
 ```go
-var Book = schema.Record("Book",
-    schema.DocumentedMember("what the book is called",
-        schema.MemberOf("title", schema.MinLength(schema.Text(), 1))),
-    schema.MemberOf("pages", schema.AtMost(schema.AtLeast(schema.Int(), 1), 20000)),
-    schema.OptionalMemberOf("subtitle", schema.Text()),
-    schema.MemberOf("id", schema.UUID()),
-)   // Schema[dynamic.Value]
+var Book = schema.Struct[dynamic.Value]("Book",
+    schema.Describing("title", schema.MinLength(schema.Text(), 1)).
+        Documented("what the book is called"),
+    schema.Describing("pages", schema.AtMost(schema.AtLeast(schema.Int(), 1), 20000)),
+    schema.Describing("subtitle", schema.Text()).Optional(),
+    schema.Describing("id", schema.UUID()),
+)
 ```
 
-`Record` is `Struct` without the getters and setters — which are the only part
-of a field declaration that needs the Go type, so leaving them out is exactly
-the difference between *describing* a shape and *binding* one. `Choice` and
-`AlternativeOf` do the same for a union. `Dynamic(node)` is the general door: a
-typed schema's `Structure()` passed through it is usable without its type.
+`Describing` is `FieldOf` without the getter and setter — the only part of a
+field declaration that needs the Go type, so leaving them out is exactly the
+difference between *describing* a shape and *binding* one. `Choosing` is
+`VariantOf` without the narrowing, for the same reason: a described value
+carries its own tag, so narrowing to a variant is reading a name.
+`Dynamic(node)` is the general door: a typed schema's `Structure()` passed
+through it is usable without its type.
+
+There is **no second codec**. `Dynamic` rebuilds the description out of the same
+combinators a typed schema is written with, so the typed and described paths
+cannot disagree about what a shape admits — they are the same path.
 
 Everything else is unchanged, because a `Schema` never cared what `A` was:
 
@@ -78,10 +86,10 @@ so the two ways of using this package meet.
 
 ### What a description can and cannot enforce
 
-It enforces **what it records**: a bound, a length, a pattern, an item count,
-optionality, and the shape itself. That is what recording constraints in the
-description was for — the rules survive without the Go type that stated them,
-and the typed and described paths are tested to reach the same verdict.
+It enforces **what it records**: a bound, a length, a pattern, an item count, a
+width, optionality, and the shape itself. That is what recording constraints in
+the description was for — the rules survive without the Go type that stated
+them, and they are enforced by the very combinators that stated them.
 
 It cannot enforce a rule that could only be code. `Email()` and `URI()` parse,
 and a parse is not a keyword, so a description alone annotates and no more.
@@ -89,90 +97,67 @@ and a parse is not a keyword, so a description alone annotates and no more.
 enforced. Saying so plainly beats a described path that silently admits what the
 typed path refuses.
 
-## Deriving one
+## Generating the Go types
 
-A struct's fields and a schema for it say the same thing twice, and the second
-copy is the one that rots. `cmd/schemagen` writes it:
+Where the description is the source of truth, the Go types come from it:
 
 ```go
-//schema:generate
-type Book struct {
-    Title   string   `json:"title"`
-    Authors []string `json:"authors"`
-    // Pages is how many pages the book has, and there is at least one.
-    Pages int `json:"pages" schema:"use=pagesSchema"`
+// examples/inventory/definitions -- unexported, because they are input
+var item = schema.Struct[dynamic.Value]("Item",
+    schema.Describing("sku", schema.Matching(schema.Text(), `^[A-Z]{3}-[0-9]{5}$`)),
+    schema.Describing("onHand", schema.Uint16()),
+    schema.Describing("note", schema.MaxLength(schema.Text(), 200)).Optional(),
+)
+
+func Descriptions() []structure.Node { return []structure.Node{item.Structure()} }
+```
+
+```go
+// examples/inventory/gen -- a dozen lines, run by go:generate
+written, err := schemagen.WriteBindings("inventory", definitions.Descriptions()...)
+```
+
+and out comes the struct, with the widths the description stated, and the typed
+schema that binds it:
+
+```go
+type Item struct {
+    Sku    string  `json:"sku"`
+    OnHand uint16  `json:"onHand"`
+    Note   *string `json:"note,omitempty"`
 }
+
+var ItemSchema = schema.Struct[Item]("Item",
+    schema.FieldOf("sku", schema.Matching(schema.Text(), "^[A-Z]{3}-[0-9]{5}$"), get, set),
+    ...
+)
 ```
 
-```go
-//go:generate go run github.com/mbauer83/effect-golang-web/cmd/schemagen -package .
-```
+Reading a description needs no parser and no reflection: a description is a Go
+value, and what reads a Go value is a Go program. So generation is a program
+that imports the descriptions — which is also why the descriptions live in their
+own package and are **unexported**. They are input. The application imports the
+generated package and uses `ItemSchema`; two usable schemas for one shape would
+be one too many.
 
-Derivation runs **one way only**. A Go struct cannot be derived from a schema,
-because Go cannot compute a type from a value; the struct is the source of truth
-and the schema follows it.
+Generation runs one way. A Go struct cannot be derived from a `Schema[A]`,
+because that value names `A` and so `A` must exist for the schema to compile at
+all. For a Go type you already have — a domain type with methods, one from
+another package — the schema is written with `Struct` and `FieldOf`, which is
+what those are for; `examples/catalog` does it that way.
 
-It is a generator rather than reflection because the module's whole claim is to
-be fully typed: reflection would discover the structure at run time and hand
-back the erasure the rest of this design refuses. Generated code is
-deterministic, formatted, checked in, and regenerated by a test that compares it
-with the structs it came from, so it cannot drift.
-
-| In the struct | In the schema |
+| In the description | In the generated code |
 |---|---|
-| `json:"name"` | the wire name; without a tag, the field name lower-camelled |
-| `json:",omitempty"` on a `*T` | `OptionalFieldOf`, present when the pointer is not nil |
-| `*T` without `omitempty` | `Nullable(T)` — present and null, which is a different thing |
-| `schema:"use=expr"` | that expression, for a refinement or a union |
-| `schema:"-"` | nothing; the field is not on the wire |
-| an unexported field | nothing |
-| a named type `N` in the package | `NSchema` |
-| a precise numeric type — `int8`, `uint32`, `float32` | the matching constructor, so the width survives the round trip |
-| the first paragraph of a doc comment | the prose a projection publishes |
+| a named `Struct` | a Go struct, and `NameSchema` binding it |
+| a named `OneOf` | an interface with an unexported marker, a struct per variant, and `NameSchema` |
+| `.Optional()` | a pointer field with `,omitempty` |
+| a stated width | that Go type — `uint16`, `float32` — rather than the widest one the wire could carry |
+| a member's prose | the field's doc comment |
+| a member name | the exported Go name, with the conventional initialisms: `id` becomes `ID` |
 
-A struct field carries a type and a name. Everything else a schema says — a
-bound, a length, a pattern, a format — has nowhere to live but the tag, so the
-tag carries the same vocabulary the [constraint](#constraints) combinators do:
-
-| Tag item | Becomes | Applies to |
-|---|---|---|
-| `min=N`, `max=N` | `AtLeast`, `AtMost` | a number |
-| `above=N`, `below=N` | `Above`, `Below` | a number |
-| `minLength=N`, `maxLength=N` | `MinLength`, `MaxLength` | a string |
-| `pattern=RE` | `Matching` | a string |
-| `minItems=N`, `maxItems=N` | `MinItems`, `MaxItems` | a list |
-| `format=X` | the checked constructor for a standard `X`, or `Formatted` for one this package has not been taught | a string |
-
-```go
-//schema:generate
-type Reading struct {
-    Code  string   `json:"code" schema:"pattern=^[A-Z]{2}-[0-9]{4}$"`
-    Pages int      `json:"pages" schema:"min=1,max=20000"`
-    Tags  []string `json:"tags" schema:"minItems=1,maxItems=8"`
-}
-```
-
-Items are separated by commas, **except inside braces, brackets or
-parentheses** — `[a-z]{2,8}` carries a comma of its own, and splitting on it
-would cut the pattern in half. Constraints are applied in the order written, so
-the tag and the generated code read the same way.
-
-A constraint written on a type it cannot apply to is refused rather than
-emitted: `minLength` on an `int` would compile into nothing sensible, and an
-explanation beats handing the reader a compile error. A constraint on a list
-applies to the list; to constrain its elements, describe the element with `use=`.
-
-Three things it refuses rather than guesses:
-
-- **`omitempty` on a non-pointer.** A zero value is not absence; the schema
-  refuses to guess that it is, so a generator that guessed for it would be worse
-  than an error.
-- **A type the table cannot name.** Guessing would produce a schema that
-  compiles and describes the wrong thing. Write one by hand and point at it with
-  `use=`.
-- **A marked type that is not a struct.** A union's alternatives, and how to
-  narrow to each, are not in an interface's declaration — see
-  [Sums](#sums).
+The output is deterministic and checked in, it is compiled as part of the
+module, and a test regenerates it in process and compares — so a description
+changed without a regeneration fails there rather than at the next request.
 
 ## Shapes
 
@@ -198,6 +183,22 @@ Three things it refuses rather than guesses:
 absent. An optional field's getter reports presence, because an empty string
 that is meant to be sent is not the same as a field that is not there — and an
 absent field is omitted rather than written as null.
+
+Everything that *modifies* rather than builds is a method, so there is nothing
+to remember about which wrap and which are called on what they change:
+
+```go
+schema.Struct[Book]("Book", …).Documented("one entry")
+schema.FieldOf("note", schema.Text(), get, set).Documented("a note")
+schema.VariantOf("circle", circleSchema, narrow, widen).Documented("a circle")
+schema.Describing("note", schema.Text()).Optional()
+```
+
+`Optional()` applies to a field whose absence can be *seen* — a described field,
+where the member is either in the object or not. A field bound with `FieldOf`
+cannot be made optional this way, because its getter returns a value and not a
+value and whether there is one; that is why `OptionalFieldOf` takes a different
+getter rather than this taking none.
 
 ## Widths
 

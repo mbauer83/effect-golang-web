@@ -16,13 +16,13 @@ import (
 
 // shapeDescription is a union with no Go type, whose alternatives are
 // themselves descriptions.
-var shapeDescription = schema.Choice("Shape",
-	schema.DocumentedAlternative("a circle, by its radius",
-		schema.AlternativeOf("circle", schema.Record("Circle",
-			schema.MemberOf("radius", schema.Above(schema.Float64(), 0))))),
-	schema.AlternativeOf("rectangle", schema.Record("Rectangle",
-		schema.MemberOf("width", schema.Above(schema.Float64(), 0)),
-		schema.MemberOf("height", schema.Above(schema.Float64(), 0)))),
+var shapeDescription = schema.OneOf[dynamic.Value]("Shape",
+	schema.Choosing("circle", schema.Struct[dynamic.Value]("Circle",
+		schema.Describing("radius", schema.Above(schema.Float64(), 0)))).
+		Documented("a circle, by its radius"),
+	schema.Choosing("rectangle", schema.Struct[dynamic.Value]("Rectangle",
+		schema.Describing("width", schema.Above(schema.Float64(), 0)),
+		schema.Describing("height", schema.Above(schema.Float64(), 0)))),
 )
 
 func TestADescribedUnionRoundTripsAndRefusesTheSameThings(t *testing.T) {
@@ -76,5 +76,39 @@ func TestADescriptionProjectsAsAnyOtherSchemaDoes(t *testing.T) {
 	}
 	if component.Properties[0].Schema.Description != "what the book is called" {
 		t.Fatalf("expected the prose published, got %q", component.Properties[0].Schema.Description)
+	}
+}
+
+func TestADescribedNullableIsPresentAndNull(t *testing.T) {
+	// Present and null is not the same as absent, and a description keeps them
+	// apart as a typed schema does: a nullable member is there carrying
+	// nothing, and an optional one is not there at all.
+	described := schema.Struct[dynamic.Value]("Reading",
+		schema.Describing("comment", schema.Nullable(schema.Text())),
+		schema.Describing("note", schema.Text()).Optional(),
+	)
+
+	value, err := schema.DecodeJSON(described, []byte(`{"comment":null}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	object := value.(dynamic.Object)
+	comment, present := object.Member("comment")
+	if !present {
+		t.Fatal("expected the nullable member to be present")
+	}
+	if _, absent := comment.(dynamic.Absent); !absent {
+		t.Fatalf("expected it to carry nothing, got %#v", comment)
+	}
+	if _, there := object.Member("note"); there {
+		t.Fatal("expected the optional member to be absent altogether")
+	}
+
+	written, err := schema.EncodeJSON(described, value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.TrimSpace(string(written)); got != `{"comment":null}` {
+		t.Fatalf("expected the null written back, got %s", got)
 	}
 }

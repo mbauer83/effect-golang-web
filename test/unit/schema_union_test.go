@@ -43,10 +43,10 @@ var rectangleSchema = schema.Struct[Rectangle]("Rectangle",
 )
 
 var shapeSchema = schema.OneOf[Shape]("Shape",
-	schema.DocumentedVariant("a circle, by its radius",
-		schema.VariantOf("circle", circleSchema,
-			func(shape Shape) (Circle, bool) { circle, is := shape.(Circle); return circle, is },
-			func(circle Circle) Shape { return circle })),
+	schema.VariantOf("circle", circleSchema,
+		func(shape Shape) (Circle, bool) { circle, is := shape.(Circle); return circle, is },
+		func(circle Circle) Shape { return circle }).
+		Documented("a circle, by its radius"),
 	schema.VariantOf("rectangle", rectangleSchema,
 		func(shape Shape) (Rectangle, bool) { rectangle, is := shape.(Rectangle); return rectangle, is },
 		func(rectangle Rectangle) Shape { return rectangle }),

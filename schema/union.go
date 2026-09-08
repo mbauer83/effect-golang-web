@@ -57,8 +57,8 @@ func VariantOf[A, B any](
 	}
 }
 
-// DocumentedVariant attaches prose a projection can carry into its output.
-func DocumentedVariant[A any](doc string, variant Variant[A]) Variant[A] {
+// Documented attaches prose a projection can carry into its output.
+func (variant Variant[A]) Documented(doc string) Variant[A] {
 	variant.doc = doc
 	return variant
 }

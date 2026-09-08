@@ -11,33 +11,29 @@ package catalog
 import "time"
 
 // Catalog is what one document holds.
-//
-//schema:generate
 type Catalog struct {
 	// Name identifies the catalogue.
-	Name string `json:"name"`
+	Name string
 	// Books are every entry, in the order the catalogue lists them.
-	Books []Book `json:"books"`
+	Books []Book
 }
 
 // Book is one entry.
 //
-// Subtitle is a pointer because absent and empty are different things, and a
-// generated optional field reads presence from the pointer rather than guessing
-// it from a zero value.
-//
-//schema:generate
+// Subtitle is a pointer because absent and empty are different things, and an
+// optional field's getter has to say which it is rather than leaving the schema
+// to guess from a zero value.
 type Book struct {
 	// Title is what the book is called.
-	Title string `json:"title" schema:"minLength=1"`
+	Title string
 	// Authors are credited in the order the book credits them.
-	Authors []string `json:"authors"`
+	Authors []string
 	// Pages is how many pages the book has, and there is at least one.
-	Pages int `json:"pages" schema:"min=1,max=20000"`
+	Pages int
 	// Subtitle is absent for a book that has none.
-	Subtitle *string `json:"subtitle,omitempty"`
+	Subtitle *string
 	// Availability is whether the book can be had.
-	Availability Availability `json:"availability"`
+	Availability Availability
 }
 
 // Availability is a sum, modelled the way Go models one: an interface with an
@@ -47,24 +43,18 @@ type Book struct {
 type Availability interface{ availability() }
 
 // InStock is a title on the shelf, with how many copies.
-//
-//schema:generate
 type InStock struct {
 	// Count is how many copies are on the shelf.
-	Count int `json:"count"`
+	Count int
 }
 
 // Awaited is a title not yet arrived, with when it is expected.
-//
-//schema:generate
 type Awaited struct {
 	// Expected is when the title should arrive.
-	Expected time.Time `json:"expected"`
+	Expected time.Time
 }
 
 // Discontinued is a title that will not be restocked.
-//
-//schema:generate
 type Discontinued struct{}
 
 func (InStock) availability()      {}

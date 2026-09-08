@@ -16,13 +16,13 @@ import (
 
 func TestProseOnAFieldReachesTheDescription(t *testing.T) {
 	documented := schema.Struct[Detail]("Detail",
-		schema.DocumentedField("what the note says",
-			schema.FieldOf("note", schema.Text(),
-				func(detail Detail) string { return detail.Note },
-				func(detail *Detail, note string) { detail.Note = note })),
+		schema.FieldOf("note", schema.Text(),
+			func(detail Detail) string { return detail.Note },
+			func(detail *Detail, note string) { detail.Note = note }).
+			Documented("what the note says"),
 	)
 
-	object, isObject := schema.Documented("one note", documented).Structure().(structure.Object)
+	object, isObject := documented.Documented("one note").Structure().(structure.Object)
 	if !isObject {
 		t.Fatalf("expected an object, got %#v", documented.Structure())
 	}
@@ -36,7 +36,7 @@ func TestProseOnAFieldReachesTheDescription(t *testing.T) {
 }
 
 func TestProseOnAUnionAndItsVariantsReachesTheDescription(t *testing.T) {
-	union, isUnion := schema.Documented("a shape", shapeSchema).Structure().(structure.Union)
+	union, isUnion := shapeSchema.Documented("a shape").Structure().(structure.Union)
 	if !isUnion {
 		t.Fatalf("expected a union, got %#v", shapeSchema.Structure())
 	}

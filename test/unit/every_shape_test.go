@@ -62,8 +62,8 @@ var everyShapeSchema = schema.Struct[everyShape]("EveryShape",
 		func(value everyShape) []int { return value.Nested },
 		func(value *everyShape, nested []int) { value.Nested = nested }),
 	schema.FieldOf("detail",
-		schema.Documented("one note, described once and referred to thereafter",
-			schema.Named("Detail", detailSchema)),
+		detailSchema.Named("Detail").
+			Documented("one note, described once and referred to thereafter"),
 		func(value everyShape) Detail { return value.Detail },
 		func(value *everyShape, detail Detail) { value.Detail = detail }),
 )

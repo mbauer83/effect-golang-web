@@ -5,6 +5,8 @@ package inventory
 
 import "github.com/mbauer83/effect-golang-web/schema"
 
+// one stocked line
+//
 // Item is generated from its description.
 type Item struct {
 	// the stock-keeping unit, three letters and five digits
@@ -20,18 +22,15 @@ type Item struct {
 
 // ItemSchema describes Item. It is generated from its description.
 var ItemSchema = schema.Struct[Item]("Item",
-	schema.DocumentedField("the stock-keeping unit, three letters and five digits",
-		schema.FieldOf("sku", schema.Matching(schema.Text(), "^[A-Z]{3}-[0-9]{5}$"),
-			func(value Item) string { return value.Sku },
-			func(value *Item, field string) { value.Sku = field })),
-	schema.DocumentedField("how many are on hand",
-		schema.FieldOf("onHand", schema.Uint16(),
-			func(value Item) uint16 { return value.OnHand },
-			func(value *Item, field uint16) { value.OnHand = field })),
-	schema.DocumentedField("what one unit weighs",
-		schema.FieldOf("weightGrams", schema.Float32(),
-			func(value Item) float32 { return value.WeightGrams },
-			func(value *Item, field float32) { value.WeightGrams = field })),
+	schema.FieldOf("sku", schema.Matching(schema.Text(), "^[A-Z]{3}-[0-9]{5}$"),
+		func(value Item) string { return value.Sku },
+		func(value *Item, field string) { value.Sku = field }).Documented("the stock-keeping unit, three letters and five digits"),
+	schema.FieldOf("onHand", schema.Uint16(),
+		func(value Item) uint16 { return value.OnHand },
+		func(value *Item, field uint16) { value.OnHand = field }).Documented("how many are on hand"),
+	schema.FieldOf("weightGrams", schema.Float32(),
+		func(value Item) float32 { return value.WeightGrams },
+		func(value *Item, field float32) { value.WeightGrams = field }).Documented("what one unit weighs"),
 	schema.FieldOf("id", schema.UUID(),
 		func(value Item) string { return value.ID },
 		func(value *Item, field string) { value.ID = field }),
@@ -47,22 +46,22 @@ var ItemSchema = schema.Struct[Item]("Item",
 			return *value.Note, true
 		},
 		func(value *Item, field string) { value.Note = &field }),
-)
+).Documented("one stocked line")
 
+// a change in what is stocked
+//
 // Movement is generated from its description.
 type Movement interface{ isMovement() }
 
 // MovementSchema describes Movement. It is generated from its description.
 var MovementSchema = schema.OneOf[Movement]("Movement",
-	schema.DocumentedVariant("stock arriving",
-		schema.VariantOf("received", ReceivedSchema,
-			func(value Movement) (Received, bool) { held, is := value.(Received); return held, is },
-			func(held Received) Movement { return held })),
-	schema.DocumentedVariant("stock leaving",
-		schema.VariantOf("shipped", ShippedSchema,
-			func(value Movement) (Shipped, bool) { held, is := value.(Shipped); return held, is },
-			func(held Shipped) Movement { return held })),
-)
+	schema.VariantOf("received", ReceivedSchema,
+		func(value Movement) (Received, bool) { held, is := value.(Received); return held, is },
+		func(held Received) Movement { return held }).Documented("stock arriving"),
+	schema.VariantOf("shipped", ShippedSchema,
+		func(value Movement) (Shipped, bool) { held, is := value.(Shipped); return held, is },
+		func(held Shipped) Movement { return held }).Documented("stock leaving"),
+).Documented("a change in what is stocked")
 
 // Received is generated from its description.
 type Received struct {

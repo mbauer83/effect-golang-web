@@ -11,11 +11,15 @@ import (
 	"os"
 
 	"github.com/mbauer83/effect-golang-web/examples/inventory/definitions"
-	"github.com/mbauer83/effect-golang-web/internal/schemagen"
+	"github.com/mbauer83/effect-golang-web/schemagen"
 )
 
 func main() {
-	written, err := schemagen.WriteBindings("inventory", definitions.Described()...)
+	for _, fault := range definitions.Faults() {
+		fmt.Fprintf(os.Stderr, "gen: %v\n", fault)
+		os.Exit(1)
+	}
+	written, err := schemagen.WriteBindings("inventory", definitions.Descriptions()...)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "gen: %v\n", err)
 		os.Exit(1)

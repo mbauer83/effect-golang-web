@@ -9,7 +9,7 @@ Nothing here is finished yet. What exists, and what is planned, is below.
 
 | Area | State |
 |---|---|
-| [Schema](docs/reference/schema.md) | usable: shapes, sums, constraints, formats, JSON, JSON Schema, descriptions with no Go type, generation from a struct |
+| [Schema](docs/reference/schema.md) | usable: shapes, sums, constraints, formats, JSON, JSON Schema, descriptions with no Go type, generation from a description |
 | [HTTP core: request, response, handler, server](docs/reference/web.md) | usable |
 | [Routing: matching, dispatch, middleware](docs/reference/web.md) | usable |
 | [Typed endpoints](docs/reference/web.md) | usable |
@@ -30,8 +30,7 @@ schema/                     Schema[A]: shapes, codecs, refinement
   schema/structure/         the description a projection walks
   schema/dynamic/           the value a description carries when there is no Go type
   schema/jsonschema/        the JSON Schema 2020-12 projection
-cmd/schemagen/              writes the schema a struct already implies
-internal/schemagen/         what it reads and what it writes
+schemagen/                  writes the Go types a description implies
 web/                        Request, Response, Handler, codecs, routes, Server
 openapi/                    the OpenAPI 3.1 projection of a surface
 examples/bookstore/         a complete HTTP program on the web core

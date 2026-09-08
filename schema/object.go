@@ -24,6 +24,10 @@ type Field[A any] struct {
 	// present reports whether an optional field has a value to write. It is
 	// nil for a required field, which always has one.
 	present func(A) bool
+	// derivable is the presence answer for a field whose absence can be seen
+	// from the value itself, which is the case for a described field: the
+	// member is in the object or it is not. Optional moves it into present.
+	derivable func(A) bool
 }
 
 // FieldOf describes a required field.
@@ -97,9 +101,32 @@ func OptionalFieldOf[A, B any](
 	}
 }
 
-// DocumentedField attaches prose a projection can carry into its output.
-func DocumentedField[A any](doc string, field Field[A]) Field[A] {
+// Documented attaches prose a projection can carry into its output.
+func (field Field[A]) Documented(doc string) Field[A] {
 	field.doc = doc
+	return field
+}
+
+// Optional marks a field that may be absent.
+//
+// It applies to a field whose presence is answerable: one describing a shape,
+// where absence is the member not being there, and one already built by
+// OptionalFieldOf. A field bound to a Go type with FieldOf cannot be made
+// optional this way, because its getter returns a value and not a value and
+// whether there is one -- and absence is a decision the program makes rather
+// than a zero value the schema guesses at. That is why OptionalFieldOf takes a
+// different getter rather than this taking none.
+func (field Field[A]) Optional() Field[A] {
+	switch {
+	case field.present != nil:
+		field.optional = true
+	case field.derivable != nil:
+		field.present = field.derivable
+		field.optional = true
+	default:
+		field.fault = fail(
+			"a bound field states presence in its getter; use OptionalFieldOf", nil)
+	}
 	return field
 }
 
