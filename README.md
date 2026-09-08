@@ -42,7 +42,7 @@ examples/bookstore/         a complete HTTP program on the web core
 examples/tally/             a websocket conversation, with shared state
 examples/library/           a repository over the database port, driver-free
 examples/dispatch/          a producer and a consumer over the broker port
-examples/catalog/           a complete program using one schema three ways
+examples/catalog/           one schema three ways, sequenced in direct style
 examples/inventory/         Go types generated from a description
 examples/cmd/webdemo/       the examples as a runnable command
 test/unit/                  behaviour of the public API

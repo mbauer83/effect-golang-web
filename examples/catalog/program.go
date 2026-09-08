@@ -7,18 +7,10 @@ import (
 	"github.com/mbauer83/effect-golang-web/schema"
 	"github.com/mbauer83/effect-golang-web/schema/jsonschema"
 	"github.com/mbauer83/effect-golang/effect"
+	"github.com/mbauer83/effect-golang/experimental/direct"
 )
 
 type catalogEffect[A any] = effect.Effect[effect.Unit, Fault, A]
-
-// loading is the workflow's explicit state. Naming it keeps the sequence flat
-// instead of nesting one FlatMap per stage.
-type loading struct {
-	document   []byte
-	catalog    Catalog
-	normalised []byte
-	contract   published
-}
 
 // published is the pair a projection yields: the document to serve and the
 // names of the shapes it declares once and refers to thereafter.
@@ -32,46 +24,33 @@ type published struct {
 //
 // The schema is validated first, so a declaration mistake fails the program at
 // its start rather than on the first document that happens to reach it.
+//
+// Written in direct style, which the reference tells you to reach for exactly
+// here: the sequence is seven dependent stages, and a Workflow's explicit state
+// type was the thing making it hard to read -- a four-field struct that existed
+// only to carry a value from one stage to the next, plus two adapters so every
+// Bind read the same way. None of that says anything about a catalogue. The
+// body holds no defer, which is the other condition: a defer here would run on
+// an ordinary domain failure and not only on a panic.
+//
+// The cost is that experimental/direct is experimental. That is a real cost and
+// it is the reason to prefer Workflow by default.
 func Program(inputPath string, normalisedPath string, contractPath string) catalogEffect[Report] {
 	io := effect.IOFor[effect.Unit]()
-	return effect.Do[effect.Unit, Fault](func() loading { return loading{} }).
-		Bind(ignoring(validated()), keepState).
-		Bind(ignoring(read(io, inputPath)), func(state loading, document []byte) loading {
-			state.document = document
-			return state
-		}).
-		Bind(func(state loading) catalogEffect[Catalog] { return decoded(state.document) },
-			func(state loading, catalog Catalog) loading {
-				state.catalog = catalog
-				return state
-			}).
-		Bind(func(state loading) catalogEffect[[]byte] { return normalised(state.catalog) },
-			func(state loading, document []byte) loading {
-				state.normalised = document
-				return state
-			}).
-		Bind(func(state loading) catalogEffect[effect.Unit] {
-			return write(io, normalisedPath, state.normalised)
-		}, keepState).
-		Bind(ignoring(contract()), func(state loading, contract published) loading {
-			state.contract = contract
-			return state
-		}).
-		Bind(func(state loading) catalogEffect[effect.Unit] {
-			return write(io, contractPath, state.contract.document)
-		}, keepState).
-		Yield(report).
-		Named("catalog")
-}
+	return direct.Run(func(bind *direct.Binder[effect.Unit, Fault]) Report {
+		direct.Bind(bind, validated())
 
-// ignoring adapts a step that does not consult the state, and keepState adapts
-// one whose result the state does not need. Together they keep every Bind in
-// the sequence reading the same way.
-func ignoring[A any](step catalogEffect[A]) func(loading) catalogEffect[A] {
-	return func(loading) catalogEffect[A] { return step }
-}
+		document := direct.Bind(bind, read(io, inputPath))
+		catalog := direct.Bind(bind, decoded(document))
+		encoded := direct.Bind(bind, normalised(catalog))
+		direct.Bind(bind, write(io, normalisedPath, encoded))
 
-func keepState[A any](state loading, _ A) loading { return state }
+		contract := direct.Bind(bind, contract())
+		direct.Bind(bind, write(io, contractPath, contract.document))
+
+		return report(catalog, contract)
+	}).Named("catalog")
+}
 
 // validated refuses to start on a schema that could never work.
 func validated() catalogEffect[effect.Unit] {
@@ -134,17 +113,17 @@ func contract() catalogEffect[published] {
 	).Named("publish-contract")
 }
 
-func report(state loading) Report {
+func report(catalog Catalog, contract published) Report {
 	shelved := 0
-	for _, book := range state.catalog.Books {
+	for _, book := range catalog.Books {
 		if _, onTheShelf := book.Availability.(InStock); onTheShelf {
 			shelved++
 		}
 	}
 	return Report{
-		Books:      len(state.catalog.Books),
+		Books:      len(catalog.Books),
 		Shelved:    shelved,
-		Components: state.contract.components,
+		Components: contract.components,
 	}
 }
 

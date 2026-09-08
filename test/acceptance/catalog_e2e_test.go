@@ -109,7 +109,7 @@ func TestTheNormalisedDocumentDecodesToTheSameValue(t *testing.T) {
 
 func TestARejectedDocumentNamesTheStageAndTheField(t *testing.T) {
 	broken := strings.Replace(catalogDocument, `"pages": 410`, `"pages": 0`, 1)
-	_, exit := run(t, broken)
+	workspace, exit := run(t, broken)
 
 	cause, failed := exit.Cause()
 	if !failed {
@@ -131,5 +131,16 @@ func TestARejectedDocumentNamesTheStageAndTheField(t *testing.T) {
 	}
 	if !errors.Is(failure, failure.Err) {
 		t.Fatalf("expected the underlying error to stay reachable, got %#v", failure)
+	}
+
+	// And the stages after it did not run. That is what a failure abandoning
+	// the sequence means, and it is the thing worth checking now the sequence
+	// is written in direct style: a short-circuit that had been swallowed would
+	// leave these documents behind, and the report would be of work the program
+	// never did.
+	for _, unwritten := range []string{"normalised.json", "contract.json"} {
+		if _, err := os.Stat(filepath.Join(workspace, unwritten)); !os.IsNotExist(err) {
+			t.Errorf("expected %s not to have been written, got %v", unwritten, err)
+		}
 	}
 }
