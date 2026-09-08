@@ -117,7 +117,7 @@ func baseShape(
 		return "", fmt.Errorf("%s: a format applies to a string, and this field is %s",
 			where(files, field.Pos()), goType)
 	}
-	return "schema.Formatted(" + strconv.Quote(format) + ")", nil
+	return formatShape(format), nil
 }
 
 // wireName is what a document calls the field, and whether it may be absent.

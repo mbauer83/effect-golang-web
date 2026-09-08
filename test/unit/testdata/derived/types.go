@@ -33,8 +33,11 @@ type Record struct {
 	// Sized is constrained by length, and by a pattern carrying a comma of its
 	// own inside braces -- which is why items are not split naively.
 	Sized string `json:"sized" schema:"minLength=2,maxLength=8,pattern=^[a-z]{2,8}$"`
-	// Shaped carries a format, which replaces the shape a string would have.
+	// Shaped carries a standard format, which both annotates and checks.
 	Shaped string `json:"shaped" schema:"format=uuid"`
+	// Annotated carries a format this package has not been taught, which
+	// annotates and claims nothing.
+	Annotated string `json:"annotated" schema:"format=isbn"`
 	// Counted is constrained by how many elements it may carry.
 	Counted []string `json:"counted" schema:"minItems=1,maxItems=4"`
 	Ignored  string             `json:"ignored" schema:"-"`

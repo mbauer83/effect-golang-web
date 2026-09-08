@@ -106,6 +106,19 @@ bounds, string lengths, a pattern, item counts. A kind says a value is a number;
 a constraint says which numbers, and a description that could not say so would
 leave every projection describing a wider type than the codec accepts.
 
+The named string formats sit beside it and are not the same thing. A format is
+an annotation a reader acts on and a rule a server enforces, and this makes
+both: `uuid`, `email`, `uri`, `url`, `uri-reference`, `hostname`, `ipv4`,
+`ipv6`. Where the rule is a regular expression it is recorded as a `Pattern`
+alongside the format name, so a consumer whose validator ignores `format` --
+which the specification permits, since `format` asserts nothing -- still gets
+the check. Where the rule is grammar, as an address is, there is nothing to
+record; that asymmetry is real and stays visible rather than being papered over
+with a regular expression that is wrong about something.
+
+`Formatted` remains the open case, carrying a name this package has not been
+taught and claiming nothing, because the format vocabulary is open by design.
+
 The vocabulary is small on purpose. A constraint earns a place in the
 description only if more than one projection can carry it; anything narrower is
 a refinement, which every projection describes as the shape underneath it. Each

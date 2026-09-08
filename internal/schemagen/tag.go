@@ -134,6 +134,31 @@ func vocabulary() []string {
 	return names
 }
 
+// formats names the constructor for each standard format.
+//
+// A known format both annotates and checks; one that is not here annotates
+// only, because JSON Schema's format vocabulary is open and a projection should
+// carry whatever the author wrote rather than refuse a name it has not been
+// taught. The generated call says which of the two it is.
+var formats = map[string]string{
+	"uuid":          "schema.UUID()",
+	"email":         "schema.Email()",
+	"uri":           "schema.URI()",
+	"url":           "schema.URL()",
+	"uri-reference": "schema.URIReference()",
+	"hostname":      "schema.Hostname()",
+	"ipv4":          "schema.IPv4()",
+	"ipv6":          "schema.IPv6()",
+}
+
+// formatShape is the shape a format asks for.
+func formatShape(format string) string {
+	if known, checked := formats[format]; checked {
+		return known
+	}
+	return "schema.Formatted(" + strconv.Quote(format) + ")"
+}
+
 // constrain wraps a shape in the constraints the tag asked for, checking that
 // each one applies to the type it is written on: a length on a number would
 // compile into nothing sensible, and a generator that emitted it would be

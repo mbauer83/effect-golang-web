@@ -83,7 +83,7 @@ tag carries the same vocabulary the [constraint](#constraints) combinators do:
 | `minLength=N`, `maxLength=N` | `MinLength`, `MaxLength` | a string |
 | `pattern=RE` | `Matching` | a string |
 | `minItems=N`, `maxItems=N` | `MinItems`, `MaxItems` | a list |
-| `format=X` | `Formatted` | a string |
+| `format=X` | the checked constructor for a standard `X`, or `Formatted` for one this package has not been taught | a string |
 
 ```go
 //schema:generate
@@ -120,7 +120,9 @@ Three things it refuses rather than guesses:
 
 | Constructor | Describes |
 |---|---|
-| `Text`, `Formatted(format)` | a string, optionally refined for readers of a projection |
+| `Text` | a string |
+| `Formatted(name)` | a string annotated with a format, and nothing more |
+| `UUID`, `Email`, `URI`, `URL`, `URIReference`, `Hostname`, `IPv4`, `IPv6` | a string in that standard format, **checked** |
 | `Int`, `Int64` | a whole number; `Int` rejects a value that does not fit |
 | `Float64` | a finite number; NaN and the infinities are refused on encode |
 | `Bool` | a boolean |
@@ -231,8 +233,40 @@ celsius := schema.TransformOrFail(schema.Float64(),
 )
 ```
 
-A refinement a schema cannot enforce should not look like one it does:
-`Formatted("email")` is a hint carried into projections, not a validation.
+## Formats
+
+A format is two different claims, and this package makes both. It is an
+annotation a reader of the contract acts on — JSON Schema's own `format` keyword
+asserts nothing, by design — and it is a rule a server has to enforce, because a
+request is refused here or it is not refused at all.
+
+```go
+schema.UUID()      // 123e4567-e89b-12d3-a456-426614174000
+schema.Email()     // parsed, not matched: the grammar is not a regular language
+schema.URI()       // absolute: it says what scheme it is
+schema.URL()       // absolute and located: a scheme, "://", and a host
+schema.Hostname()  // RFC 1123 labels, at most 253 characters
+schema.IPv4()      // told from the parsed form, so ::1 is not one
+```
+
+Where the rule **is** a regular expression — `uuid`, `url`, `hostname` — the
+expression is recorded as well as the format name, so a consumer whose validator
+ignores `format` still gets the check from `pattern`. Where the rule is grammar
+or arithmetic — an address, a URI — there is nothing to record and the document
+can only annotate. That asymmetry is real and is not hidden.
+
+`Email` refuses `Ada <ada@example.test>`: that is a mailbox, and a field asking
+for an address means the address. `URL` refuses `mailto:ada@example.test`, which
+is the whole difference between naming a thing and saying where it is; it
+annotates as `uri`, because that is the registered name and there is none for a
+locator.
+
+`Formatted(name)` is the open case: the format vocabulary is open, so a name
+this package has not been taught is carried into the projection and **claims
+nothing**. `Matching(pattern)` is the escape hatch for a rule of your own.
+
+A refinement a schema cannot enforce should not look like one it does, which is
+why those two are named differently from the rest.
 
 ## Encoding and decoding
 
