@@ -17,6 +17,12 @@ import (
 type Routes[R, E any] struct {
 	declarations []Declaration
 	tree         *treeNode[R, E]
+	// assembled and reject are what this was made from, kept so the surface
+	// can be rebuilt with a wrapper around every route. A Routes that could
+	// not be re-derived from its own parts would force a caller to keep the
+	// parts itself, which is a worse place for them.
+	assembled []Route[R, E]
+	reject    func(error) Response
 }
 
 // NewRoutes assembles routes, answering a malformed request with 400 and the
@@ -42,7 +48,11 @@ func NewRoutesRejecting[R, E any](
 		return Routes[R, E]{}, faulted("assembling routes", errNoRoutes)
 	}
 
-	assembled := Routes[R, E]{tree: newTreeNode[R, E]()}
+	assembled := Routes[R, E]{
+		tree:      newTreeNode[R, E](),
+		assembled: slices.Clone(routes),
+		reject:    reject,
+	}
 	for _, route := range routes {
 		if route.fault != nil {
 			return Routes[R, E]{}, route.fault
@@ -61,6 +71,49 @@ func NewRoutesRejecting[R, E any](
 // A published document is projected from these.
 func (routes Routes[R, E]) Declarations() []Declaration {
 	return routes.declarations
+}
+
+// Matched derives a handler from a handler, and is told which route it is
+// deriving it for.
+//
+// The shape every cross-cutting concern that has to name the route needs:
+// observation, a per-route rate limit, an audit line. Ordinary Middleware
+// cannot do it, because it wraps the surface's handler and by then the only
+// thing left of the route is the path the client asked for -- and a path is an
+// unbounded value, so naming anything after it is how a metric label or a span
+// name becomes one series per request.
+type Matched[R, E any] func(Declaration, Handler[R, E]) Handler[R, E]
+
+// Wrapping applies one wrapper to every route, giving each the declaration it
+// belongs to.
+//
+// A setting on the surface, applied in one place, rather than something a
+// caller has to remember at every call site: a route that was not written
+// through the right constructor would be a route that quietly is not observed,
+// and nothing would say so.
+//
+//	surface, err := web.NewRoutes(routes...)
+//	surface = surface.Wrapping(inspect.Observing(costs))
+//
+// It cannot fail. The patterns are the ones that already assembled, and a
+// wrapper does not change them, so there is nothing left to refuse. A zero
+// Routes wraps nothing and stays itself.
+func (routes Routes[R, E]) Wrapping(each Matched[R, E]) Routes[R, E] {
+	if each == nil || len(routes.assembled) == 0 {
+		return routes
+	}
+	wrapped := make([]Route[R, E], 0, len(routes.assembled))
+	for _, route := range routes.assembled {
+		wrapped = append(wrapped, route.wrapping(each))
+	}
+	// The same routes with the same patterns, so this cannot refuse what it
+	// already accepted; an error here would be a bug in the tree rather than
+	// a caller's mistake, and reporting it as the caller's would be a lie.
+	rebuilt, err := NewRoutesRejecting(routes.reject, wrapped...)
+	if err != nil {
+		return routes
+	}
+	return rebuilt
 }
 
 // Handler dispatches a request to the route that matches it.

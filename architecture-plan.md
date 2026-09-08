@@ -462,6 +462,14 @@ Separating them is what makes three things possible from one value: dispatch, an
 OpenAPI document, and a client. A route that carried only a function could give
 none of them.
 
+**ADDED**: `Matched` and `Routes.Wrapping` are the seam for a concern that has
+to name the route it is wrapping. `Middleware` wraps the surface and sees only
+the path a client asked for, which is unbounded -- so anything naming a route
+after it produces one series per request. Observation was written against the
+handler constructor instead, which meant a program had to be written
+differently to be observed and could miss a route without saying so. The seam
+belongs here, at the layer that knows which route matched.
+
 **ADDED**: the client is `web.Dial`, `web.Fetch` and `web.Call`, and it delivers
 the response half of "typed client" rather than both halves. `Output` now holds
 a decoder beside its encoder, so `Call` reads a response through the same schema

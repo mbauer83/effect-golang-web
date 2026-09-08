@@ -309,6 +309,41 @@ refused, because a client meets one API and not a collection of separately
 worded ones. `Declarations()` returns what the routes say about themselves, in
 declared order, which is what a published document is projected from.
 
+## Wrapping every route
+
+```go
+type Matched[R, E any] func(Declaration, Handler[R, E]) Handler[R, E]
+
+surface, err := web.NewRoutes(routes...)
+surface = surface.Wrapping(observing)     // one setting, whole surface
+```
+
+`Middleware` wraps the surface's handler, and by then the only thing left of
+the route is the path the client asked for. That is enough for authentication
+or a rate limit and **not** enough for anything that has to *name* the route: a
+concrete path is an unbounded value, so a span name or a metric label made from
+one becomes a series per request.
+
+`Matched` is the wrapper that is told which route it is wrapping. `Wrapping`
+applies one to every route, giving each its own `Declaration`, and returns the
+surface rebuilt — the same declarations, the same precedence, the same
+rejections.
+
+**It is a setting and not a convention.** A concern applied at every call site
+is one that can be forgotten at one call site, and nothing would say so; a
+concern applied to the assembled surface covers the route somebody added this
+morning. Turning it off is not applying it, which a caller can decide from a
+flag at start-up. `Wrapping(nil)` and a zero `Routes` are both the surface
+itself.
+
+A wrapper sees the route's whole work — the codecs as well as the handler,
+because it wraps what dispatch calls. That is the useful boundary: a route
+whose response is expensive to encode is expensive to serve whatever its
+handler cost, and a request the codecs refuse never reaches the handler at all.
+
+It cannot fail. The patterns are the ones that already assembled and a wrapper
+does not change them, so there is nothing left to refuse.
+
 ## Middleware
 
 ```go

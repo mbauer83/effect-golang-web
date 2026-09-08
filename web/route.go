@@ -26,6 +26,25 @@ func (route Route[R, E]) Declaration() Declaration {
 	return route.declaration
 }
 
+// wrapping returns the route with each built handler passed through the
+// wrapper, together with the declaration it belongs to.
+//
+// The wrapper sees the route's whole work: the codecs as well as the handler,
+// because it wraps what dispatch calls. That is the useful boundary -- a route
+// whose response is expensive to encode is expensive to serve, whatever the
+// handler cost.
+func (route Route[R, E]) wrapping(each Matched[R, E]) Route[R, E] {
+	if route.fault != nil || route.build == nil {
+		return route
+	}
+	inner := route.build
+	declaration := route.declaration
+	route.build = func(reject func(error) Response) Handler[R, E] {
+		return each(declaration, inner(reject))
+	}
+	return route
+}
+
 // Handle gives an endpoint its handler.
 //
 // The handler takes the decoded input and returns the output value, not a
