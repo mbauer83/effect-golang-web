@@ -60,6 +60,15 @@ jobs:
         working-directory: effect-golang-web
         run: go test -race -count=1 ./...
 
+      # Generated code is checked in, so a struct changed without a
+      # regeneration is caught here as well as by the drift test -- this step
+      # also fails if a go:generate directive itself has stopped working.
+      - name: Generated code
+        working-directory: effect-golang-web
+        run: |
+          go generate ./...
+          git diff --exit-code
+
       # The examples must remain runnable programs, not only test fixtures.
       - name: Examples
         working-directory: effect-golang-web

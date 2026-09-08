@@ -17,10 +17,13 @@ import (
 )
 
 // Book is one entry.
+//
+//schema:generate
 type Book struct {
-	Title   string
-	Authors []string
-	Pages   int
+	Title   string   `json:"title"`
+	Authors []string `json:"authors"`
+	// Pages is how many pages the book has, and there is at least one.
+	Pages int `json:"pages" schema:"use=pagesSchema"`
 }
 
 // Store holds the collection. It is safe for concurrent use because a server

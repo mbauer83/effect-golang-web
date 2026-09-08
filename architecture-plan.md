@@ -166,11 +166,11 @@ document is compiled by an external JSON Schema 2020-12 validator and checked to
 accept every document the codec writes and refuse every one it refuses. The
 validator is a test dependency only.
 
-## 3.4 Derivation is a separate decision
+## 3.4 Derivation is generation, and runs one way
 
 Go has neither Scala's implicit derivation nor TypeScript's mapped types, so a
-schema for a struct is written rather than summoned. Three ways exist to change
-that, and they are not equivalent:
+schema for a struct is written rather than summoned. Three ways existed to
+change that, and they are not equivalent:
 
 ```text
 combinators     statically typed, no reflection, verbose for a wide struct
@@ -179,13 +179,29 @@ generation      statically typed and terse, but adds a build step
 ```
 
 The combinator core is required by all three, because reflection and generation
-would both *produce* combinator schemas. It is therefore built first, and which
-derivation to add is deferred until there is a real application to measure the
-verbosity against. Nothing built now is wasted by that decision.
+both *produce* combinator schemas, so it was built first and the choice
+deferred until there were real applications to measure the verbosity against.
 
-Whatever is added must not become the only usable path: a schema a caller can
-write by hand is what keeps the description honest when a struct's wire shape
-differs from its Go shape.
+DECIDED after two of them existed: **generation**. Reflection would discover
+the structure at run time and hand back the erasure the rest of this design
+refuses; the module's own architecture test forbids a top type in production
+code for exactly that reason, and reflection is that ban by another name.
+Generated code is deterministic, formatted, fully typed, checked in, and
+regenerated in process by a test that compares it with the structs it came
+from.
+
+Derivation runs one way only. A Go struct cannot be derived from a schema,
+because Go cannot compute a type from a value; the struct is the source of
+truth and the schema follows it. The other direction would need a source of
+truth outside Go, which is a different project.
+
+Generation did not become the only usable path. Everything the generator emits
+is a call a person could have written, so the two remain interchangeable, and
+three things it refuses rather than guesses keep a hand-written schema
+necessary: `omitempty` on a non-pointer, because a zero value is not absence; a
+type the table cannot name, because guessing produces a schema that compiles
+and describes the wrong thing; and a marked type that is not a struct, because
+a union's alternatives are not in an interface's declaration.
 
 ---
 
