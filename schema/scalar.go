@@ -35,22 +35,24 @@ func Formatted(format string) Schema[string] {
 // Int describes a platform int, narrowed on decode so a value that does not fit
 // is rejected rather than silently truncated.
 func Int() Schema[int] {
-	return TransformOrFail(Int64(),
-		func(value int64) (int, error) {
-			narrowed := int(value)
-			if int64(narrowed) != value {
-				return 0, fail("integer does not fit in an int", nil)
-			}
-			return narrowed, nil
-		},
-		func(value int) (int64, error) { return int64(value), nil },
-	)
+	return withPrecision(
+		TransformOrFail(Int64(),
+			func(value int64) (int, error) {
+				narrowed := int(value)
+				if int64(narrowed) != value {
+					return 0, fail("integer does not fit in an int", nil)
+				}
+				return narrowed, nil
+			},
+			func(value int) (int64, error) { return int64(value), nil },
+		),
+		structure.IntBits)
 }
 
-// Int64 describes a 64-bit signed integer.
+// Int64 describes a 64-bit signed integer, which is the width the wire carries.
 func Int64() Schema[int64] {
 	return of(
-		structure.Scalar{Kind: structure.Integer},
+		structure.Scalar{Kind: structure.Integer, Precision: structure.Int64Bits},
 		func(value int64, into Sink) error { return into.Integer(value) },
 		func(from Source) (int64, error) { return from.Integer() },
 	)
@@ -63,7 +65,7 @@ func Int64() Schema[int64] {
 // says so.
 func Float64() Schema[float64] {
 	return of(
-		structure.Scalar{Kind: structure.Number},
+		structure.Scalar{Kind: structure.Number, Precision: structure.Float64Bits},
 		func(value float64, into Sink) error {
 			if math.IsNaN(value) || math.IsInf(value, 0) {
 				return fail("number is not finite", nil)

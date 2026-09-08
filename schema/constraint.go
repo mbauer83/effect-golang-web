@@ -18,9 +18,15 @@ import (
 	"github.com/mbauer83/effect-golang-web/schema/structure"
 )
 
-// numeric is the kinds a bound can be stated over.
+// numeric is every Go type a bound can be stated over.
+//
+// It is the whole numeric breadth of the language rather than the two shapes
+// the wire has, which is what makes a bound outside a type's range a compile
+// error: AtMost(Int8(), 200) does not build, because 200 is not an int8.
 type numeric interface {
-	~int | ~int64 | ~float64
+	~int | ~int8 | ~int16 | ~int32 | ~int64 |
+		~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 |
+		~float32 | ~float64
 }
 
 // AtLeast admits values no less than minimum.

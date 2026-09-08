@@ -127,6 +127,7 @@ with the structs it came from, so it cannot drift.
 | `schema:"-"` | nothing; the field is not on the wire |
 | an unexported field | nothing |
 | a named type `N` in the package | `NSchema` |
+| a precise numeric type — `int8`, `uint32`, `float32` | the matching constructor, so the width survives the round trip |
 | the first paragraph of a doc comment | the prose a projection publishes |
 
 A struct field carries a type and a name. Everything else a schema says — a
@@ -180,8 +181,9 @@ Three things it refuses rather than guesses:
 | `Text` | a string |
 | `Formatted(name)` | a string annotated with a format, and nothing more |
 | `UUID`, `Email`, `URI`, `URL`, `URIReference`, `Hostname`, `IPv4`, `IPv6` | a string in that standard format, **checked** |
-| `Int`, `Int64` | a whole number; `Int` rejects a value that does not fit |
-| `Float64` | a finite number; NaN and the infinities are refused on encode |
+| `Int`, `Int8`, `Int16`, `Int32`, `Int64` | a whole number of that width |
+| `Uint`, `Uint8`, `Uint16`, `Uint32`, `Uint64` | an unsigned whole number of that width |
+| `Float32`, `Float64` | a finite number; NaN and the infinities are refused on encode |
 | `Bool` | a boolean |
 | `Bytes` | an opaque byte string, base64 in a text format |
 | `Time` | an instant, RFC 3339 in a text format |
@@ -196,6 +198,37 @@ Three things it refuses rather than guesses:
 absent. An optional field's getter reports presence, because an empty string
 that is meant to be sent is not the same as a field that is not there — and an
 absent field is omitted rather than written as null.
+
+## Widths
+
+The wire carries two numeric shapes and Go has twelve. A description says which
+of the twelve, so the wire shape is **derived** rather than declared: every one
+of these is `integer` or `number` on the wire, and a format reads that and needs
+to know nothing about the width.
+
+Three things follow, and each of them is the reason to state a width:
+
+- **A bound outside the type's range is a compile error.** `AtMost(Int8(), 200)`
+  does not build, because 200 is not an `int8`. The constructor being precisely
+  typed is what buys this; no check at run time is involved.
+- **The range the width implies is recorded**, so the published contract states
+  `minimum: 0, maximum: 255` for a `Uint8` without anyone writing it down — and
+  a schema used without its Go type still refuses what the width cannot hold.
+- **A generator emits the type the author meant** rather than the widest one
+  that would hold it.
+
+Decoding refuses a value the width cannot hold rather than truncating it, and
+`Float32` refuses one beyond its range rather than turning it into an infinity.
+
+`Uint` and `Uint64` are bounded by the largest *signed* 64-bit value, not the
+largest unsigned one: the wire carries a signed integer, so a value above that
+cannot be expressed at all and claiming otherwise would be lying about what the
+schema can carry.
+
+Only the widths the specification registers a name for become a `format` —
+`int32`, `int64`, `float`, `double`. The rest are stated by `minimum` and
+`maximum`, which is what a reader can act on; putting `uint16` in a contract
+would be telling a client about Go.
 
 ## Sums
 

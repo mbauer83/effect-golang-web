@@ -36,6 +36,7 @@ web/                        Request, Response, Handler, codecs, routes, Server
 openapi/                    the OpenAPI 3.1 projection of a surface
 examples/bookstore/         a complete HTTP program on the web core
 examples/catalog/           a complete program using one schema three ways
+examples/inventory/         Go types generated from a description
 examples/cmd/webdemo/       the examples as a runnable command
 test/unit/                  behaviour of the public API
 test/acceptance/            the example programs, end to end

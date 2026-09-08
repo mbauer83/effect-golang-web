@@ -17,6 +17,8 @@ import (
 	"net/mail"
 	"net/netip"
 	"net/url"
+
+	"github.com/mbauer83/effect-golang-web/schema/structure"
 )
 
 // UUID admits the textual form of a UUID, in any case.
@@ -153,4 +155,52 @@ func checked[A any](inner Schema[A], check func(A) error) Schema[A] {
 			return decoded, nil
 		},
 	)
+}
+
+// Constructor is what a generator needs to write a scalar back out: the call,
+// and how many of the constraints in the shape that call already carries.
+//
+// The count is here rather than in the generator because only this package
+// knows what each constructor records, and a second table would fall out of
+// step with these the first time one of them changed.
+type Constructor struct {
+	Call    string
+	Carries int
+}
+
+// FormatConstructors names the constructor for each standard format.
+var FormatConstructors = map[string]Constructor{
+	"uuid":          {Call: "schema.UUID()", Carries: constraintsIn(UUID())},
+	"email":         {Call: "schema.Email()", Carries: constraintsIn(Email())},
+	"uri":           {Call: "schema.URI()", Carries: constraintsIn(URI())},
+	"uri-reference": {Call: "schema.URIReference()", Carries: constraintsIn(URIReference())},
+	"hostname":      {Call: "schema.Hostname()", Carries: constraintsIn(Hostname())},
+	"ipv4":          {Call: "schema.IPv4()", Carries: constraintsIn(IPv4())},
+	"ipv6":          {Call: "schema.IPv6()", Carries: constraintsIn(IPv6())},
+}
+
+// PrecisionConstructors names the constructor for each Go numeric width.
+var PrecisionConstructors = map[structure.Precision]Constructor{
+	structure.Int8Bits:    {Call: "schema.Int8()", Carries: constraintsIn(Int8())},
+	structure.Int16Bits:   {Call: "schema.Int16()", Carries: constraintsIn(Int16())},
+	structure.Int32Bits:   {Call: "schema.Int32()", Carries: constraintsIn(Int32())},
+	structure.Int64Bits:   {Call: "schema.Int64()", Carries: constraintsIn(Int64())},
+	structure.IntBits:     {Call: "schema.Int()", Carries: constraintsIn(Int())},
+	structure.Uint8Bits:   {Call: "schema.Uint8()", Carries: constraintsIn(Uint8())},
+	structure.Uint16Bits:  {Call: "schema.Uint16()", Carries: constraintsIn(Uint16())},
+	structure.Uint32Bits:  {Call: "schema.Uint32()", Carries: constraintsIn(Uint32())},
+	structure.Uint64Bits:  {Call: "schema.Uint64()", Carries: constraintsIn(Uint64())},
+	structure.UintBits:    {Call: "schema.Uint()", Carries: constraintsIn(Uint())},
+	structure.Float32Bits: {Call: "schema.Float32()", Carries: constraintsIn(Float32())},
+	structure.Float64Bits: {Call: "schema.Float64()", Carries: constraintsIn(Float64())},
+}
+
+// constraintsIn counts what a constructor records, so a generator emitting the
+// constructor knows not to emit those again.
+func constraintsIn[A any](shape Schema[A]) int {
+	scalar, isScalar := shape.node.(structure.Scalar)
+	if !isScalar {
+		return 0
+	}
+	return len(scalar.Constraints)
 }

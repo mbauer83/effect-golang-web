@@ -191,7 +191,11 @@ func appliesToType(kind appliesTo, goType string) bool {
 	}
 }
 
-var numbers = map[string]bool{"int": true, "int64": true, "float64": true}
+var numbers = map[string]bool{
+	"int": true, "int8": true, "int16": true, "int32": true, "int64": true,
+	"uint": true, "uint8": true, "uint16": true, "uint32": true, "uint64": true,
+	"float32": true, "float64": true,
+}
 
 // literal renders a tag value as the Go literal the combinator takes.
 func literal(asked constraint) (string, error) {

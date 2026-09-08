@@ -23,7 +23,7 @@ func render(collected collected) ([]byte, error) {
 	renderImports(&written, collected)
 
 	for _, described := range collected.types {
-		if err := renderType(&written, described); err != nil {
+		if err := renderType(&written, described, "the struct"); err != nil {
 			return nil, err
 		}
 	}
@@ -98,9 +98,9 @@ func qualifiersIn(types []structType) []string {
 // renderType writes one schema. A struct with no fields is allowed: an empty
 // variant of a union is a real shape, and refusing it would make one
 // unexpressible.
-func renderType(written *bytes.Buffer, described structType) error {
-	fmt.Fprintf(written, "\n// %sSchema describes %s. It is generated from the struct.\n",
-		described.name, described.name)
+func renderType(written *bytes.Buffer, described structType, origin string) error {
+	fmt.Fprintf(written, "\n// %sSchema describes %s. It is generated from %s.\n",
+		described.name, described.name, origin)
 	fmt.Fprintf(written, "var %sSchema = ", described.name)
 	if described.doc != "" {
 		fmt.Fprintf(written, "schema.Documented(%s,\n", strconv.Quote(described.doc))

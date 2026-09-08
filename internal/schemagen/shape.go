@@ -44,11 +44,19 @@ func shapeOf(goType string, field *ast.Field, files *token.FileSet) (string, err
 // is a scalar on the wire whatever Go calls it.
 var scalars = map[string]string{
 	"string":    "schema.Text()",
-	"int":       "schema.Int()",
-	"int64":     "schema.Int64()",
-	"float64":   "schema.Float64()",
 	"bool":      "schema.Bool()",
 	"time.Time": "schema.Time()",
+	"int":       "schema.Int()",
+	"int8":      "schema.Int8()",
+	"int16":     "schema.Int16()",
+	"int32":     "schema.Int32()",
+	"int64":     "schema.Int64()",
+	"uint":      "schema.Uint()",
+	"uint16":    "schema.Uint16()",
+	"uint32":    "schema.Uint32()",
+	"uint64":    "schema.Uint64()",
+	"float32":   "schema.Float32()",
+	"float64":   "schema.Float64()",
 }
 
 func wrapped(combinator string, inner string, field *ast.Field, files *token.FileSet) (string, error) {

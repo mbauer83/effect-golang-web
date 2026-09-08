@@ -127,6 +127,26 @@ measuring a value is type-dependent -- a number is compared, a string is
 counted, a list is counted differently -- and a generic one would have to take a
 measuring function nobody wants to write.
 
+ADDED: a `Scalar` also carries a `Precision`, the Go representation it is
+carried in. The wire has two numeric shapes and Go has twelve, and a
+description that only said "a whole number" would make a generator guess a
+width and make a published contract claim a range wider than the program
+accepts. Kind stays the wire vocabulary; Precision is Go-side detail a format
+never reads. The wire shape is derived from the width, not declared beside it.
+
+Three dividends, and the first is why the constructors are precisely typed
+rather than a width being a field somebody sets: `AtMost(Int8(), 200)` is a
+**compile error**, because 200 is not an int8. Go cannot check a bound against
+a range at compile time in general, but it checks a constant against a type for
+free, and that is the same thing where it matters. The second is that the range
+a width implies is recorded, so a contract states it without anyone writing it
+down and a description enforces it without the Go type. The third is that a
+generator emits the type the author meant.
+
+Only the widths the specification registers a name for become a format
+keyword. The rest are stated by minimum and maximum: a range is something a
+reader acts on, and "uint16" in a contract is telling a client about Go.
+
 `Reference` exists for two reasons at once: recursive types terminate, and
 OpenAPI wants `$ref` rather than an inlined copy at every use.
 
@@ -226,7 +246,30 @@ The typed and described paths are tested to reach the same verdict on the same
 value, because a generated struct that accepted what its description refused
 would be the one bug this whole arrangement exists to prevent.
 
-## 3.5 Derivation is generation, and runs one way
+## 3.5 Derivation is generation, and runs both ways
+
+CORRECTED: it runs both ways, and the earlier claim that a struct could not be
+derived from a schema was wrong about the mechanism.
+
+A Go struct cannot be derived from a `Schema[A]` value, because that value
+names `A` and so `A` must exist for it to compile. But a description that names
+no Go type -- `Record`, `Choice`, a `structure.Node` -- compiles on its own, and
+reading it needs no parser and no reflection: it is a Go value, so a Go program
+reads it by calling `Structure()`. Generation from a description is therefore a
+program that imports the descriptions and writes the types, which is fifteen
+lines and no toolchain gymnastics.
+
+So both directions exist, and both are right sometimes. A wire shape that
+differs from the domain type wants the struct first; a contract several programs
+share wants the description first. They share the rendering, so a schema
+generated from a struct and one generated from a description are the same code
+-- two emitters would drift.
+
+`examples/catalog` is the first direction and `examples/inventory` the second.
+The generated file in each is compiled as part of the module, so the compiler
+checks it, and a drift test regenerates it in process and compares.
+
+## 3.6 What a generator will not guess
 
 Go has neither Scala's implicit derivation nor TypeScript's mapped types, so a
 schema for a struct is written rather than summoned. Three ways existed to
