@@ -79,6 +79,21 @@ func read(t *testing.T, response *http.Response) []byte {
 	return body
 }
 
+// interpreted runs one of the store's effects, which is how a test reads a
+// store whose operations are descriptions.
+func interpreted[A any](t *testing.T, fx effect.Effect[effect.Unit, bookstore.Fault, A]) A {
+	t.Helper()
+	runtime, err := effect.NewRuntime()
+	if err != nil {
+		t.Fatal(err)
+	}
+	value, succeeded := runtime.Run(context.Background(), effect.Unit{}, fx).Value()
+	if !succeeded {
+		t.Fatal("the store refused a read")
+	}
+	return value
+}
+
 func TestTheBookstoreAnswersWithTheDocumentItsSchemaDescribes(t *testing.T) {
 	base := running(t, bookstore.NewStore(
 		bookstore.Book{Title: "Zionomicon", Authors: []string{"John A. De Goes"}, Pages: 632},
@@ -113,7 +128,10 @@ func TestAPostedEntityIsDecodedThroughTheSameSchema(t *testing.T) {
 	if response.StatusCode != http.StatusCreated {
 		t.Fatalf("expected 201, got %d: %s", response.StatusCode, read(t, response))
 	}
-	if held := store.All(); len(held) != 1 || held[0].Pages != 10 {
+	// Reading the store is an effect, as writing it is, so the test interprets
+	// it rather than calling it.
+	held := interpreted(t, store.All())
+	if len(held) != 1 || held[0].Pages != 10 {
 		t.Fatalf("unexpected store contents: %#v", held)
 	}
 }
