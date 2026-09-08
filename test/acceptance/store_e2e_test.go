@@ -17,7 +17,7 @@ func TestTheStoreRefusesInTheFailureChannelAndNotThroughAnError(t *testing.T) {
 	// The store's refusal is typed and travels where a typed failure travels.
 	// It used to come back as an error that the boundary dug the type out of
 	// with errors.As, which is the thing a failure channel exists to avoid.
-	store := bookstore.NewStore(bookstore.Book{Title: "Held", Authors: []string{"A"}, Pages: 10})
+	store := built(t, bookstore.NewStore(bookstore.Book{Title: "Held", Authors: []string{"A"}, Pages: 10}))
 	runtime, err := effect.NewRuntime()
 	if err != nil {
 		t.Fatal(err)
@@ -43,7 +43,7 @@ func TestTheStoreRefusesInTheFailureChannelAndNotThroughAnError(t *testing.T) {
 func TestTheStoreIsSafeWhenManyRequestsAddAtOnce(t *testing.T) {
 	// A server handles requests concurrently, so the store has to survive it.
 	// Exactly one of a hundred attempts at one title may succeed.
-	store := bookstore.NewStore()
+	store := built(t, bookstore.NewStore())
 	runtime, err := effect.NewRuntime()
 	if err != nil {
 		t.Fatal(err)
@@ -77,7 +77,7 @@ func TestAReaderCannotChangeTheStoreThroughWhatItWasGiven(t *testing.T) {
 	// A read hands back a copy. Without one, a caller holding the result would
 	// be holding the store's own memory, and writing to it would change the
 	// store from outside every rule the store enforces.
-	store := bookstore.NewStore(bookstore.Book{Title: "Held", Authors: []string{"A"}, Pages: 10})
+	store := built(t, bookstore.NewStore(bookstore.Book{Title: "Held", Authors: []string{"A"}, Pages: 10}))
 
 	held := interpreted(t, store.All())
 	held[0].Title = "changed"

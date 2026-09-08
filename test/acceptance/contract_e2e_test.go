@@ -17,7 +17,7 @@ import (
 func TestTheSurfaceDescribesItselfForAPublishedContract(t *testing.T) {
 	// Dispatch and the document come from the same declarations, which is why
 	// separating an endpoint from its handler was worth doing.
-	surface, err := bookstore.Surface(bookstore.NewStore())
+	surface, err := bookstore.Surface(built(t, bookstore.NewStore()))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,7 +45,7 @@ func TestTheServedContractIsValidAndDescribesTheRoutesThatServeIt(t *testing.T) 
 	// The document a client fetches is the projection of the same declarations
 	// that dispatch its requests, and it is checked by a parser that has never
 	// seen this module.
-	base := running(t, bookstore.NewStore())
+	base := running(t, built(t, bookstore.NewStore()))
 	response := get(t, base+"/openapi.json")
 
 	if response.StatusCode != http.StatusOK {

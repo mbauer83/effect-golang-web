@@ -8,6 +8,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -61,9 +62,15 @@ func runBookstore(runtime *effect.Runtime) {
 	if err != nil {
 		fail(err)
 	}
-	store := bookstore.NewStore(
-		bookstore.Book{Title: "Zionomicon", Authors: []string{"John A. De Goes"}, Pages: 632},
-	)
+	// The store holds a Ref, so building one is an effect: its state cannot
+	// exist before something interprets the description that makes it.
+	store, made := runtime.Run(context.Background(), effect.Unit{},
+		bookstore.NewStore(
+			bookstore.Book{Title: "Zionomicon", Authors: []string{"John A. De Goes"}, Pages: 632},
+		)).Value()
+	if !made {
+		fail(errors.New("the store could not be built"))
+	}
 	surface, err := bookstore.Published(store)
 	if err != nil {
 		fail(err)

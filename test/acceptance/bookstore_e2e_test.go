@@ -79,6 +79,20 @@ func read(t *testing.T, response *http.Response) []byte {
 	return body
 }
 
+// built makes a store, which is an effect because the Ref it holds is one.
+func built(t *testing.T, making effect.Effect[effect.Unit, effect.Never, *bookstore.Store]) *bookstore.Store {
+	t.Helper()
+	runtime, err := effect.NewRuntime()
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, made := runtime.Run(context.Background(), effect.Unit{}, making).Value()
+	if !made {
+		t.Fatal("expected the store to be built")
+	}
+	return store
+}
+
 // interpreted runs one of the store's effects, which is how a test reads a
 // store whose operations are descriptions.
 func interpreted[A any](t *testing.T, fx effect.Effect[effect.Unit, bookstore.Fault, A]) A {
@@ -95,9 +109,9 @@ func interpreted[A any](t *testing.T, fx effect.Effect[effect.Unit, bookstore.Fa
 }
 
 func TestTheBookstoreAnswersWithTheDocumentItsSchemaDescribes(t *testing.T) {
-	base := running(t, bookstore.NewStore(
+	base := running(t, built(t, bookstore.NewStore(
 		bookstore.Book{Title: "Zionomicon", Authors: []string{"John A. De Goes"}, Pages: 632},
-	))
+	)))
 	response := get(t, base+"/books")
 
 	if response.StatusCode != http.StatusOK {
@@ -115,7 +129,7 @@ func TestTheBookstoreAnswersWithTheDocumentItsSchemaDescribes(t *testing.T) {
 }
 
 func TestAPostedEntityIsDecodedThroughTheSameSchema(t *testing.T) {
-	store := bookstore.NewStore()
+	store := built(t, bookstore.NewStore())
 	base := running(t, store)
 
 	response, err := http.Post(base+"/books", "application/json",
@@ -140,7 +154,7 @@ func TestARefusedEntityBecomesABadRequestThatNamesTheField(t *testing.T) {
 	// The rule lives in the schema, the vocabulary lives in the application,
 	// and the status is decided once at the boundary. The handler chose none of
 	// them.
-	base := running(t, bookstore.NewStore())
+	base := running(t, built(t, bookstore.NewStore()))
 
 	response, err := http.Post(base+"/books", "application/json",
 		strings.NewReader(`{"title":"New","authors":["A"],"pages":0}`))
@@ -158,7 +172,7 @@ func TestARefusedEntityBecomesABadRequestThatNamesTheField(t *testing.T) {
 }
 
 func TestSomethingTheStoreDoesNotHoldIsNotFound(t *testing.T) {
-	base := running(t, bookstore.NewStore())
+	base := running(t, built(t, bookstore.NewStore()))
 
 	if got := get(t, base+"/books/Missing").StatusCode; got != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d", got)
@@ -168,9 +182,9 @@ func TestSomethingTheStoreDoesNotHoldIsNotFound(t *testing.T) {
 func TestAnApplicationRefusalBecomesItsStatusAtTheBoundaryAndNowhereElse(t *testing.T) {
 	// The store refuses a duplicate title in its own vocabulary. Nothing in the
 	// handler or the store mentions 409; the boundary decides that once.
-	base := running(t, bookstore.NewStore(
+	base := running(t, built(t, bookstore.NewStore(
 		bookstore.Book{Title: "Held", Authors: []string{"A"}, Pages: 10},
-	))
+	)))
 
 	response, err := http.Post(base+"/books", "application/json",
 		strings.NewReader(`{"title":"Held","authors":["A"],"pages":10}`))
@@ -188,7 +202,7 @@ func TestAnApplicationRefusalBecomesItsStatusAtTheBoundaryAndNowhereElse(t *test
 }
 
 func TestAMethodTheSurfaceDoesNotServeIsToldWhatItCouldHaveUsed(t *testing.T) {
-	base := running(t, bookstore.NewStore())
+	base := running(t, built(t, bookstore.NewStore()))
 
 	request, err := http.NewRequest(http.MethodDelete, base+"/books", nil)
 	if err != nil {
