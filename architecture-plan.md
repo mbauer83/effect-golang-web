@@ -752,6 +752,123 @@ on. Before it existed, `Scan` and the binding direction were at 40% and 33%.
 
 ---
 
+## 7.1 DDL and migrations: researched, not built
+
+Asked for: generate DDL for Postgres and MySQL/MariaDB from a description, with
+the mapping an ORM needs. RESEARCHED. Nothing is built, and the findings are
+here so the decision is on the record.
+
+### What the reference implementations do
+
+**Effect-TS generates no DDL.** In the pinned tree, `CREATE TABLE` appears only
+in hand-written test fixtures; `@effect/sql-pg`'s migrator runs `.sql` files and
+shells out to `pg_dump` for schema dumps. There is no projection from `Schema`
+to DDL anywhere in it.
+
+What it does have is the thing an ORM mapping actually needs, and it is not a
+transformation: `unstable/schema/VariantSchema` turns one field set into six
+related schemas -- `select`, `insert`, `update`, `json`, `jsonCreate`,
+`jsonUpdate` -- with each field declaring which variants it appears in.
+`Model.GeneratedByDb` appears in `select` and `json` only, so the insert shape
+genuinely lacks the database-generated column. `SqlModel.makeRepository` then
+takes `tableName`, `idColumn` and `softDeleteColumn` as plain strings, not
+derived from anything.
+
+**Drizzle runs the other direction.** `drizzle-zod` derives Zod schemas *from*
+table definitions -- `createSelectSchema`, `createInsertSchema`,
+`createUpdateSchema`. The table is the source of truth. The same trio of
+variants, arrived at independently.
+
+**The Zod-to-DDL packages that exist hit the predictable wall.** They emit
+`CREATE TABLE`; the one that attempts diffing skips destructive operations by
+default and emits primary-key changes as comments for a human.
+
+### Why a direct Schema-to-DDL projection is wrong
+
+DDL is **under-determined** by `Schema[A]`. The description cannot supply column
+identity across renames, keys, indexes, foreign keys, defaults, generated
+columns, collation, or the nullable-versus-optional distinction as a database
+means it.
+
+And rename detection is not a maturity problem. `drizzle-kit`, the most
+developed tool in that ecosystem, cannot tell a rename from a drop-plus-add: it
+asks interactively, the prompt has open bugs where no keypress advances it, its
+programmatic API throws when a diff contains both a create and a delete of the
+same kind, and choosing "renamed" emits the rename while dropping the
+accompanying type change.
+
+This module already learned that lesson elsewhere. Protobuf needed `Numbered`
+because renaming is safe and renumbering is not. A table needs the same, for
+the same reason.
+
+Dialect differences are structural rather than cosmetic, so one rendering will
+not do: Postgres has no `UNSIGNED`, MySQL's `BOOLEAN` is `TINYINT(1)`,
+`SERIAL`/`IDENTITY` against `AUTO_INCREMENT`, `ENUM` is a separate `CREATE TYPE`
+in Postgres, and only Postgres has transactional DDL -- which changes migration
+*strategy* and not only syntax.
+
+### The migration approach to take, and it is not diffing
+
+The industry splits into two camps, and Atlas names them: **versioned**, a
+script per change, against **declarative**, a desired state plus a diff against
+the live database. Atlas is candid that declarative plans are
+**non-deterministic**, because they depend on the state they find.
+
+The approach recorded here is neither, and it is better than both: a migration
+is a **declared function from the table declaration at one pinned version to the
+declaration at the next**, monotonically versioned, carrying the mapping --
+which column became which, where a new column's values come from -- as data
+rather than as inference. Nothing is guessed, so a rename is exact rather than
+interactive, and a plan is deterministic because it never consults the database
+to decide *what* to do.
+
+The prior art is good. Django's migrations are already close: a checked-in list
+of `Operation` objects with a dependency DAG executed in topological order, and
+`RenameField` an explicit operation rather than an inference -- untyped and
+imperative, but the right shape. And Cambria (Litt et al., 2021) goes further
+with composable bidirectional **lenses**, generating the TypeScript types and
+the JSON Schema *from the lens definitions themselves*.
+
+That last part is the refinement worth taking: write **version 1 and the lenses**
+and derive versions 2..n, rather than writing each version's declaration and a
+function between them and then having to check that the function really takes
+one to the other. Derive, but **materialise** -- emit each derived version as a
+checked-in artifact with a drift test, which is exactly what `schemagen`
+already does for bindings.
+
+### What Go can and cannot give this
+
+Three limits to state plainly rather than discover later.
+
+- **Not compile-time.** A table declaration is a *value* in Go, not a type, so
+  the compiler cannot check that a migration accounts for every column of its
+  target. Encoding columns in types would need a type parameter per column and
+  would be unusable. What is available is **assembly-time totality**: a
+  `Migration` value validates that it accounts for every column of the target
+  and carries a fault if it does not, checked in a test and at start-up. That is
+  the pattern already used for ambiguous routes, endpoint declarations and
+  schema faults. Scala or Haskell could do better here; Go cannot, and the
+  design should not pretend otherwise.
+- **Inverses are not total.** Dropping a column loses data, so a backward lens
+  can only fabricate a default. Down-migrations are therefore best-effort by
+  nature, and the design should say so rather than promise reversibility.
+- **A declared chain cannot reconcile drift.** Someone who alters production by
+  hand leaves a database the chain does not describe -- the one thing
+  declarative diffing does better. The answer is a cheap verification step:
+  before applying N to N+1, assert the live database matches the declaration at
+  N, and refuse rather than proceed. That keeps determinism and still notices.
+
+### The shape, if it is built
+
+A `Table` declaration referencing schemas for its column shapes and adding what
+a table needs: declared column identity, keys, indexes, foreign keys, defaults,
+generated columns. `select`/`insert`/`update` variants projected from it, which
+is the ORM mapping and makes today's implicit one explicit -- `sql.Columns` and
+`sql.Arguments` currently take the field name as the column name and the
+declared order as the argument order, which is a mapping nobody wrote down.
+Per-dialect rendering that **refuses** what a dialect cannot express rather than
+approximating it, as every other projection here refuses rather than guesses.
+
 # 8. Implementation sequence
 
 ```text

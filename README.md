@@ -20,6 +20,7 @@ Nothing here is finished yet. What exists, and what is planned, is below.
 | [AMQP 1.0](docs/reference/amqp10.md) | usable; the adapter itself unverified against a broker |
 | [protobuf](docs/reference/protobuf.md) | usable: proto3 projection and wire codec |
 | [gRPC](docs/reference/grpc.md) | usable: unary procedures, Connect transport, projected contract |
+| DDL and migrations | researched, not built ([the findings](architecture-plan.md#71-ddl-and-migrations-researched-not-built)) |
 
 The [architecture plan](architecture-plan.md) records the design decisions,
 including which underlying library was chosen for each concern and what was
