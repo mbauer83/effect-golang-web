@@ -82,6 +82,7 @@ func TestPackagesDependOnlyInward(t *testing.T) {
 var thirdPartyAllowedIn = map[string]bool{
 	"websocket": true,
 	"amqp091":   true,
+	"amqp10":    true,
 	"grpc":      true,
 	"sql":       true,
 }

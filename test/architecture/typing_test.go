@@ -1,7 +1,7 @@
 package architecture
 
-// Nothing in this module holds a value it cannot name -- with two exceptions,
-// both on the record and both checked to stay where they say they are.
+// Nothing in this module holds a value it cannot name -- with three
+// exceptions, each on the record and each checked to stay where it says it is.
 
 import (
 	"io/fs"
@@ -33,6 +33,9 @@ var untypedBoundaries = map[string]string{
 	// An AMQP field table is a set of named values of a dozen kinds, which the
 	// protocol defines and the library represents as map[string]any.
 	"amqp091/field_values.go": "a message's headers",
+	// AMQP 1.0's application properties and annotations are the same shape
+	// under a different protocol, with a different set of permitted values.
+	"amqp10/property_values.go": "a message's properties",
 }
 
 func TestNoDescriptionEscapesIntoATopType(t *testing.T) {

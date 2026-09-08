@@ -576,6 +576,42 @@ the shape of the answer: scoped connection and session, a receiver as a
 `Stream`, sending as an effect, settlement explicit, and the same `Schema`
 describing the body.
 
+DONE, with four things settled by building it.
+
+- The fourth disposition is why this is a package and not an adapter. `Release`
+  and `Modify` both put a message back, and the difference is what the broker
+  learns: a release says the message is back and nothing else, where a modify
+  says a receiver tried and failed, or that this receiver is the wrong one, and
+  records what it found out. A 0-9-1 requeue is a release, so a broker there
+  deciding whether a message has failed too often has only its own redelivery
+  count to go on. `examples/consign` is three finalities -- *not now*, *not me*,
+  *never* -- each mapping to exactly one disposition, and telling them apart is
+  the application's job because nothing else can.
+- There is no topology. 1.0 has nothing in the protocol to declare a node with:
+  an address is the broker's own configuration. So the in-process broker's
+  `Declare` stands in for that configuration rather than for a protocol
+  operation, and the integration suite needs two environment variables where
+  0-9-1's needed one.
+- Credit is not a prefetch. A 0-9-1 consumer with no prefetch gets everything;
+  a 1.0 link with no credit gets **nothing**, because the protocol is
+  credit-based. So `Receiver` takes it as an argument rather than offering it as
+  a tuning step.
+- The application properties are the module's **third** erasure boundary, and it
+  is deliberately not shared with the second. The two do the same-looking thing
+  and permit different value sets -- 1.0 has unsigned integers, UUIDs, symbols
+  and described types 0-9-1 cannot encode -- with a differently named nested map
+  in each library. Merging them would invent "a broker's untyped map", a concept
+  neither specification has, and the first value one protocol accepted and the
+  other did not would split it again. Recorded here because a reviewer seeing
+  two near-identical files should know it was considered.
+
+Both AMQP packages are unverified against a real broker. No broker is reachable
+on the machine this was built on and Docker's daemon is not usable there, so
+what the adapters themselves do -- the sections and maps they write, the flags
+they pass, the cancellation and the detached-link ending -- is covered only by
+tests that skip. A skipped test is not evidence, and the README says so for
+both.
+
 **gRPC.** The protobuf codec is a schema projection. The transport sits behind a
 port so Connect and `grpc-go` are both implementable, and neither is baked in.
 
@@ -646,7 +682,7 @@ on. Before it existed, `Scan` and the binding direction were at 40% and 33%.
 5. websocket  DONE
 6. sql  DONE
 7. amqp 0-9-1  DONE
-8. amqp 1.0
+8. amqp 1.0  DONE
 9. grpc
 ```
 

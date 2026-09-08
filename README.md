@@ -17,7 +17,7 @@ Nothing here is finished yet. What exists, and what is planned, is below.
 | [WebSockets](docs/reference/websocket.md) | usable |
 | [SQL](docs/reference/sql.md) | usable |
 | [AMQP 0-9-1](docs/reference/amqp091.md) | usable; the adapter itself unverified against a broker |
-| AMQP 1.0 | planned |
+| [AMQP 1.0](docs/reference/amqp10.md) | usable; the adapter itself unverified against a broker |
 | gRPC and protobuf | planned |
 
 The [architecture plan](architecture-plan.md) records the design decisions,
@@ -38,10 +38,13 @@ websocket/                  a conversation over an upgraded connection
 sql/                        statements, rows decoded by a Schema, transactions
 amqp091/                    messages over AMQP 0-9-1, acknowledged explicitly
   amqp091/inprocess/        a broker that runs inside the test that uses it
+amqp10/                     messages over AMQP 1.0, settled by disposition
+  amqp10/inprocess/         the same, for a protocol with four outcomes
 examples/bookstore/         a complete HTTP program on the web core
 examples/tally/             a websocket conversation, with shared state
 examples/library/           a repository over the database port, driver-free
 examples/dispatch/          a producer and a consumer over the broker port
+examples/consign/           the four dispositions AMQP 1.0 settles a message by
 examples/catalog/           one schema three ways, sequenced in direct style
 examples/inventory/         Go types generated from a description
 examples/cmd/webdemo/       the examples as a runnable command

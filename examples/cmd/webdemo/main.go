@@ -49,6 +49,7 @@ func main() {
 	runCatalog(runtime, workspace)
 	runBookstore(runtime)
 	runDispatch(runtime)
+	runConsign(runtime)
 }
 
 // runBookstore starts the HTTP program on a port the operating system chooses,

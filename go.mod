@@ -3,6 +3,7 @@ module github.com/mbauer83/effect-golang-web
 go 1.27.0
 
 require (
+	github.com/Azure/go-amqp v1.7.0
 	github.com/coder/websocket v1.8.15
 	github.com/getkin/kin-openapi v0.149.0
 	github.com/mbauer83/effect-golang v0.0.0
