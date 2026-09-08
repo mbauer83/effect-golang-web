@@ -94,7 +94,7 @@ func TestTheDefaultExchangeRoutesByQueueName(t *testing.T) {
 			return amqp091.Publish[effect.Unit](broker,
 				amqp091.Target{Key: "work"}, amqp091.Message{Body: []byte("one")})
 		}).
-		FlatMap(func(effect.Unit) queueing[[]amqp091.Delivery] {
+		FlatMap(func(effect.Unit) queueing[[]amqp091.Received[[]byte]] {
 			return effect.RunCollect(amqp091.Consume[effect.Unit](broker, "work").TakeStream(1))
 		})
 
@@ -103,12 +103,12 @@ func TestTheDefaultExchangeRoutesByQueueName(t *testing.T) {
 	if !ok {
 		t.Fatalf("unexpected exit: %+v", exit)
 	}
-	if len(arrived) != 1 || string(arrived[0].Body) != "one" {
+	if len(arrived) != 1 || string(arrived[0].Delivery.Body) != "one" {
 		t.Fatalf("unexpected deliveries: %#v", arrived)
 	}
 	// The delivery says where it came from, which a consumer bound to several
 	// keys needs in order to tell which one this was.
-	if arrived[0].Key != "work" || arrived[0].Exchange != "" {
+	if arrived[0].Delivery.Key != "work" || arrived[0].Delivery.Exchange != "" {
 		t.Fatalf("unexpected origin: %#v", arrived[0])
 	}
 }
@@ -200,7 +200,7 @@ func TestHeadersReachTheConsumerAsTheyWereSent(t *testing.T) {
 			return amqp091.Publish[effect.Unit](broker, amqp091.Target{Key: "traced"},
 				amqp091.Message{Body: []byte("{}"), Headers: sent})
 		}).
-		FlatMap(func(effect.Unit) queueing[[]amqp091.Delivery] {
+		FlatMap(func(effect.Unit) queueing[[]amqp091.Received[[]byte]] {
 			return effect.RunCollect(amqp091.Consume[effect.Unit](broker, "traced").TakeStream(1))
 		})
 
@@ -209,9 +209,9 @@ func TestHeadersReachTheConsumerAsTheyWereSent(t *testing.T) {
 	if !ok {
 		t.Fatalf("unexpected exit: %+v", exit)
 	}
-	held, present := arrived[0].Headers.Member("trace")
+	held, present := arrived[0].Delivery.Headers.Member("trace")
 	if !present || held != dynamic.OfText("a4f9") {
-		t.Fatalf("unexpected headers: %#v", arrived[0].Headers)
+		t.Fatalf("unexpected headers: %#v", arrived[0].Delivery.Headers)
 	}
 }
 

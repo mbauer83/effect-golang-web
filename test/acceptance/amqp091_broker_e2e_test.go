@@ -102,9 +102,9 @@ func TestAMessageCrossesARealBrokerWithItsHeadersAndComesBackAsItself(t *testing
 	exit := brokered(t, func(
 		channel *amqp091.Channel,
 		topology amqp091.Topology,
-	) dispatching[[]amqp091.Delivery] {
+	) dispatching[[]amqp091.Received[[]byte]] {
 		return amqp091.Publish[effect.Unit](channel, published(topology), sent).
-			FlatMap(func(effect.Unit) dispatching[[]amqp091.Delivery] {
+			FlatMap(func(effect.Unit) dispatching[[]amqp091.Received[[]byte]] {
 				return effect.RunCollect(
 					amqp091.Consume[effect.Unit](channel, topology.Queues[0].Name).TakeStream(1))
 			})
@@ -121,7 +121,7 @@ func TestAMessageCrossesARealBrokerWithItsHeadersAndComesBackAsItself(t *testing
 	// unit suite checks the conversion, and this checks that what it produces
 	// is what the protocol carries.
 	for _, header := range everyHeaderKind().Fields {
-		held, present := arrived[0].Headers.Member(header.Name)
+		held, present := arrived[0].Delivery.Headers.Member(header.Name)
 		if !present {
 			t.Errorf("%s did not survive the broker", header.Name)
 			continue
@@ -141,25 +141,31 @@ func TestStoppingEarlyStopsTheBrokerSendingAndLeavesTheRestWaiting(t *testing.T)
 	exit := brokered(t, func(
 		channel *amqp091.Channel,
 		topology amqp091.Topology,
-	) dispatching[[]amqp091.Delivery] {
+	) dispatching[[]amqp091.Received[[]byte]] {
 		queue := topology.Queues[0].Name
 		return effect.ForEach([]int{1, 2, 3}, func(int) dispatching[effect.Unit] {
 			return amqp091.Publish[effect.Unit](channel, published(topology),
 				amqp091.Message{Body: []byte("{}")})
 		}).
-			FlatMap(func([]effect.Unit) dispatching[[]amqp091.Delivery] {
-				// One, then the scope that held the subscription closes.
+			FlatMap(func([]effect.Unit) dispatching[[]amqp091.Received[[]byte]] {
+				// One, unacknowledged, then the scope that held the
+				// subscription closes.
 				return effect.RunCollect(
 					amqp091.Consume[effect.Unit](channel, queue).TakeStream(1))
 			}).
-			FlatMap(func(first []amqp091.Delivery) dispatching[[]amqp091.Delivery] {
+			FlatMap(func(first []amqp091.Received[[]byte]) dispatching[[]amqp091.Received[[]byte]] {
 				if len(first) != 1 {
 					t.Errorf("expected one delivery from the first consumer, got %d", len(first))
 				}
-				// A fresh subscription: the two the first consumer never
-				// acknowledged are back, so the broker knows it is gone.
-				return effect.RunCollect(
-					amqp091.Consume[effect.Unit](channel, queue).TakeStream(2))
+				// A fresh subscription: what the first consumer never
+				// acknowledged is back, so the broker knows it is gone.
+				//
+				// This one acknowledges as it reads, which with a prefetch of
+				// one is the difference between reading two and reading one
+				// and then waiting: an unacknowledged delivery is the one the
+				// broker is waiting on before it sends anything else.
+				return effect.RunCollect(acknowledging(
+					amqp091.Consume[effect.Unit](channel, queue).TakeStream(2)))
 			})
 	})
 
@@ -170,6 +176,16 @@ func TestStoppingEarlyStopsTheBrokerSendingAndLeavesTheRestWaiting(t *testing.T)
 	if len(rest) != 2 {
 		t.Fatalf("expected the other two waiting, got %d", len(rest))
 	}
+}
+
+// acknowledging accepts each delivery as it is read.
+func acknowledging(
+	deliveries effect.Stream[effect.Unit, amqp091.Fault, amqp091.Received[[]byte]],
+) effect.Stream[effect.Unit, amqp091.Fault, amqp091.Received[[]byte]] {
+	return effect.MapStreamEffect(deliveries,
+		func(received amqp091.Received[[]byte]) dispatching[amqp091.Received[[]byte]] {
+			return amqp091.Ack[effect.Unit](received).As(received)
+		})
 }
 
 // everyHeaderKind is one header of each kind the protocol carries.

@@ -12,4 +12,11 @@
 // publisher confirms and durability are absent, and it says so rather than
 // pretending: a fake that answered every question the way the real one does
 // would have to be the real one.
+//
+// Prefetch is absent too, and it is the absence worth knowing about, because
+// Prefetch is an operation a program calls and this has no answer for it. A
+// real broker sends at most that many unsettled deliveries and then waits, so
+// a consumer that never acknowledges stalls after that many; here it reads
+// everything. A test that turns on acknowledgement behaviour needs a broker --
+// which is what the acceptance job with a RabbitMQ service container is for.
 package inprocess

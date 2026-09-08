@@ -57,7 +57,7 @@ when a caller asks.
 ## Consuming, and acknowledgement
 
 ```go
-amqp091.Consume[R](channel, "shipping")                // Stream[R, Fault, Delivery]
+amqp091.Consume[R](channel, "shipping")                // Stream[R, Fault, Received[[]byte]]
 amqp091.Values[R](channel, "shipping", OrderSchema)    // Stream[R, Fault, Received[A]]
 
 func (received Received[A]) Read() (A, error)
@@ -68,6 +68,15 @@ amqp091.Requeue[R](received)  // back to the queue
 
 Three named operations rather than `Reject(requeue bool)`, because "true" does
 not say which way round the question was asked.
+
+**Both entry points yield a `Received`, so both can acknowledge.** `Consume`
+undecoded is `Received[[]byte]` whose `Read` is the body as it arrived — the
+identity decoding, which cannot refuse. A bare `Delivery` would have been the
+obvious element and is the wrong one: acknowledgement belongs to the
+subscription, so a delivery parted from its own cannot be acknowledged at all,
+and a consumer that never acknowledges is one the broker stops sending to.
+Against a real broker with `Prefetch(1)` that consumer reads exactly one message
+and then waits for a second that will never come.
 
 **A delivery the schema refuses does not fail the stream.** That is the opposite
 of a [websocket](websocket.md) and deliberately so: a conversation is stateful,
@@ -164,6 +173,12 @@ It does enforce the rules a real broker enforces — declare before you bind,
 declare before you consume — because a fake that invented names would hide a
 missing declaration until deployment.
 
+**`Prefetch` is the absence worth knowing about**, because it is an operation a
+program calls and this has no answer for it. A real broker sends at most that
+many unsettled deliveries and then waits, so a consumer that never acknowledges
+stalls after that many; here it reads everything. Anything that turns on
+acknowledgement behaviour needs the gated suite below.
+
 ## What a real broker verifies, and is not verified here
 
 The integration suite is gated on `EFFECT_GOLANG_AMQP_URL`. Everything the
@@ -174,7 +189,11 @@ consumer really stops the broker sending.
 
 Those tests **skip** where no broker is reachable, and a skipped test is not
 evidence — so CI runs them against a RabbitMQ service container, in a job of
-their own. They were written on a machine where no broker was reachable, so
-until a pushed run is green they establish nothing.
+their own. They were written on a machine where no broker was reachable, and
+the first runs earned their keep: RabbitMQ 4 refused a queue that was neither
+durable nor exclusive, a nested header table needed the library's own named
+type, and a consumer with a prefetch stalled because an undecoded delivery had
+no way to be acknowledged. None of the three was visible to the in-process
+broker.
 
 [`examples/dispatch`](../../examples/dispatch/dispatch.go) is the program.

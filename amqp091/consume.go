@@ -12,14 +12,25 @@ import (
 	"github.com/mbauer83/effect-golang/effect"
 )
 
-// Consume subscribes to a queue and streams what arrives.
-func Consume[R any](channel Consuming, queue string) effect.Stream[R, Fault, Delivery] {
+// Consume subscribes to a queue and streams what arrives, undecoded.
+//
+// The element is a Received[[]byte] and not a Delivery, because a delivery
+// parted from its subscription cannot be acknowledged -- and a consumer that
+// never acknowledges is one the broker stops sending to. With a prefetch of
+// one it receives one message and then waits forever, which is a stall no
+// amount of reading fixes. So the three acknowledgements Values gives are the
+// three this gives, and Read is the body as it arrived: the identity decoding,
+// which cannot refuse.
+func Consume[R any](channel Consuming, queue string) effect.Stream[R, Fault, Received[[]byte]] {
 	return effect.StreamFromResource(
 		func(scope effect.Scope) effect.Effect[R, Fault, Deliveries] {
 			return subscribing[R](scope, channel, queue)
 		},
-		func(from Deliveries) effect.Stream[R, Fault, Delivery] {
-			return arriving[R](from, queue)
+		func(from Deliveries) effect.Stream[R, Fault, Received[[]byte]] {
+			return effect.MapStream(arriving[R](from, queue),
+				func(delivery Delivery) Received[[]byte] {
+					return Received[[]byte]{Delivery: delivery, from: from, value: delivery.Body}
+				})
 		},
 	)
 }
