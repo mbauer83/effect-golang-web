@@ -105,7 +105,7 @@ A `Transaction` answers `Query` and `Execute` but **not** `Begin`: nested
 transactions are a different feature with different semantics, and a type
 offering one it does not have would be lying.
 
-## The port, and the one untyped file
+## The port, and one of the two untyped files
 
 `Querying`, `Beginning`, `Cursor` and `Transaction` are the whole port.
 `database/sql` is itself an abstraction over drivers, so a second one earns its
@@ -114,8 +114,8 @@ either fits behind the same operations, and an application that depends on the
 port depends on neither. `examples/library` never imports a driver; the tests
 supply sqlite.
 
-`sql/driver_values.go` is the one file in this module allowed a top type, and
-the architecture test names it. `database/sql` scans into `any` and a driver
+`sql/driver_values.go` is one of the two files in this module allowed a top type
+-- the other is an AMQP field table -- and the architecture test names both. `database/sql` scans into `any` and a driver
 hands one back, because a driver cannot know what a column holds until it reads
 it. That is a genuine boundary rather than a shortcut, so it is confined to one
 file whose whole subject is crossing it — and above that line everything works

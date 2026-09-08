@@ -1,6 +1,6 @@
 package sql
 
-// The one place this module holds a value it cannot name.
+// One of the two places this module holds a value it cannot name.
 //
 // database/sql scans into any and a driver hands back any, because a driver
 // cannot know what a column holds until it reads it. That is a genuine boundary
@@ -8,8 +8,8 @@ package sql
 // works in the universal representation, which has a case for each of the seven
 // kinds a driver may produce.
 //
-// The architecture test names this file, so the exemption is a decision on the
-// record rather than a hole someone widened.
+// The architecture test names this file and the other one, so each exemption is
+// a decision on the record rather than a hole someone widened.
 
 import (
 	"fmt"

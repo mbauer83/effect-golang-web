@@ -16,7 +16,8 @@ Nothing here is finished yet. What exists, and what is planned, is below.
 | [OpenAPI generation](docs/reference/openapi.md) | usable |
 | [WebSockets](docs/reference/websocket.md) | usable |
 | [SQL](docs/reference/sql.md) | usable |
-| AMQP | planned |
+| [AMQP 0-9-1](docs/reference/amqp091.md) | usable; the adapter itself unverified against a broker |
+| AMQP 1.0 | planned |
 | gRPC and protobuf | planned |
 
 The [architecture plan](architecture-plan.md) records the design decisions,
@@ -35,9 +36,12 @@ web/                        Request, Response, Handler, codecs, routes, Server
 openapi/                    the OpenAPI 3.1 projection of a surface
 websocket/                  a conversation over an upgraded connection
 sql/                        statements, rows decoded by a Schema, transactions
+amqp091/                    messages over AMQP 0-9-1, acknowledged explicitly
+  amqp091/inprocess/        a broker that runs inside the test that uses it
 examples/bookstore/         a complete HTTP program on the web core
 examples/tally/             a websocket conversation, with shared state
 examples/library/           a repository over the database port, driver-free
+examples/dispatch/          a producer and a consumer over the broker port
 examples/catalog/           a complete program using one schema three ways
 examples/inventory/         Go types generated from a description
 examples/cmd/webdemo/       the examples as a runnable command
@@ -64,6 +68,7 @@ alternatives are in the [architecture plan](architecture-plan.md).
 | JSON syntax | `encoding/json/jsontext` (standard library) |
 | WebSocket | `github.com/coder/websocket` |
 | AMQP 0-9-1 | `github.com/rabbitmq/amqp091-go` |
+| AMQP 1.0 | `github.com/Azure/go-amqp` (a different protocol, a separate package) |
 | protobuf | `google.golang.org/protobuf` |
 | gRPC transport | pluggable; `connectrpc.com/connect` as the reference |
 | SQL | `database/sql` port and adapter; `modernc.org/sqlite` in tests |

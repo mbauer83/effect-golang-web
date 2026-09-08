@@ -81,7 +81,7 @@ func TestPackagesDependOnlyInward(t *testing.T) {
 // no third-party import may appear outside the transport that needs it.
 var thirdPartyAllowedIn = map[string]bool{
 	"websocket": true,
-	"amqp":      true,
+	"amqp091":   true,
 	"grpc":      true,
 	"sql":       true,
 }

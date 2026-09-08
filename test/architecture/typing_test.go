@@ -1,7 +1,7 @@
 package architecture
 
-// Nothing in this module holds a value it cannot name -- with one exception, on
-// the record and checked to stay where it says it is.
+// Nothing in this module holds a value it cannot name -- with two exceptions,
+// both on the record and both checked to stay where they say they are.
 
 import (
 	"io/fs"
@@ -18,17 +18,22 @@ import (
 // map[string]any, which is why this is the invariant most likely to be lost by
 // convenience.
 //
-// One file is exempt, and the exemption is a decision on the record rather than
-// a hole someone widened: database/sql scans into a top type and a driver hands
-// one back, because a driver cannot know what a column holds until it reads it.
-// That boundary is real, so it is confined to one file whose whole subject is
-// crossing it.
-//
 // The check is over declarations. A type argument -- Schema[any] -- would slip
 // past it, which is why the bans above stay as well.
-// driverBoundary is the one file where a top type is allowed, because the
-// standard library's row scanning is untyped and something has to meet it.
-const driverBoundary = "sql/driver_values.go"
+
+// untypedBoundaries are the files where a top type is allowed. Each is a place
+// where something outside this module is untyped and something has to meet it,
+// and each is confined to one file whose whole subject is crossing it. A list
+// is a decision on the record rather than a hole someone widened -- and a list
+// that grows is a thing a reviewer sees in the diff.
+var untypedBoundaries = map[string]string{
+	// database/sql scans into a top type and a driver hands one back, because
+	// a driver cannot know what a column holds until it reads it.
+	"sql/driver_values.go": "a driver's values",
+	// An AMQP field table is a set of named values of a dozen kinds, which the
+	// protocol defines and the library represents as map[string]any.
+	"amqp091/field_values.go": "a message's headers",
+}
 
 func TestNoDescriptionEscapesIntoATopType(t *testing.T) {
 	typeParameters := regexp.MustCompile(`\[[\w,\s]*any[\w,\s]*\]`)
@@ -38,7 +43,7 @@ func TestNoDescriptionEscapesIntoATopType(t *testing.T) {
 		if err != nil || entry.IsDir() || !strings.HasSuffix(path, ".go") {
 			return err
 		}
-		if strings.HasSuffix(path, "_test.go") || strings.HasSuffix(path, driverBoundary) {
+		if strings.HasSuffix(path, "_test.go") || exempt(path) {
 			return nil
 		}
 		for number, line := range strings.Split(readSource(t, path), "\n") {
@@ -56,16 +61,29 @@ func TestNoDescriptionEscapesIntoATopType(t *testing.T) {
 	}
 }
 
-// The exemption has to stay one file, and it has to stay used. A boundary that
-// moved would take the exemption with it silently; one that was no longer
-// needed would leave a licence nobody was exercising.
-func TestTheOneUntypedBoundaryIsWhereItSaysItIs(t *testing.T) {
-	boundary := filepath.Join(moduleRoot(t), driverBoundary)
-	source, err := os.ReadFile(boundary)
-	if err != nil {
-		t.Fatalf("%s is exempt from the top-type ban and does not exist: %v", driverBoundary, err)
+func exempt(path string) bool {
+	for boundary := range untypedBoundaries {
+		if strings.HasSuffix(filepath.ToSlash(path), boundary) {
+			return true
+		}
 	}
-	if !strings.Contains(string(source), " any)") && !strings.Contains(string(source), "]any") {
-		t.Errorf("%s is exempt from the top-type ban and does not use one", driverBoundary)
+	return false
+}
+
+// Each exemption has to stay one file, and it has to stay used. A boundary that
+// moved would take its exemption with it silently; one that was no longer
+// needed would leave a licence nobody was exercising.
+func TestEveryUntypedBoundaryIsWhereItSaysItIs(t *testing.T) {
+	for boundary, subject := range untypedBoundaries {
+		source, err := os.ReadFile(filepath.Join(moduleRoot(t), boundary))
+		if err != nil {
+			t.Errorf("%s is exempt from the top-type ban, for %s, and does not exist: %v",
+				boundary, subject, err)
+			continue
+		}
+		if !strings.Contains(string(source), " any)") && !strings.Contains(string(source), "]any") {
+			t.Errorf("%s is exempt from the top-type ban, for %s, and does not use one",
+				boundary, subject)
+		}
 	}
 }

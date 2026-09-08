@@ -6,6 +6,7 @@ require (
 	github.com/coder/websocket v1.8.15
 	github.com/getkin/kin-openapi v0.149.0
 	github.com/mbauer83/effect-golang v0.0.0
+	github.com/rabbitmq/amqp091-go v1.14.0
 	// A JSON Schema validator, used only by the tests: the projection is
 	// checked against a parser that has never seen this module. Nothing in the
 	// module itself needs it.

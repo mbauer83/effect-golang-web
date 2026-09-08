@@ -47,6 +47,7 @@ with `net/http`, which is the module's spine.
 | JSON syntax | `encoding/json/jsontext` | Standard library in Go 1.27, token-based streaming, which is exactly the shape a schema-driven codec needs. No third-party JSON library is faster *and* token-based, and none is better maintained than the standard library. |
 | WebSocket | `github.com/coder/websocket` | Context-aware on every operation, which is what this runtime's cancellation model needs; minimal surface, no cgo, runs over `net/http`, released within months. `gorilla/websocket` is two years stale and is not context-native. |
 | AMQP 0-9-1 | `github.com/rabbitmq/amqp091-go` | Maintained by the RabbitMQ team; the successor to `streadway/amqp`. There is no serious alternative. |
+| AMQP 1.0 | `github.com/Azure/go-amqp` | A different protocol under the same name, so a separate package rather than a second adapter: 1.0 has no exchanges, keys or bindings and settles by disposition. This is the maintained Go implementation, and it is at 1.x. |
 | protobuf | `google.golang.org/protobuf` | The only maintained implementation. |
 | gRPC transport | pluggable, `connectrpc.com/connect` as the reference | Connect speaks the gRPC wire protocol *over* `net/http`, so one server, one middleware stack and this module's routing compose with it. `google.golang.org/grpc` runs its own server with its own interceptors, a parallel universe to `net/http`; it remains supportable behind the same port for callers who need xDS or a service mesh. |
 | SQL | `database/sql` port, `github.com/jackc/pgx/v5` reference adapter | Defining the port over `database/sql` keeps every driver usable; pgx is the best-maintained and fastest Postgres driver and works both ways. |
@@ -521,9 +522,59 @@ stateful, so a peer that said something unreadable has said something about the
 whole exchange. `Inbound` is there for a conversation that would rather skip
 one.
 
-**AMQP.** A channel is a scoped resource; a consumer is a `Stream`; publishing
-is an effect. Acknowledgement is explicit, because at-least-once delivery is a
-property the caller must decide about, not one a library should hide.
+**AMQP 0-9-1.** A channel is a scoped resource; a consumer is a `Stream`;
+publishing is an effect. Acknowledgement is explicit, because at-least-once
+delivery is a property the caller must decide about, not one a library should
+hide.
+
+DONE, with four things settled by building it.
+
+- The version is in the package name. `amqp091`, not `amqp`, because AMQP 1.0
+  shares the name and almost nothing else and `amqp` beside `amqp10` would read
+  as the general one. See below.
+- There is a port, and not for the reason `sql` has one: amqp091-go is the only
+  serious implementation. It is there because a program that publishes and
+  consumes must be testable without a broker, and because `Publishing`,
+  `Consuming` and `Declaring` are what an application actually depends on --
+  three interfaces rather than one, since most programs use one of them.
+  `amqp091/inprocess` is the substitute, and it is **shipped** rather than kept
+  in a test file: if testability is the argument for the port, the thing that
+  makes it testable is part of the capability. `effecttest` in the runtime is
+  the precedent.
+- A delivery the schema refuses does **not** fail the stream, which is the
+  opposite of the websocket decision and for the reason that one was made: a
+  conversation is stateful, so an unreadable message says something about the
+  whole exchange; a queue is a sequence of separate messages, so it says
+  something about one. That needed `CollectStreamEffect` in the runtime --
+  `MapStreamEffect` is one-for-one, so a consumer deciding *effectfully* whether
+  a value survives had nowhere to put the decision.
+- A message's headers are an AMQP field table, which the protocol defines as a
+  set of named values and the library represents as `map[string]any`. That is
+  the module's **second** erasure boundary, named by the same architecture test
+  as the first. It maps better than the database one: a field table permits
+  every kind the representation has, nesting included, so nothing is narrowed.
+  The two conversions are public, with `map[string]any` in their signatures
+  rather than the library's named type, so the boundary can be tested from
+  outside without anything above the package acquiring the dependency.
+
+One correction, found by writing the reference rather than by a test: the first
+version of the subscription's release cancelled nothing, on the reasoning that
+the subscription's lifetime is the channel's. That is wrong. A stream that
+stopped early leaves a broker that has no idea and goes on sending, into a Go
+channel nobody reads; with a prefetch set those deliveries are unacknowledged
+and the queue stalls behind them. Cancelling needs a consumer tag, and the
+library does not hand back the one it generates -- so the consumer is named
+here. It is checked only in the integration suite, because the in-process broker
+does not push and so cannot witness it.
+
+**AMQP 1.0** is a separate package, `amqp10`, over `github.com/Azure/go-amqp`.
+Not a variant of the above and not behind the same port: 1.0 has no exchanges,
+no routing keys and no bindings -- it addresses nodes directly -- and it settles
+a delivery by disposition (accept, reject, release, modify) rather than by
+acknowledgement. A port covering both would cover neither. What the two share is
+the shape of the answer: scoped connection and session, a receiver as a
+`Stream`, sending as an effect, settlement explicit, and the same `Schema`
+describing the body.
 
 **gRPC.** The protobuf codec is a schema projection. The transport sits behind a
 port so Connect and `grpc-go` are both implementable, and neither is baked in.
@@ -594,8 +645,9 @@ on. Before it existed, `Scan` and the binding direction were at 40% and 33%.
 4. OpenAPI generation  DONE
 5. websocket  DONE
 6. sql  DONE
-7. amqp
-8. grpc
+7. amqp 0-9-1  DONE
+8. amqp 1.0
+9. grpc
 ```
 
 Each step gets tests, an example and documentation before the next begins, on
