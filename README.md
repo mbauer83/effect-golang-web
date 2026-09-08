@@ -19,7 +19,7 @@ Nothing here is finished yet. What exists, and what is planned, is below.
 | [AMQP 0-9-1](docs/reference/amqp091.md) | usable; the adapter itself unverified against a broker |
 | [AMQP 1.0](docs/reference/amqp10.md) | usable; the adapter itself unverified against a broker |
 | [protobuf](docs/reference/protobuf.md) | usable: proto3 projection and wire codec |
-| gRPC | planned |
+| [gRPC](docs/reference/grpc.md) | usable: unary procedures, Connect transport, projected contract |
 
 The [architecture plan](architecture-plan.md) records the design decisions,
 including which underlying library was chosen for each concern and what was
@@ -42,11 +42,13 @@ amqp091/                    messages over AMQP 0-9-1, acknowledged explicitly
   amqp091/inprocess/        a broker that runs inside the test that uses it
 amqp10/                     messages over AMQP 1.0, settled by disposition
   amqp10/inprocess/         the same, for a protocol with four outcomes
+grpc/                       unary procedures over the gRPC wire protocol
 examples/bookstore/         a complete HTTP program on the web core
 examples/tally/             a websocket conversation, with shared state
 examples/library/           a repository over the database port, driver-free
 examples/dispatch/          a producer and a consumer over the broker port
 examples/consign/           the four dispositions AMQP 1.0 settles a message by
+examples/quoting/           a gRPC service, and the .proto file it implies
 examples/catalog/           one schema three ways, sequenced in direct style
 examples/inventory/         Go types generated from a description
 examples/cmd/webdemo/       the examples as a runnable command
@@ -75,7 +77,7 @@ alternatives are in the [architecture plan](architecture-plan.md).
 | AMQP 0-9-1 | `github.com/rabbitmq/amqp091-go` |
 | AMQP 1.0 | `github.com/Azure/go-amqp` (a different protocol, a separate package) |
 | protobuf | `google.golang.org/protobuf` |
-| gRPC transport | pluggable; `connectrpc.com/connect` as the reference |
+| gRPC transport | pluggable behind a port; `connectrpc.com/connect` is the one here |
 | SQL | `database/sql` port and adapter; `modernc.org/sqlite` in tests |
 | OpenAPI | emitted from our own model; `kin-openapi` in tests only |
 | JSON Schema validation | `santhosh-tekuri/jsonschema/v6`, in tests only |

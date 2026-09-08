@@ -18,8 +18,33 @@ type Document struct {
 	// Messages are every named shape reachable from the root, each declared
 	// once, in the order they were first reached.
 	Messages []Message
-	// Root is the name of the message the projected description became.
+	// Services are the procedures, where the description being projected is a
+	// service rather than one message. A file with none is a file of types,
+	// which is what a projected message on its own is.
+	Services []Service
+	// Root is the name of the message the projected description became, for a
+	// projection of one message. It is empty for a projection of services,
+	// which have no single root.
 	Root string
+}
+
+// Service is one proto3 service: a name, and the procedures it offers.
+type Service struct {
+	Name    string
+	Doc     string
+	Methods []Method
+}
+
+// Method is one procedure of a service.
+//
+// Unary only, because that is what the description of a request and a response
+// says. A streaming procedure is a different shape and would need the
+// description to say which side streams.
+type Method struct {
+	Name     string
+	Doc      string
+	Request  string
+	Response string
 }
 
 // Message is one proto3 message.
@@ -71,7 +96,22 @@ func (document Document) Render() string {
 		written.WriteString("\n")
 		message.render(written)
 	}
+	for _, service := range document.Services {
+		written.WriteString("\n")
+		service.render(written)
+	}
 	return written.String()
+}
+
+func (service Service) render(written *strings.Builder) {
+	writeComment(written, "", service.Doc)
+	written.WriteString("service " + service.Name + " {\n")
+	for _, method := range service.Methods {
+		writeComment(written, "  ", method.Doc)
+		written.WriteString("  rpc " + method.Name +
+			"(" + method.Request + ") returns (" + method.Response + ");\n")
+	}
+	written.WriteString("}\n")
 }
 
 func (message Message) render(written *strings.Builder) {

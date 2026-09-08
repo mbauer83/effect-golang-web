@@ -88,18 +88,27 @@ func stated(constraint structure.Constraint) string {
 	case structure.Below:
 		return "below " + number(held.Value)
 	case structure.MinLength:
-		return "at least " + strconv.Itoa(held.Value) + " characters"
+		return "at least " + pluralised(held.Value, "character")
 	case structure.MaxLength:
-		return "at most " + strconv.Itoa(held.Value) + " characters"
+		return "at most " + pluralised(held.Value, "character")
 	case structure.Pattern:
 		return "matching " + held.Expression
 	case structure.MinItems:
-		return "at least " + strconv.Itoa(held.Value) + " items"
+		return "at least " + pluralised(held.Value, "item")
 	case structure.MaxItems:
-		return "at most " + strconv.Itoa(held.Value) + " items"
+		return "at most " + pluralised(held.Value, "item")
 	default:
 		return ""
 	}
+}
+
+// pluralised words a count, because "at least 1 characters" appears in a file
+// other people read.
+func pluralised(value int, thing string) string {
+	if value == 1 {
+		return "1 " + thing
+	}
+	return strconv.Itoa(value) + " " + thing + "s"
 }
 
 func number(value float64) string {

@@ -3,6 +3,7 @@ module github.com/mbauer83/effect-golang-web
 go 1.27.0
 
 require (
+	connectrpc.com/connect v1.21.0
 	github.com/Azure/go-amqp v1.7.0
 	// A protobuf compiler and the reference implementation, used only by the
 	// tests: the proto3 projection is compiled by a real compiler and the wire
@@ -18,6 +19,11 @@ require (
 	// checked against a parser that has never seen this module. Nothing in the
 	// module itself needs it.
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
+	// h2c, used only by the tests: gRPC proper needs HTTP/2, and over plain TCP
+	// that means h2c -- so this is what lets the claim "it really is gRPC on the
+	// wire" be checked rather than asserted. A deployment with TLS needs none of
+	// it, and nothing in the module imports it.
+	golang.org/x/net v0.58.0
 	google.golang.org/protobuf v1.36.12
 	modernc.org/sqlite v1.58.0
 )
@@ -36,7 +42,7 @@ require (
 	github.com/rogpeppe/go-internal v1.16.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
-	golang.org/x/text v0.14.0 // indirect
+	golang.org/x/text v0.41.0 // indirect
 	modernc.org/libc v1.75.6 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.12.1 // indirect

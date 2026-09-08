@@ -1,7 +1,7 @@
 package architecture
 
-// Nothing in this module holds a value it cannot name -- with three
-// exceptions, each on the record and each checked to stay where it says it is.
+// Nothing in this module holds a value it cannot name -- with four exceptions,
+// each on the record and each checked to stay where it says it is.
 
 import (
 	"io/fs"
@@ -36,6 +36,9 @@ var untypedBoundaries = map[string]string{
 	// AMQP 1.0's application properties and annotations are the same shape
 	// under a different protocol, with a different set of permitted values.
 	"amqp10/property_values.go": "a message's properties",
+	// Connect's Codec contract is untyped, because a codec is registered for a
+	// content type and marshals whatever message its procedure takes.
+	"grpc/connect_codec.go": "a gRPC codec's messages",
 }
 
 func TestNoDescriptionEscapesIntoATopType(t *testing.T) {

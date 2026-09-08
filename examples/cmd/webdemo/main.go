@@ -50,6 +50,7 @@ func main() {
 	runBookstore(runtime)
 	runDispatch(runtime)
 	runConsign(runtime)
+	runQuoting(runtime)
 }
 
 // runBookstore starts the HTTP program on a port the operating system chooses,

@@ -40,6 +40,70 @@ func Project(node structure.Node, packageName string) (Document, error) {
 	}, nil
 }
 
+// Declared is one procedure to project: its name, its prose, and the
+// descriptions of what it takes and returns.
+type Declared struct {
+	Service  string
+	Method   string
+	Doc      string
+	Request  structure.Node
+	Response structure.Node
+}
+
+// ProjectServices projects a set of procedures into one proto3 file.
+//
+// Every shape they mention is declared once and shared, the way an OpenAPI
+// document shares its components: a type used by ten procedures appears once.
+// The services come out in the order their procedures were first named, and the
+// procedures in the order they were given, so the same input always produces
+// the same file -- which is what lets the file be checked in.
+func ProjectServices(packageName string, procedures ...Declared) (Document, error) {
+	projection := &projector{
+		declared: map[string]bool{},
+		visiting: map[string]bool{},
+	}
+	services := map[string]int{}
+	document := Document{Package: packageName}
+
+	for _, procedure := range procedures {
+		method, err := projection.declaredMethod(procedure)
+		if err != nil {
+			return Document{}, err
+		}
+		at, known := services[procedure.Service]
+		if !known {
+			at = len(document.Services)
+			services[procedure.Service] = at
+			document.Services = append(document.Services,
+				Service{Name: procedure.Service})
+		}
+		document.Services[at].Methods = append(document.Services[at].Methods, method)
+	}
+
+	document.Imports = projection.imports
+	document.Messages = projection.messages
+	return document, nil
+}
+
+func (projection *projector) declaredMethod(procedure Declared) (Method, error) {
+	request, err := projection.named(procedure.Request)
+	if err != nil {
+		return Method{}, fmt.Errorf("the request of %s/%s: %w",
+			procedure.Service, procedure.Method, err)
+	}
+	response, err := projection.named(procedure.Response)
+	if err != nil {
+		return Method{}, fmt.Errorf("the response of %s/%s: %w",
+			procedure.Service, procedure.Method, err)
+	}
+	return Method{
+		Name:     procedure.Method,
+		Doc:      firstParagraph(procedure.Doc),
+		Request:  request,
+		Response: response,
+	}, nil
+}
+
 type projector struct {
 	messages []Message
 	declared map[string]bool

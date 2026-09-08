@@ -646,8 +646,43 @@ them.
   on a boolean that was merely false. The constraints still apply to the implied
   zero, which is where a zero gets refused, so nothing was lost by fixing it.
 
+The transport is DONE too, with four things settled by building it.
+
+- The port works in **bytes**. A transport's job is the envelope, the protocol
+  negotiation and the status; the meaning of the payload is the schema's, above
+  it. That is what keeps the port small enough for a second implementation to be
+  plausible -- Connect and grpc-go disagree about almost everything except that
+  a unary call is bytes in and bytes or a code out. `Answering` returns a
+  `Failure` rather than an `error`, because a transport inventing a code from an
+  error string would be inventing the one thing the caller branches on.
+- `Boundary` is **parallel to `web.Adapter`, not built on it**, and the
+  duplication is worth its cost: an RPC answers with a code and a message where
+  a resource answers with a status and an entity, and an application's refusals
+  map onto one or the other directly. "No such customer" is `NotFound` to an
+  RPC and 404 to a resource, and neither is the other's translation -- routing
+  through the HTTP vocabulary on the way would translate twice and lose in both
+  directions.
+- **Unary only**, said out loud rather than left to be discovered. A streaming
+  procedure is a `Stream` on one side or both, which is a different shape from a
+  handler and needs what the websocket needed: the boundary interpreting rather
+  than answering. `Adapter.Interpret` is that seam and it already exists, so
+  this is a thing to add when there is a caller.
+- Connect's `Codec` contract is untyped, so this is the module's **fourth**
+  erasure boundary -- one file, named by the architecture test, in which the
+  assertion is checked rather than assumed. The codec is called `proto` so that
+  `application/grpc+proto` goes on the wire and a generated client talks to it
+  without knowing anything about it.
+
+One test was hiding a gap, found by neutering. The server's own contract check
+looked covered, but the typed client refuses a bad request before sending it --
+so removing the server's check changed nothing. The half that matters is a
+caller that does *not* hold the description, which is every client generated
+from the projected file in another language, and it needed a test that calls
+the transport with the bytes such a client sends for a zero.
+
 `google.golang.org/protobuf` and `bufbuild/protocompile` are **test**
-dependencies only. The schema layer carries no third-party dependency, and the
+dependencies only, as are `golang.org/x/net` (h2c, so gRPC proper can be
+exercised over plain TCP). The schema layer carries no third-party dependency, and the
 format is a published specification; what the canonical implementation is for
 here is checking that what this emits is what protobuf reads, in both
 directions, against a descriptor produced by this module's own projection. A
@@ -721,7 +756,7 @@ on. Before it existed, `Scan` and the binding direction were at 40% and 33%.
 6. sql  DONE
 7. amqp 0-9-1  DONE
 8. amqp 1.0  DONE
-9. grpc
+9. grpc  DONE
 ```
 
 Each step gets tests, an example and documentation before the next begins, on
