@@ -17,6 +17,8 @@ type Field[A any] struct {
 	node     structure.Node
 	optional bool
 	number   int
+	identity bool
+	computed bool
 	fault    error
 	encode   func(A, Sink) error
 	decode   func(*A, Source) error
@@ -120,6 +122,31 @@ func (field Field[A]) Numbered(number int) Field[A] {
 		return field
 	}
 	field.number = number
+	return field
+}
+
+// Identity marks the field that distinguishes one of these from another.
+//
+// A projection to storage makes it the key. A derived update shape leaves it
+// out, because a key selects the row rather than being part of the row's new
+// value. An object with one is an entity in its own right; an object without
+// one is a value belonging to whatever holds it.
+func (field Field[A]) Identity() Field[A] {
+	field.identity = true
+	return field
+}
+
+// Computed marks a field whose value comes from somewhere other than the
+// caller: a default, a trigger, a derivation.
+//
+// It is left out of every derived shape a caller supplies, because asking for a
+// value that will be overwritten is asking a question with no answer.
+//
+// Compose it with Identity for a key the database generates, and use Identity
+// alone for one the application generates. That composition is the distinction
+// other libraries spell with two separate concepts.
+func (field Field[A]) Computed() Field[A] {
+	field.computed = true
 	return field
 }
 

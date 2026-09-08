@@ -20,7 +20,8 @@ Nothing here is finished yet. What exists, and what is planned, is below.
 | [AMQP 1.0](docs/reference/amqp10.md) | usable; the adapter itself unverified against a broker |
 | [protobuf](docs/reference/protobuf.md) | usable: proto3 projection and wire codec |
 | [gRPC](docs/reference/grpc.md) | usable: unary procedures, Connect transport, projected contract |
-| DDL and migrations | researched, not built ([the findings](architecture-plan.md#71-ddl-and-migrations-researched-not-built)) |
+| [Derived shapes: create, update, select](docs/reference/variant.md) | usable |
+| DDL and migrations | researched; the derived shapes above are the first piece ([the findings](architecture-plan.md#71-ddl-and-migrations-researched-not-built)) |
 
 The [architecture plan](architecture-plan.md) records the design decisions,
 including which underlying library was chosen for each concern and what was
@@ -34,6 +35,7 @@ schema/                     Schema[A]: shapes, codecs, refinement
   schema/dynamic/           the value a description carries when there is no Go type
   schema/jsonschema/        the JSON Schema 2020-12 projection
   schema/protobuf/          the proto3 projection and the protobuf wire codec
+  schema/variant/           the create, update and select shapes one description has
 schemagen/                  writes the Go types a description implies
 web/                        Request, Response, Handler, codecs, routes, Server
 openapi/                    the OpenAPI 3.1 projection of a surface

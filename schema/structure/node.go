@@ -80,6 +80,31 @@ type Object struct {
 	Fields []Field
 }
 
+// Identity is the field that distinguishes one of these from another, if the
+// description names one.
+func (object Object) Identity() (Field, bool) {
+	for _, field := range object.Fields {
+		if field.Identity {
+			return field, true
+		}
+	}
+	return Field{}, false
+}
+
+// IsEntity reports whether this object is a thing in its own right rather than
+// a value belonging to whatever holds it.
+//
+// It is derived from having an identity rather than declared separately, which
+// is a deliberate simplification: an object with an identity is an entity and
+// one without is a value, so a separate marker could only ever agree with the
+// identity or contradict it. An address inside a customer is a value and lives
+// in the customer's row; an order line has an identity and lives in its own
+// table.
+func (object Object) IsEntity() bool {
+	_, named := object.Identity()
+	return named
+}
+
 // Field is one member of an object.
 type Field struct {
 	Name string
@@ -94,6 +119,20 @@ type Field struct {
 	// derived from declaration order would change when the declaration was
 	// reordered.
 	Number int
+	// Identity says this field is what distinguishes one of these from
+	// another. A projection to storage makes it the key; a projection to an
+	// update shape leaves it out, because a key is what selects the row rather
+	// than something the row's new value contains.
+	Identity bool
+	// Computed says the value comes from somewhere other than the caller: a
+	// default, a trigger, a derivation. It is left out of every shape a caller
+	// supplies, because asking for a value that will be overwritten is asking
+	// a question with no answer.
+	//
+	// The two compose, and the composition is the distinction other libraries
+	// spell with two separate concepts: an identity the application supplies is
+	// Identity alone, and one the database generates is both.
+	Computed bool
 }
 
 // Sequence is an ordered, variable-length list.
@@ -161,58 +200,3 @@ func (Mapping) node()   {}
 func (Union) node()     {}
 func (Nullable) node()  {}
 func (Reference) node() {}
-
-// Precision is the Go representation a scalar is carried in.
-//
-// The wire has two numeric shapes and Go has twelve. A Kind says which of the
-// two a value is on the wire; a Precision says which of the twelve it is in a
-// program, so a generator emits the type the author meant rather than the
-// widest one that would hold it, and a projection can state the range that
-// choice implies.
-//
-// It is Go-side detail deliberately kept out of Kind: a format reads the Kind
-// and needs to know nothing about this.
-type Precision uint8
-
-const (
-	// Unstated is a scalar whose Go representation the description does not
-	// pin down: the default for its kind.
-	Unstated Precision = iota
-	Int8Bits
-	Int16Bits
-	Int32Bits
-	Int64Bits
-	IntBits
-	Uint8Bits
-	Uint16Bits
-	Uint32Bits
-	Uint64Bits
-	UintBits
-	Float32Bits
-	Float64Bits
-)
-
-// Numeric is the wire kind the precision belongs to, and whether it names a
-// number at all.
-//
-// This is how the wire shape is derived rather than declared beside the width:
-// there is one answer, so the two cannot disagree.
-func (precision Precision) Numeric() (Kind, bool) {
-	switch precision {
-	case Unstated:
-		return Text, false
-	case Float32Bits, Float64Bits:
-		return Number, true
-	default:
-		return Integer, true
-	}
-}
-
-// String names a precision the way Go spells the type.
-func (precision Precision) String() string {
-	return [...]string{
-		"", "int8", "int16", "int32", "int64", "int",
-		"uint8", "uint16", "uint32", "uint64", "uint",
-		"float32", "float64",
-	}[precision]
-}

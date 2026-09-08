@@ -869,6 +869,49 @@ declared order as the argument order, which is a mapping nobody wrote down.
 Per-dialect rendering that **refuses** what a dialect cannot express rather than
 approximating it, as every other projection here refuses rather than guesses.
 
+## 7.1.1 The derived shapes, built
+
+`schema/variant` is the first piece, and it is the piece everything else needs:
+`Select`, `Create`, `Update`, and the two `...WithEntities` forms, each a
+function from a `structure.Node` to a `structure.Node`.
+
+Three decisions came out of building it.
+
+**Two marks, not three.** `Identity` and `Computed` on a field, and an entity is
+**derived** from having an identity rather than declared. A separate entity
+marker could only ever agree with the identity or contradict it, and there is
+nothing useful to say in the contradicting case -- so the prior art's third
+marker is gone. The two compose to cover what Effect needs `GeneratedByApp` and
+`GeneratedByDb` for: an identity the application supplies is `Identity` alone
+and appears in a create shape, one the database generates is both and does not.
+
+**An update shape is not a create shape with the identity removed.** Every field
+it keeps becomes optional, because a change says what is changing and a field
+nobody mentioned is a field nobody is changing. That is the whole difference,
+and it is why they are two functions rather than one with a flag. The nested
+forms are separate functions for the same reason: creating a root and creating a
+whole aggregate are different requests, and a boolean at the call site would not
+say which was meant.
+
+**The marks do not survive the derivation.** A shape a caller supplies has no
+identity to declare and nothing computed left in it, so carrying them through
+would say something untrue -- and a projection reading them would make a key out
+of a field that is no longer one.
+
+Two tests were vacuous and neutering found both. The aggregate's own identity is
+generated, so `Computed` dropped it first and the identity rule was never
+exercised: it needed an entity whose identity is the application's. And after
+derivation the root has no marked field left, so checking the root for surviving
+marks proved nothing -- the kept identity on a nested entity is where one would
+show.
+
+One behaviour worth recording because it was measured rather than assumed: a
+member a derived shape does not declare is **skipped, not refused**. So a client
+that reads an order and posts the whole of it back to create another is not
+refused over the identity it could not have known to omit, and the identity it
+sent is dropped rather than carried through. That is this layer's ordinary
+tolerance and the right answer here.
+
 ## 7.2 Prior art: a previous attempt at exactly this
 
 `up2parts-aggregate-schema` (TypeScript, over Zod) is a working attempt at the
