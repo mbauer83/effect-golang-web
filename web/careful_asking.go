@@ -49,5 +49,10 @@ func recovered[R any](failed Fault) effect.Effect[R, Fault, Received] {
 	})
 }
 
-var errUnstatedTerms = errors.New(
+// ErrUnstatedTerms is terms that do not say enough to read a service by.
+//
+// Exported because a caller wrapping this in its own adapter has the same
+// refusal to make before it can build one, and a second sentence saying the
+// same thing would be a second sentence to keep in step.
+var ErrUnstatedTerms = errors.New(
 	"a careful client needs a name, an allowance and a lifetime; see web.Carefully")

@@ -87,9 +87,9 @@ func Carefully(client *Client, terms Terms, keeping cache.Store, pacing rate.Lim
 	case client == nil || client.client == nil:
 		return nil, errNoHTTPClient
 	case !terms.IsStated():
-		return nil, errUnstatedTerms
+		return nil, ErrUnstatedTerms
 	case keeping == nil || pacing == nil:
-		return nil, errUnstatedTerms
+		return nil, ErrUnstatedTerms
 	}
 	return &Careful{client: client, terms: terms, keeping: keeping, pacing: pacing}, nil
 }

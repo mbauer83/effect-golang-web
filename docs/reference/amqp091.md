@@ -117,6 +117,15 @@ idempotent at the broker: a declaration matching what is there succeeds, and one
 that contradicts it is refused, which is the broker telling you two programs
 disagree about a name and worth hearing at start-up.
 
+A queue's `DeadLetter` is where the broker sends what a consumer discarded. It
+belongs to the queue rather than to a rejection because that is where the
+broker keeps it: a consumer discards, and what happens next was decided when
+the queue was declared. Without one, `Discard` means the message is gone — so a
+consumer meeting a message it can never act on has only two other answers, and
+both are bad: requeue it, which with one consumer is a loop, or acknowledge
+something it did not do. A `Key` keeps the routing key it arrived with when
+empty, which is what a single dead-letter exchange usually wants.
+
 A queue's `Access` is `Shared` unless it says otherwise — any connection may
 consume from it, which is what a queue named in a topology is for. `Owned`
 restricts it to the connection that declared it and has the broker delete it

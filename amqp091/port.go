@@ -148,7 +148,35 @@ type Queue struct {
 	Name       string
 	Durability Durability
 	Access     Access
+	// DeadLetter is where the broker sends what this queue's consumer
+	// discarded. Its zero value sends it nowhere, which is what Discard means
+	// without one.
+	DeadLetter DeadLetter
 }
+
+// DeadLetter is where a discarded message goes instead of nowhere.
+//
+// Part of the queue rather than of a rejection, because that is where the
+// broker keeps it: a consumer discards a message, and what happens to it next
+// was decided when the queue was declared. A consumer cannot choose per
+// message, and a queue whose dead letter is added later does not acquire it --
+// the broker refuses a declaration that contradicts what is there, which is
+// how that mistake is heard about at start-up.
+//
+// Worth stating rather than leaving to a caller's arguments, because a queue
+// with no dead letter is a queue where a message no consumer can act on is
+// simply gone: the consumer's only alternatives are to requeue it, which with
+// one consumer is a loop, or to acknowledge something it did not do.
+type DeadLetter struct {
+	Exchange string
+	// Key is what the dead-lettered message is routed by. Empty keeps the
+	// key it arrived with, which is the broker's own default and is usually
+	// what a single dead-letter exchange wants.
+	Key string
+}
+
+// IsStated reports whether a queue says where its discards go.
+func (letter DeadLetter) IsStated() bool { return letter.Exchange != "" }
 
 // Binding is an exchange sending a queue the messages that match a key.
 type Binding struct {
