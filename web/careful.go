@@ -181,7 +181,7 @@ func askUpstream[R any](
 // latency, and an unenforced rate limit costs a service's goodwill and this
 // program its access.
 func awaitTurn[R any](careful *Careful) effect.Effect[R, Fault, effect.Unit] {
-	return rate.Waiting[R](careful.pacing, careful.terms.Allowed, careful.terms.Longest).
+	return rate.AwaitTurn[R](careful.pacing, careful.terms.Allowed, careful.terms.Longest).
 		MapError(func(failed rate.Fault) Fault {
 			return Fault{Doing: "waiting for a turn at " + careful.terms.Named, Err: failed}
 		})

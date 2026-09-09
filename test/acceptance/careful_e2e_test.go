@@ -47,7 +47,7 @@ func answers(t *testing.T, status int, entity string) *asked {
 // process.
 func carefully(t *testing.T, service *asked, patience web.Patience) (*web.Careful, cache.Store) {
 	t.Helper()
-	keeping := cache.Holding(64, time.Now)
+	keeping := cache.NewHeld(64, time.Now)
 	careful, err := web.Carefully(
 		web.Dial(http.DefaultClient, service.server.URL),
 		web.Terms{
@@ -57,7 +57,7 @@ func carefully(t *testing.T, service *asked, patience web.Patience) (*web.Carefu
 			Patience: patience,
 		},
 		keeping,
-		rate.Holding(time.Now),
+		rate.NewHeld(time.Now),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -202,8 +202,8 @@ func TestATurnIsWaitedForBeforeAsking(t *testing.T) {
 			Allowed: rate.Allowance{Name: "a slow service", Most: 3, Every: 300 * time.Millisecond},
 			Fresh:   time.Minute,
 		},
-		cache.Holding(64, time.Now),
-		rate.Holding(time.Now),
+		cache.NewHeld(64, time.Now),
+		rate.NewHeld(time.Now),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -234,7 +234,7 @@ func TestTermsThatSayNothingAreRefusedWhereTheyAreWritten(t *testing.T) {
 		{Allowed: rate.Allowance{Name: "a service", Most: 1, Every: time.Second}, Fresh: time.Minute},
 		{Named: "a service", Allowed: rate.Allowance{Name: "a service", Most: 1, Every: time.Second}},
 	} {
-		if _, err := web.Carefully(client, terms, cache.Holding(8, time.Now), rate.Holding(time.Now)); err == nil {
+		if _, err := web.Carefully(client, terms, cache.NewHeld(8, time.Now), rate.NewHeld(time.Now)); err == nil {
 			t.Fatalf("expected %+v to be refused", terms)
 		}
 	}
