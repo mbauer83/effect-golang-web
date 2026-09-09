@@ -33,17 +33,17 @@ type Rate struct {
 
 // EnquirySchema describes an enquiry.
 var EnquirySchema = schema.Struct[Enquiry]("Enquiry",
-	schema.FieldOf("origin", schema.MinLength(schema.Text(), 1),
+	schema.FieldOf("origin", schema.Text().Constrained(schema.MinLength(1)),
 		func(held Enquiry) string { return held.Origin },
 		func(held *Enquiry, value string) { held.Origin = value }).
 		Numbered(1).
 		Documented("Origin is where the shipment starts."),
-	schema.FieldOf("destination", schema.MinLength(schema.Text(), 1),
+	schema.FieldOf("destination", schema.Text().Constrained(schema.MinLength(1)),
 		func(held Enquiry) string { return held.Destination },
 		func(held *Enquiry, value string) { held.Destination = value }).
 		Numbered(2).
 		Documented("Destination is where it is going."),
-	schema.FieldOf("kilos", schema.Above(schema.Float64(), 0),
+	schema.FieldOf("kilos", schema.Float64().Constrained(schema.Above[float64](0)),
 		func(held Enquiry) float64 { return held.Kilos },
 		func(held *Enquiry, value float64) { held.Kilos = value }).
 		Numbered(3).
@@ -52,13 +52,13 @@ var EnquirySchema = schema.Struct[Enquiry]("Enquiry",
 
 // RateSchema describes a rate.
 var RateSchema = schema.Struct[Rate]("Rate",
-	schema.FieldOf("carrier", schema.MinLength(schema.Text(), 1),
+	schema.FieldOf("carrier", schema.Text().Constrained(schema.MinLength(1)),
 		func(held Rate) string { return held.Carrier },
 		func(held *Rate, value string) { held.Carrier = value }).Numbered(1),
-	schema.FieldOf("currency", schema.Matching(schema.Text(), `^[A-Z]{3}$`),
+	schema.FieldOf("currency", schema.Text().Constrained(schema.Matching(`^[A-Z]{3}$`)),
 		func(held Rate) string { return held.Currency },
 		func(held *Rate, value string) { held.Currency = value }).Numbered(2),
-	schema.FieldOf("cents", schema.AtLeast(schema.Int64(), 1),
+	schema.FieldOf("cents", schema.Int64().Constrained(schema.AtLeast[int64](1)),
 		func(held Rate) int64 { return held.Cents },
 		func(held *Rate, value int64) { held.Cents = value }).Numbered(3),
 ).Documented("Rate is what a carrier would charge.")

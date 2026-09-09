@@ -161,7 +161,7 @@ func TestAWrapperSeesTheCodecsAndNotOnlyTheHandler(t *testing.T) {
 	received := through(t, httptest.NewRequest(http.MethodGet, "/books/x", nil),
 		watching,
 		echo(http.MethodGet, "/books/{title}",
-			web.PathParam("title", schema.MinLength(schema.Text(), 4))))
+			web.PathParam("title", schema.Text().Constrained(schema.MinLength(4)))))
 
 	if received.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected the codec to refuse the short title, got %d", received.StatusCode)
