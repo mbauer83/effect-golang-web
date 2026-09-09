@@ -46,7 +46,7 @@ func Send[R any](socket Socket, message Message) effect.Effect[R, Fault, effect.
 		func(ctx context.Context, _ R) (effect.Unit, error) {
 			return effect.Unit{}, socket.connection.Write(ctx, messageType(message.Kind), message.Data)
 		},
-		func(err error) Fault { return faulted("sending a message", err) },
+		func(err error) Fault { return faultOf("sending a message", err) },
 	).Named("send")
 }
 
@@ -64,7 +64,7 @@ func Receive[R any](socket Socket) effect.Effect[R, Fault, Message] {
 			}
 			return Message{Kind: messageKind(kind), Data: data}, nil
 		},
-		func(err error) Fault { return faulted("reading a message", err) },
+		func(err error) Fault { return faultOf("reading a message", err) },
 	).Named("receive")
 }
 
@@ -83,11 +83,11 @@ func Close[R any](socket Socket, reason string) effect.Effect[R, Fault, effect.U
 		func(context.Context, R) (effect.Unit, error) {
 			return effect.Unit{}, socket.connection.Close(ws.StatusNormalClosure, reason)
 		},
-		func(err error) Fault { return faulted("closing the connection", err) },
+		func(err error) Fault { return faultOf("closing the connection", err) },
 	).Named("close")
 }
 
-// closing releases the socket when its scope ends.
+// closeSocket releases the socket when its scope ends.
 //
 // It says goodbye first. A peer that is told the conversation is over ends its
 // own inbound stream and reports nothing, whereas a peer whose connection
@@ -97,8 +97,8 @@ func Close[R any](socket Socket, reason string) effect.Effect[R, Fault, effect.U
 //
 // If the polite close cannot be sent, the connection goes anyway: a release
 // that failed to let go would be worse than one that was rude.
-func closing[R any](socket Socket) effect.Effect[R, effect.Never, effect.Unit] {
-	return effect.Release[R](func(context.Context) error {
+func closeSocket[R any](socket Socket) effect.Effect[R, effect.Never, effect.Unit] {
+	return effect.AddFinalizer[R](func(context.Context) error {
 		if err := socket.connection.Close(ws.StatusNormalClosure, ""); err == nil {
 			return nil
 		}

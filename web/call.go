@@ -66,13 +66,13 @@ func Call[R, In, Out any](
 	}
 	return Fetch[R](client, endpoint.method, path, requesting).
 		FlatMap(func(received Received) effect.Effect[R, Fault, Out] {
-			return answered[R](endpoint.output, received, endpoint.method+" "+path)
+			return decodeResponse[R](endpoint.output, received, endpoint.method+" "+path)
 		})
 }
 
-// answered reads the response the output declared, or says what arrived
+// decodeResponse reads the response the output declared, or says what arrived
 // instead.
-func answered[R, Out any](
+func decodeResponse[R, Out any](
 	output Output[Out],
 	received Received,
 	called string,

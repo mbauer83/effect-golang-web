@@ -34,18 +34,18 @@ type Rate struct {
 // EnquirySchema describes an enquiry.
 var EnquirySchema = schema.Struct[Enquiry]("Enquiry",
 	schema.FieldOf("origin", schema.Text().Constrained(schema.MinLength(1)),
-		func(held Enquiry) string { return held.Origin },
-		func(held *Enquiry, value string) { held.Origin = value }).
+		func(enquiry Enquiry) string { return enquiry.Origin },
+		func(enquiry *Enquiry, value string) { enquiry.Origin = value }).
 		Numbered(1).
 		Documented("Origin is where the shipment starts."),
 	schema.FieldOf("destination", schema.Text().Constrained(schema.MinLength(1)),
-		func(held Enquiry) string { return held.Destination },
-		func(held *Enquiry, value string) { held.Destination = value }).
+		func(enquiry Enquiry) string { return enquiry.Destination },
+		func(enquiry *Enquiry, value string) { enquiry.Destination = value }).
 		Numbered(2).
 		Documented("Destination is where it is going."),
 	schema.FieldOf("kilos", schema.Float64().Constrained(schema.Above[float64](0)),
-		func(held Enquiry) float64 { return held.Kilos },
-		func(held *Enquiry, value float64) { held.Kilos = value }).
+		func(enquiry Enquiry) float64 { return enquiry.Kilos },
+		func(enquiry *Enquiry, value float64) { enquiry.Kilos = value }).
 		Numbered(3).
 		Documented("Kilos is what it weighs, and it weighs something."),
 ).Documented("Enquiry asks what a shipment would cost.")
@@ -53,14 +53,14 @@ var EnquirySchema = schema.Struct[Enquiry]("Enquiry",
 // RateSchema describes a rate.
 var RateSchema = schema.Struct[Rate]("Rate",
 	schema.FieldOf("carrier", schema.Text().Constrained(schema.MinLength(1)),
-		func(held Rate) string { return held.Carrier },
-		func(held *Rate, value string) { held.Carrier = value }).Numbered(1),
+		func(rate Rate) string { return rate.Carrier },
+		func(rate *Rate, value string) { rate.Carrier = value }).Numbered(1),
 	schema.FieldOf("currency", schema.Text().Constrained(schema.Matching(`^[A-Z]{3}$`)),
-		func(held Rate) string { return held.Currency },
-		func(held *Rate, value string) { held.Currency = value }).Numbered(2),
+		func(rate Rate) string { return rate.Currency },
+		func(rate *Rate, value string) { rate.Currency = value }).Numbered(2),
 	schema.FieldOf("cents", schema.Int64().Constrained(schema.AtLeast[int64](1)),
-		func(held Rate) int64 { return held.Cents },
-		func(held *Rate, value int64) { held.Cents = value }).Numbered(3),
+		func(rate Rate) int64 { return rate.Cents },
+		func(rate *Rate, value int64) { rate.Cents = value }).Numbered(3),
 ).Documented("Rate is what a carrier would charge.")
 
 // Service is the fully-qualified proto service name, which is what forms the
@@ -128,11 +128,11 @@ func Priced(rates map[string]Rate) func(Enquiry) quoting[Rate] {
 		return effect.For[effect.Unit, Refusal]().
 			Suspend(func() quoting[Rate] {
 				if enquiry.Kilos > heaviest {
-					return refusing(TooHeavy, "no carrier takes more than 24 tonnes")
+					return quoteRefusal(TooHeavy, "no carrier takes more than 24 tonnes")
 				}
 				rate, carried := rates[enquiry.Origin+"-"+enquiry.Destination]
 				if !carried {
-					return refusing(NoRoute,
+					return quoteRefusal(NoRoute,
 						"nobody carries "+enquiry.Origin+" to "+enquiry.Destination)
 				}
 				// Priced by weight, rounded up to the cent.
@@ -142,7 +142,7 @@ func Priced(rates map[string]Rate) func(Enquiry) quoting[Rate] {
 	}
 }
 
-func refusing(reason Reason, details string) quoting[Rate] {
+func quoteRefusal(reason Reason, details string) quoting[Rate] {
 	return effect.For[effect.Unit, Refusal]().
 		Fail[Rate](Refusal{Reason: reason, Details: details})
 }

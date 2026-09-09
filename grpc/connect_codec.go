@@ -36,11 +36,11 @@ type passingThrough struct{}
 func (passingThrough) Name() string { return "proto" }
 
 func (passingThrough) Marshal(message any) ([]byte, error) {
-	held, ours := message.(*payload)
+	heldValue, ours := message.(*payload)
 	if !ours {
 		return nil, fmt.Errorf("this codec carries bytes, and Connect offered a %T", message)
 	}
-	return held.bytes, nil
+	return heldValue.bytes, nil
 }
 
 func (passingThrough) Unmarshal(bytes []byte, into any) error {

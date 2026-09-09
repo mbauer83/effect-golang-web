@@ -12,8 +12,8 @@ import (
 	broker "github.com/Azure/go-amqp"
 )
 
-// transferred is the library's message for one of ours.
-func transferred(message Message) (*broker.Message, error) {
+// libraryMessage is the library's message for one of ours.
+func libraryMessage(message Message) (*broker.Message, error) {
 	properties, err := Properties(message.Properties)
 	if err != nil {
 		return nil, err
@@ -34,14 +34,14 @@ func transferred(message Message) (*broker.Message, error) {
 	return sent, nil
 }
 
-// delivered is what arrived, in the universal representation.
+// deliveryOf is what arrived, in the universal representation.
 //
 // A message with no delivery tag cannot be settled, and settlement is the whole
 // point of this package's consuming side -- so it is refused here rather than
 // arriving as something the consumer will fail to acknowledge. That happens when
 // the link was attached in the settle-on-send mode, which this package does not
 // use.
-func delivered(received *broker.Message) (Delivery, error) {
+func deliveryOf(received *broker.Message) (Delivery, error) {
 	if len(received.DeliveryTag) == 0 {
 		return Delivery{}, errNoTag
 	}
@@ -89,11 +89,11 @@ func subject(received *broker.Message) *string {
 	return received.Properties.Subject
 }
 
-func text(held *string) string {
-	if held == nil {
+func text(text *string) string {
+	if text == nil {
 		return ""
 	}
-	return *held
+	return *text
 }
 
 // attempts is the broker's count of previous deliveries.

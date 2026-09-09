@@ -23,7 +23,7 @@ func SendValue[R, A any](socket Socket, shape schema.Schema[A], value A) effect.
 			document, err := schema.EncodeJSON(shape, value)
 			if err != nil {
 				return effect.For[R, Fault]().
-					Fail[effect.Unit](faulted("encoding a message", err))
+					Fail[effect.Unit](faultOf("encoding a message", err))
 			}
 			return Send[R](socket, Message{Kind: Text, Data: document})
 		}).
@@ -41,7 +41,7 @@ func ReceiveValue[R, A any](socket Socket, shape schema.Schema[A]) effect.Effect
 				func(context.Context, R) (A, error) {
 					return schema.DecodeJSON(shape, message.Data)
 				},
-				func(err error) Fault { return faulted("reading a message", err) },
+				func(err error) Fault { return faultOf("reading a message", err) },
 			)
 		}).
 		Named("receive-value")
@@ -61,7 +61,7 @@ func Values[R, A any](socket Socket, shape schema.Schema[A]) effect.Stream[R, Fa
 				func(context.Context, R) (A, error) {
 					return schema.DecodeJSON(shape, message.Data)
 				},
-				func(err error) Fault { return faulted("reading a message", err) },
+				func(err error) Fault { return faultOf("reading a message", err) },
 			)
 		})
 }

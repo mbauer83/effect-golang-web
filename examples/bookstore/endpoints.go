@@ -34,7 +34,7 @@ func Published(store *Store) (web.Routes[effect.Unit, Fault], error) {
 	if err != nil {
 		return web.Routes[effect.Unit, Fault]{}, err
 	}
-	return web.NewRoutes(append(routes(store), publishing(contract))...)
+	return web.NewRoutes(append(routes(store), publishBook(contract))...)
 }
 
 // Contract projects the surface into an OpenAPI document.
@@ -60,9 +60,9 @@ func routes(store *Store) []web.Route[effect.Unit, Fault] {
 	}
 }
 
-// publishing serves the contract as it stands. Its entity is already encoded,
+// publishBook serves the contract as it stands. Its entity is already encoded,
 // so it is answered as the bytes it is rather than through a schema.
-func publishing(contract []byte) web.Route[effect.Unit, Fault] {
+func publishBook(contract []byte) web.Route[effect.Unit, Fault] {
 	return web.Handle(
 		web.GET("/openapi.json", web.Nothing(),
 			web.ReturnsRaw(http.StatusOK, "application/json")).

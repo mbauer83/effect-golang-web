@@ -61,11 +61,11 @@ func Serve[R any](scope effect.Scope, address string, handler http.Handler) effe
 // for.
 func ServeWith[R any](scope effect.Scope, settings Settings, handler http.Handler) effect.Effect[R, Fault, Server] {
 	operations := effect.For[R, Fault]()
-	return listening[R](scope, settings).
+	return listen[R](scope, settings).
 		FlatMap(func(listener net.Listener) effect.Effect[R, Fault, Server] {
-			return reporting[R](scope).
+			return logServing[R](scope).
 				FlatMap(func(abandoned chan error) effect.Effect[R, Fault, Server] {
-					loop := serving[R](httpServer(settings, handler), listener, settings.Grace, abandoned)
+					loop := serveLoop[R](httpServer(settings, handler), listener, settings.Grace, abandoned)
 					return operations.ForkIn(scope, loop).
 						Map(func(fiber effect.Fiber[Fault, effect.Unit]) Server {
 							return Server{address: listener.Addr(), serving: fiber}

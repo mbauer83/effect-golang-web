@@ -113,14 +113,14 @@ func FetchCarefully[R any](
 	path string,
 	requesting Requesting,
 ) effect.Effect[R, Fault, Received] {
-	filed := careful.filed(method, path, requesting)
-	return recalling[R](careful, filed).
-		FlatMap(func(kept cache.Cached) effect.Effect[R, Fault, Received] {
-			if received, replayed := replayed(kept); replayed {
+	filed := careful.cacheKey(method, path, requesting)
+	return getCached[R](careful, filed).
+		FlatMap(func(cached cache.Cached) effect.Effect[R, Fault, Received] {
+			if received, replayed := responseFrom(cached); replayed {
 				return effect.Succeed[R, Fault](received)
 			}
-			return asking[R](careful, method, path, requesting).
-				FlatMap(filing[R](careful, filed, requesting.About))
+			return askUpstream[R](careful, method, path, requesting).
+				FlatMap(putCached[R](careful, filed, requesting.About))
 		}).
 		Named("fetch carefully")
 }
@@ -145,54 +145,54 @@ func CallCarefully[R, In, Out any](
 	}
 	return FetchCarefully[R](careful, endpoint.method, path, requesting).
 		FlatMap(func(received Received) effect.Effect[R, Fault, Out] {
-			return answered[R](endpoint.output, received, endpoint.method+" "+path)
+			return decodeResponse[R](endpoint.output, received, endpoint.method+" "+path)
 		})
 }
 
-// asking takes a turn and asks, again on the terms' patience.
+// askUpstream takes a turn and asks, again on the terms' patience.
 //
 // The turn is inside the retry rather than around it, so a second attempt
-// waits for its own turn: asking again past the rate a service agreed to is
+// waits for its own turn: askUpstream again past the rate a service agreed to is
 // how a program that meant to be careful gets itself blocked.
 //
-// A status worth asking again about is carried as a failure while the retry is
+// A status worth askUpstream again about is carried as a failure while the retry is
 // running and handed back as the Received it came from once the patience is
 // spent, because a schedule retries a failure and this function answers with a
 // status. Both are true of the same response.
-func asking[R any](
+func askUpstream[R any](
 	careful *Careful,
 	method string,
 	path string,
 	requesting Requesting,
 ) effect.Effect[R, Fault, Received] {
-	return waiting[R](careful).
+	return awaitTurn[R](careful).
 		FlatMap(func(effect.Unit) effect.Effect[R, Fault, Received] {
 			return Fetch[R](careful.client, method, path, requesting).
-				FlatMap(refusing[R](method + " " + path))
+				FlatMap(askRefusal[R](method + " " + path))
 		}).
-		Retry(retrying(careful.terms.Patience)).
-		CatchAll(recovered[R])
+		Retry(retrySchedule(careful.terms.Patience)).
+		CatchAll(staleAnswer[R])
 }
 
-// waiting is this program's turn to ask.
+// awaitTurn is this program's turn to ask.
 //
 // A pace this program cannot consult is a request this program does not make,
 // and that asymmetry with the cache is deliberate: an unreadable cache costs
 // latency, and an unenforced rate limit costs a service's goodwill and this
 // program its access.
-func waiting[R any](careful *Careful) effect.Effect[R, Fault, effect.Unit] {
+func awaitTurn[R any](careful *Careful) effect.Effect[R, Fault, effect.Unit] {
 	return rate.Waiting[R](careful.pacing, careful.terms.Allowed, careful.terms.Longest).
 		MapError(func(failed rate.Fault) Fault {
 			return Fault{Doing: "waiting for a turn at " + careful.terms.Named, Err: failed}
 		})
 }
 
-// retrying is the terms' patience as a schedule over what went wrong.
-func retrying(patience Patience) effect.Schedule[Fault, effect.Unit] {
+// retrySchedule is the terms' patience as a schedule over what went wrong.
+func retrySchedule(patience Patience) effect.Schedule[Fault, effect.Unit] {
 	if !patience.IsPatient() {
 		return effect.Stop[Fault]()
 	}
-	return effect.AndSchedules(
+	return effect.IntersectSchedules(
 		effect.Exponential[Fault](patience.First, patience.Longest),
 		effect.Recurs[Fault](patience.Retries),
 	).

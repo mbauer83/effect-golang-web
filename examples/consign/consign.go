@@ -123,12 +123,12 @@ func Collect(
 	return effect.CollectStreamEffect(
 		amqp10.Values[effect.Unit](link, ShipmentSchema),
 		func(received amqp10.Received[Shipment]) consigning[effect.Chunk[Shipment]] {
-			return collecting(received, carrier)
+			return collectConsignment(received, carrier)
 		})
 }
 
-// collecting is what happens to one delivery.
-func collecting(
+// collectConsignment is what happens to one delivery.
+func collectConsignment(
 	received amqp10.Received[Shipment],
 	carrier func(Shipment) consigning[Outcome],
 ) consigning[effect.Chunk[Shipment]] {
@@ -142,7 +142,7 @@ func collecting(
 				"the shipment cannot be read: "+err.Error()).As(effect.ChunkOf[Shipment]()))
 		}
 		outcome := direct.Bind(bind, carrier(shipment))
-		return direct.Bind(bind, settled(received, shipment, outcome))
+		return direct.Bind(bind, validateConsignment(received, shipment, outcome))
 	})
 }
 
@@ -150,8 +150,8 @@ func collecting(
 // the condition for direct style.
 type settling = direct.Binder[effect.Unit, amqp10.Fault]
 
-// settled turns the carrier's answer into the disposition that says it.
-func settled(
+// validateConsignment turns the carrier's answer into the disposition that says it.
+func validateConsignment(
 	received amqp10.Received[Shipment],
 	shipment Shipment,
 	outcome Outcome,
@@ -167,14 +167,14 @@ func settled(
 	return amqp10.Modify[effect.Unit](received, amqp10.Change{
 		Tried:     refused.Finality == NotNow,
 		Elsewhere: refused.Finality == NotMe,
-		Annotations: recorded("refused-because", refused.Reason,
+		Annotations: recordConsignment("refused-because", refused.Reason,
 			"attempts", strconv.FormatUint(uint64(received.Delivery.Attempts+1), 10)),
 	}).As(effect.ChunkOf[Shipment]())
 }
 
-// recorded is what to write on a message being given back, so whoever gets it
+// recordConsignment is what to write on a message being given back, so whoever gets it
 // next knows what happened to it here.
-func recorded(pairs ...string) dynamic.Object {
+func recordConsignment(pairs ...string) dynamic.Object {
 	written := dynamic.Object{}
 	for index := 0; index+1 < len(pairs); index += 2 {
 		written.Fields = append(written.Fields,

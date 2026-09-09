@@ -31,7 +31,7 @@ func (fault Fault) Unwrap() error {
 	return fault.Err
 }
 
-func faulted(doing string, subject string, err error) Fault {
+func faultOf(doing string, subject string, err error) Fault {
 	return Fault{Doing: doing, Subject: subject, Err: err}
 }
 

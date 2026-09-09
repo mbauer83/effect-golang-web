@@ -25,7 +25,7 @@ type sending struct {
 func (link *sending) Address() string { return link.address }
 
 func (link *sending) Send(ctx context.Context, message Message) error {
-	sent, err := transferred(message)
+	sent, err := libraryMessage(message)
 	if err != nil {
 		return err
 	}
@@ -69,7 +69,7 @@ func (link *receiving) Receive(ctx context.Context) (Delivery, bool, error) {
 		}
 		return Delivery{}, false, err
 	}
-	delivery, err := delivered(received)
+	delivery, err := deliveryOf(received)
 	if err != nil {
 		return Delivery{}, false, err
 	}
@@ -128,11 +128,11 @@ func (link *receiving) settle(
 	disposition func(context.Context, *broker.Message) error,
 ) error {
 	link.mutex.Lock()
-	message, held := link.unsettled[tag]
+	message, unsettledEntry := link.unsettled[tag]
 	delete(link.unsettled, tag)
 	link.mutex.Unlock()
 
-	if !held {
+	if !unsettledEntry {
 		return errUnknownTag
 	}
 	return disposition(ctx, message)

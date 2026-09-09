@@ -30,7 +30,7 @@ func (fault Fault) Unwrap() error {
 	return fault.Err
 }
 
-func faulted(doing string, procedure string, err error) Fault {
+func faultOf(doing string, procedure string, err error) Fault {
 	return Fault{Doing: doing, Procedure: procedure, Err: err}
 }
 

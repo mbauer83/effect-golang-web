@@ -37,7 +37,7 @@ func NewConnected() *Connected {
 // answers for one name means the author meant one thing and wrote two.
 func (transport *Connected) Answer(path string, answer Answering) error {
 	if transport.answered[path] {
-		return faulted("answering a procedure", path, errAnsweredTwice)
+		return faultOf("answering a procedure", path, errAnsweredTwice)
 	}
 	transport.answered[path] = true
 
@@ -58,7 +58,7 @@ func (transport *Connected) Answer(path string, answer Answering) error {
 // Handler is what the HTTP core mounts.
 func (transport *Connected) Handler() (http.Handler, error) {
 	if len(transport.answered) == 0 {
-		return nil, faulted("building a handler", "", errNoProcedures)
+		return nil, faultOf("building a handler", "", errNoProcedures)
 	}
 	return transport.mux, nil
 }

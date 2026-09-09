@@ -52,47 +52,47 @@ func NewBroker() *Broker {
 
 // Declare states a node at an address. A real broker's addresses come from its
 // own configuration, so this is the test standing in for that configuration.
-func (held *Broker) Declare(address string) {
-	held.mutex.Lock()
-	defer held.mutex.Unlock()
-	if _, already := held.nodes[address]; !already {
-		held.nodes[address] = &node{}
+func (broker *Broker) Declare(address string) {
+	broker.mutex.Lock()
+	defer broker.mutex.Unlock()
+	if _, already := broker.nodes[address]; !already {
+		broker.nodes[address] = &node{}
 	}
 }
 
 // Accepted is the tags of the messages a receiver said it was done with.
-func (held *Broker) Accepted() []string {
-	held.mutex.Lock()
-	defer held.mutex.Unlock()
-	return append([]string(nil), held.settled.accepted...)
+func (broker *Broker) Accepted() []string {
+	broker.mutex.Lock()
+	defer broker.mutex.Unlock()
+	return append([]string(nil), broker.settled.accepted...)
 }
 
 // Rejected is the messages a receiver said would never be processed, and why.
-func (held *Broker) Rejected() []Rejection {
-	held.mutex.Lock()
-	defer held.mutex.Unlock()
-	return append([]Rejection(nil), held.settled.rejected...)
+func (broker *Broker) Rejected() []Rejection {
+	broker.mutex.Lock()
+	defer broker.mutex.Unlock()
+	return append([]Rejection(nil), broker.settled.rejected...)
 }
 
 // Released is the tags of the messages a receiver gave back unchanged.
-func (held *Broker) Released() []string {
-	held.mutex.Lock()
-	defer held.mutex.Unlock()
-	return append([]string(nil), held.settled.released...)
+func (broker *Broker) Released() []string {
+	broker.mutex.Lock()
+	defer broker.mutex.Unlock()
+	return append([]string(nil), broker.settled.released...)
 }
 
 // Modified is the messages a receiver gave back with something said about them.
-func (held *Broker) Modified() []Modification {
-	held.mutex.Lock()
-	defer held.mutex.Unlock()
-	return append([]Modification(nil), held.settled.modified...)
+func (broker *Broker) Modified() []Modification {
+	broker.mutex.Lock()
+	defer broker.mutex.Unlock()
+	return append([]Modification(nil), broker.settled.modified...)
 }
 
 // Waiting is how many messages a node holds that nobody has taken.
-func (held *Broker) Waiting(address string) int {
-	held.mutex.Lock()
-	defer held.mutex.Unlock()
-	waiting, known := held.nodes[address]
+func (broker *Broker) Waiting(address string) int {
+	broker.mutex.Lock()
+	defer broker.mutex.Unlock()
+	waiting, known := broker.nodes[address]
 	if !known {
 		return 0
 	}

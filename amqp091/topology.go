@@ -47,7 +47,7 @@ func DeclareExchange[R any](channel Declaring, exchange Exchange) effect.Effect[
 		func(ctx context.Context, _ R) (effect.Unit, error) {
 			return effect.Unit{}, channel.DeclareExchange(ctx, exchange)
 		},
-		func(err error) Fault { return faulted("declaring an exchange", exchange.Name, err) },
+		func(err error) Fault { return faultOf("declaring an exchange", exchange.Name, err) },
 	).Named("declare-exchange")
 }
 
@@ -57,7 +57,7 @@ func DeclareQueue[R any](channel Declaring, queue Queue) effect.Effect[R, Fault,
 		func(ctx context.Context, _ R) (effect.Unit, error) {
 			return effect.Unit{}, channel.DeclareQueue(ctx, queue)
 		},
-		func(err error) Fault { return faulted("declaring a queue", queue.Name, err) },
+		func(err error) Fault { return faultOf("declaring a queue", queue.Name, err) },
 	).Named("declare-queue")
 }
 
@@ -67,6 +67,6 @@ func BindQueue[R any](channel Declaring, binding Binding) effect.Effect[R, Fault
 		func(ctx context.Context, _ R) (effect.Unit, error) {
 			return effect.Unit{}, channel.Bind(ctx, binding)
 		},
-		func(err error) Fault { return faulted("binding a queue", binding.Queue, err) },
+		func(err error) Fault { return faultOf("binding a queue", binding.Queue, err) },
 	).Named("bind-queue")
 }

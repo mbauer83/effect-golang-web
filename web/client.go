@@ -88,7 +88,7 @@ func Carrying[A any](
 ) (Requesting, error) {
 	document, err := schema.EncodeJSON(shape, value)
 	if err != nil {
-		return Requesting{}, faulted("encoding the request body", err)
+		return Requesting{}, faultOf("encoding the request body", err)
 	}
 	requesting.Entity = document
 	requesting.MediaType = "application/json"

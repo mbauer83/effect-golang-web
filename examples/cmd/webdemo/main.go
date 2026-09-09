@@ -88,8 +88,8 @@ func runBookstore(runtime *effect.Runtime) {
 
 	// The store's operations are effects, so counting what it holds is one
 	// too: the runtime interprets it like anything else.
-	held, _ := runtime.Run(context.Background(), effect.Unit{}, store.All()).Value()
-	fmt.Printf("bookstore: stopped with %d books\n", len(held))
+	background, _ := runtime.Run(context.Background(), effect.Unit{}, store.All()).Value()
+	fmt.Printf("bookstore: stopped with %d books\n", len(background))
 }
 
 func get(url string) *http.Response {

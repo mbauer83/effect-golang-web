@@ -50,7 +50,7 @@ type Store struct {
 // retry, which is never what a program meant.
 func NewStore(books ...Book) effect.Effect[effect.Unit, effect.Never, *Store] {
 	return effect.NewRef[effect.Unit](slices.Clone(books)).
-		Map(func(held effect.Ref[[]Book]) *Store { return &Store{books: held} })
+		Map(func(ref effect.Ref[[]Book]) *Store { return &Store{books: ref} })
 }
 
 // All lists the collection.
@@ -58,7 +58,7 @@ func NewStore(books ...Book) effect.Effect[effect.Unit, effect.Never, *Store] {
 // It hands back a copy, so a reader cannot change the store through what it was
 // given.
 func (store *Store) All() storeEffect[[]Book] {
-	return widened(store.books.Get[effect.Unit]().Map(slices.Clone)).Named("list-books")
+	return widenFault(store.books.Get[effect.Unit]().Map(slices.Clone)).Named("list-books")
 }
 
 // Add appends a book, or refuses because the store already holds that title.
@@ -69,11 +69,11 @@ func (store *Store) All() storeEffect[[]Book] {
 // rather than as an error a caller has to interrogate; nothing here knows it
 // will become a status.
 func (store *Store) Add(book Book) storeEffect[effect.Unit] {
-	added := effect.Modify[effect.Unit](store.books, func(held []Book) ([]Book, bool) {
-		if slices.ContainsFunc(held, sameTitle(book.Title)) {
-			return held, false
+	added := effect.Modify[effect.Unit](store.books, func(bookGiven []Book) ([]Book, bool) {
+		if slices.ContainsFunc(bookGiven, sameTitle(book.Title)) {
+			return bookGiven, false
 		}
-		return append(held, book), true
+		return append(bookGiven, book), true
 	})
 	// Direct style: read the answer, then decide. As a FlatMap the deciding
 	// was nested inside the reading, which is the wrong way round for
@@ -81,7 +81,7 @@ func (store *Store) Add(book Book) storeEffect[effect.Unit] {
 	// else, because binding one abandons the body, which is what a refusal
 	// means.
 	return direct.Run(func(bind *storing) effect.Unit {
-		if direct.Bind(bind, widened(added)) {
+		if direct.Bind(bind, widenFault(added)) {
 			return effect.Unit{}
 		}
 		direct.Bind(bind, effect.For[effect.Unit, Fault]().Fail[effect.Unit](Fault{
@@ -95,13 +95,13 @@ func (store *Store) Add(book Book) storeEffect[effect.Unit] {
 // Find returns the book with the given title, or refuses because there is none.
 func (store *Store) Find(title string) storeEffect[Book] {
 	return direct.Run(func(bind *storing) Book {
-		held := direct.Bind(bind, widened(store.books.Get[effect.Unit]()))
-		index := slices.IndexFunc(held, sameTitle(title))
+		getEntry := direct.Bind(bind, widenFault(store.books.Get[effect.Unit]()))
+		index := slices.IndexFunc(getEntry, sameTitle(title))
 		if index < 0 {
 			direct.Bind(bind, effect.For[effect.Unit, Fault]().
 				Fail[Book](Fault{Kind: NotFound}))
 		}
-		return held[index]
+		return getEntry[index]
 	}).Named("find-book")
 }
 
@@ -114,11 +114,11 @@ func (store *Store) Find(title string) storeEffect[Book] {
 type storing = direct.Binder[effect.Unit, Fault]
 
 func sameTitle(title string) func(Book) bool {
-	return func(held Book) bool { return held.Title == title }
+	return func(book Book) bool { return book.Title == title }
 }
 
-// widened puts an operation that cannot fail into the store's failure channel,
+// widenFault puts an operation that cannot fail into the store's failure channel,
 // so a read and a refusal compose in one expression.
-func widened[A any](fx effect.Effect[effect.Unit, effect.Never, A]) storeEffect[A] {
+func widenFault[A any](fx effect.Effect[effect.Unit, effect.Never, A]) storeEffect[A] {
 	return effect.For[effect.Unit, Fault]().WidenError(fx)
 }

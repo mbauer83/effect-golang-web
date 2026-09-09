@@ -49,19 +49,19 @@ func Accept[R, E any](
 				// would be worse than saying it once.
 				return
 			}
-			boundary.Interpret(request.Context(), conversing(Socket{connection: connection}, converse))
+			boundary.Interpret(request.Context(), runConversation(Socket{connection: connection}, converse))
 		}))
 }
 
-// conversing owns the socket for exactly as long as the conversation.
-func conversing[R, E any](
+// runConversation owns the socket for exactly as long as the conversation.
+func runConversation[R, E any](
 	socket Socket,
 	converse func(Socket) effect.Effect[R, E, effect.Unit],
 ) effect.Effect[R, E, effect.Unit] {
 	return effect.Scoped(func(scope effect.Scope) effect.Effect[R, E, effect.Unit] {
 		return scope.AcquireRelease(
 			effect.For[R, E]().Succeed(socket),
-			closing[R],
+			closeSocket[R],
 		).FlatMap(converse).Named("conversation")
 	})
 }

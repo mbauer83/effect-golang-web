@@ -57,7 +57,7 @@ func Bytes(status int, contentType string, body []byte) Response {
 func JSON[A any](status int, shape schema.Schema[A], value A) (Response, error) {
 	document, err := schema.EncodeJSON(shape, value)
 	if err != nil {
-		return Response{}, faulted("encoding the response body", err)
+		return Response{}, faultOf("encoding the response body", err)
 	}
 	return Bytes(status, "application/json", document), nil
 }

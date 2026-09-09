@@ -31,12 +31,12 @@ import (
 // nothing above this package acquires the dependency by calling it. A nested
 // table inside it is the named type, because the library will not accept
 // anything else; a caller reading one back uses Headers rather than looking.
-func Table(named dynamic.Object) (map[string]any, error) {
-	if len(named.Fields) == 0 {
+func Table(object dynamic.Object) (map[string]any, error) {
+	if len(object.Fields) == 0 {
 		return nil, nil
 	}
-	made := make(map[string]any, len(named.Fields))
-	for _, header := range named.Fields {
+	made := make(map[string]any, len(object.Fields))
+	for _, header := range object.Fields {
 		crossed, err := fieldOf(header.Value)
 		if err != nil {
 			return nil, fmt.Errorf("header %q: %w", header.Name, err)
@@ -47,34 +47,34 @@ func Table(named dynamic.Object) (map[string]any, error) {
 }
 
 func fieldOf(value dynamic.Value) (any, error) {
-	switch held := value.(type) {
+	switch shape := value.(type) {
 	case dynamic.Absent:
 		return nil, nil
 	case dynamic.Boolean:
-		return held.Value, nil
+		return shape.Value, nil
 	case dynamic.Integer:
-		return held.Value, nil
+		return shape.Value, nil
 	case dynamic.Number:
-		return held.Value, nil
+		return shape.Value, nil
 	case dynamic.Text:
-		return held.Value, nil
+		return shape.Value, nil
 	case dynamic.Bytes:
-		return held.Value, nil
+		return shape.Value, nil
 	case dynamic.Timestamp:
-		return held.Value, nil
+		return shape.Value, nil
 	case dynamic.Object:
 		// The library's named type and not the map underneath it: its
 		// validator switches on the exact type, so a nested map[string]any is
 		// refused at publish with "value map[string]interface {} not
 		// supported". The top-level map converts implicitly on the way in,
 		// which is why only the nesting has to say so.
-		nested, err := Table(held)
+		nested, err := Table(shape)
 		if err != nil {
 			return nil, err
 		}
 		return broker.Table(nested), nil
 	case dynamic.List:
-		return fieldsOf(held)
+		return fieldsOf(shape)
 	default:
 		// Unreachable from outside: dynamic.Value is sealed by an unexported
 		// method, so this guards against a case being added to the sum without
@@ -103,7 +103,7 @@ func fieldsOf(list dynamic.List) ([]any, error) {
 func Headers(received map[string]any) (dynamic.Object, error) {
 	object := dynamic.Object{Fields: make([]dynamic.Field, 0, len(received))}
 	for _, name := range sortedNames(received) {
-		value, err := carried(received[name])
+		value, err := fieldValue(received[name])
 		if err != nil {
 			return dynamic.Object{}, fmt.Errorf("header %q: %w", name, err)
 		}
@@ -112,7 +112,7 @@ func Headers(received map[string]any) (dynamic.Object, error) {
 	return object, nil
 }
 
-func carried(received any) (dynamic.Value, error) {
+func fieldValue(received any) (dynamic.Value, error) {
 	switch value := received.(type) {
 	case nil:
 		return dynamic.Absent{}, nil
@@ -154,7 +154,7 @@ func carried(received any) (dynamic.Value, error) {
 func elements(received []any) (dynamic.Value, error) {
 	list := dynamic.List{Elements: make([]dynamic.Value, 0, len(received))}
 	for index, element := range received {
-		value, err := carried(element)
+		value, err := fieldValue(element)
 		if err != nil {
 			return nil, fmt.Errorf("element %d: %w", index, err)
 		}

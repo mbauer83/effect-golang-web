@@ -67,13 +67,13 @@ func Contract(packageName string, procedures ...Declaring) (protobuf.Document, e
 func within(packageName string, service string) (string, error) {
 	prefix := packageName + "."
 	if !strings.HasPrefix(service, prefix) {
-		return "", faulted("projecting a contract", service,
+		return "", faultOf("projecting a contract", service,
 			fmt.Errorf("%q is not in package %q, so the path a client calls would not be the "+
 				"path this answers at", service, packageName))
 	}
 	bare := strings.TrimPrefix(service, prefix)
 	if bare == "" || strings.Contains(bare, ".") {
-		return "", faulted("projecting a contract", service,
+		return "", faultOf("projecting a contract", service,
 			fmt.Errorf("%q names a service inside a nested package, and a file declares one",
 				service))
 	}

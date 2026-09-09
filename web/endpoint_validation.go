@@ -20,7 +20,7 @@ func ValidateEndpoint[In, Out any](endpoint Endpoint[In, Out]) error {
 		return endpoint.fault
 	}
 	if endpoint.method == "" || endpoint.output.encode == nil {
-		return faulted("using an endpoint", errZeroEndpoint)
+		return faultOf("using an endpoint", errZeroEndpoint)
 	}
 	return nil
 }
@@ -36,7 +36,7 @@ func firstEndpointFault[In, Out any](
 ) error {
 	switch {
 	case method == "":
-		return faulted("declaring an endpoint", errNamelessMethod)
+		return faultOf("declaring an endpoint", errNamelessMethod)
 	case pathErr != nil:
 		return pathErr
 	}
@@ -47,10 +47,10 @@ func firstEndpointFault[In, Out any](
 		return output.fault
 	}
 	if output.encode == nil {
-		return faulted("declaring an endpoint", errNoOutput)
+		return faultOf("declaring an endpoint", errNoOutput)
 	}
 	if output.status < 100 || output.status > 599 {
-		return faulted("declaring an endpoint", errUnstatusedOutput)
+		return faultOf("declaring an endpoint", errUnstatusedOutput)
 	}
 	return capturesMatchParameters(segments, input.parameters)
 }
@@ -71,7 +71,7 @@ func capturesMatchParameters(segments []segment, parameters []Parameter) error {
 	}
 	for _, parameter := range parameters {
 		if parameter.In == InPath && !captured[parameter.Name] {
-			return faulted("declaring an endpoint",
+			return faultOf("declaring an endpoint",
 				errors.New("the path parameter "+parameter.Name+" is not captured by the path"))
 		}
 	}

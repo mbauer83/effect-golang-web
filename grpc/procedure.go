@@ -44,9 +44,9 @@ func Unary[In, Out any](
 	}
 	switch {
 	case strings.TrimSpace(service) == "":
-		procedure.fault = faulted("declaring a procedure", method, errNoService)
+		procedure.fault = faultOf("declaring a procedure", method, errNoService)
 	case strings.TrimSpace(method) == "":
-		procedure.fault = faulted("declaring a procedure", service, errNoMethod)
+		procedure.fault = faultOf("declaring a procedure", service, errNoMethod)
 	}
 	if procedure.fault == nil {
 		procedure.fault = firstSchemaFault(procedure)
@@ -100,10 +100,10 @@ func (procedure Procedure[In, Out]) Fault() error {
 // and the first call is the wrong place to find out.
 func firstSchemaFault[In, Out any](procedure Procedure[In, Out]) error {
 	if err := schema.Validate(procedure.request); err != nil {
-		return faulted("declaring a procedure", procedure.Path(), err)
+		return faultOf("declaring a procedure", procedure.Path(), err)
 	}
 	if err := schema.Validate(procedure.response); err != nil {
-		return faulted("declaring a procedure", procedure.Path(), err)
+		return faultOf("declaring a procedure", procedure.Path(), err)
 	}
 	return nil
 }

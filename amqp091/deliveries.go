@@ -33,7 +33,7 @@ func (from *subscribed) Next(ctx context.Context) (Delivery, bool, error) {
 		if !more {
 			return Delivery{}, false, nil
 		}
-		delivery, err := delivered(arrived)
+		delivery, err := deliveryOf(arrived)
 		if err != nil {
 			return Delivery{}, false, err
 		}
@@ -76,8 +76,8 @@ func (from *subscribed) Close() error {
 	return closedAlready(from.channel.Cancel(from.tag, false))
 }
 
-// delivered is what arrived, in the universal representation.
-func delivered(arrived broker.Delivery) (Delivery, error) {
+// deliveryOf is what arrived, in the universal representation.
+func deliveryOf(arrived broker.Delivery) (Delivery, error) {
 	carried, err := Headers(arrived.Headers)
 	if err != nil {
 		return Delivery{}, err

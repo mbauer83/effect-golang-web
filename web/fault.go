@@ -28,9 +28,9 @@ func (fault Fault) Unwrap() error {
 	return fault.Err
 }
 
-// faulted names what failed, and reports nothing when nothing did, so a caller
+// faultOf names what failed, and reports nothing when nothing did, so a caller
 // composing stages does not have to check twice.
-func faulted(doing string, err error) error {
+func faultOf(doing string, err error) error {
 	if err == nil {
 		return nil
 	}

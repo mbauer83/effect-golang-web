@@ -46,11 +46,11 @@ func NewBoundary[R, E any](
 ) (*Boundary[R, E], error) {
 	switch {
 	case runtime == nil:
-		return nil, faulted("building a boundary", "", errNoRuntime)
+		return nil, faultOf("building a boundary", "", errNoRuntime)
 	case transport == nil:
-		return nil, faulted("building a boundary", "", errNoTransport)
+		return nil, faultOf("building a boundary", "", errNoTransport)
 	case onFailure == nil:
-		return nil, faulted("building a boundary", "", errNoFailureMapping)
+		return nil, faultOf("building a boundary", "", errNoFailureMapping)
 	}
 	return &Boundary[R, E]{
 		runtime:     runtime,
@@ -108,16 +108,16 @@ func Answer[R, E, In, Out any](
 		return err
 	}
 	if handle == nil {
-		return faulted("answering a procedure", procedure.Path(),
+		return faultOf("answering a procedure", procedure.Path(),
 			errors.New("a procedure needs a handler"))
 	}
 	return boundary.transport.Answer(procedure.Path(),
 		func(ctx context.Context, request []byte) ([]byte, *Failure) {
-			return answering(ctx, boundary, procedure, handle, request)
+			return handleCall(ctx, boundary, procedure, handle, request)
 		})
 }
 
-func answering[R, E, In, Out any](
+func handleCall[R, E, In, Out any](
 	ctx context.Context,
 	boundary *Boundary[R, E],
 	procedure Procedure[In, Out],
@@ -148,7 +148,7 @@ func answering[R, E, In, Out any](
 	if err != nil {
 		// The handler produced something its own description refuses, which is
 		// a fault of the service rather than of the caller.
-		boundary.report(ctx, faulted("encoding a response", procedure.Path(), err))
+		boundary.report(ctx, faultOf("encoding a response", procedure.Path(), err))
 		return nil, &Failure{Code: Internal, Message: "the response could not be encoded"}
 	}
 	return written, nil

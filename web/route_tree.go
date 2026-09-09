@@ -159,8 +159,8 @@ func bind(bound []binding, name string, value string) []binding {
 	return append(bound, binding{name: name, value: value})
 }
 
-// captured turns the bindings into what a request carries.
-func captured(bindings []binding) map[string]string {
+// boundParameters turns the bindings into what a request carries.
+func boundParameters(bindings []binding) map[string]string {
 	if len(bindings) == 0 {
 		return nil
 	}

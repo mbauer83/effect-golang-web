@@ -33,8 +33,8 @@ func Dial[R any](scope effect.Scope, address string, subprotocols ...string) eff
 			}
 			return Socket{connection: connection}, nil
 		},
-		func(err error) Fault { return faulted("dialling "+address, err) },
+		func(err error) Fault { return faultOf("dialling "+address, err) },
 	).Named("dial")
 
-	return scope.AcquireRelease(acquire, closing[R])
+	return scope.AcquireRelease(acquire, closeSocket[R])
 }

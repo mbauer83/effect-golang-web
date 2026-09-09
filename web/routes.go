@@ -28,7 +28,7 @@ type Routes[R, E any] struct {
 // NewRoutes assembles routes, answering a malformed request with 400 and the
 // reason the codec gave.
 func NewRoutes[R, E any](routes ...Route[R, E]) (Routes[R, E], error) {
-	return NewRoutesRejecting(rejected, routes...)
+	return NewRoutesRejecting(rejectRequest, routes...)
 }
 
 // NewRoutesRejecting assembles routes with its own answer to a request the
@@ -42,10 +42,10 @@ func NewRoutesRejecting[R, E any](
 	routes ...Route[R, E],
 ) (Routes[R, E], error) {
 	if reject == nil {
-		return Routes[R, E]{}, faulted("assembling routes", errNoRejection)
+		return Routes[R, E]{}, faultOf("assembling routes", errNoRejection)
 	}
 	if len(routes) == 0 {
-		return Routes[R, E]{}, faulted("assembling routes", errNoRoutes)
+		return Routes[R, E]{}, faultOf("assembling routes", errNoRoutes)
 	}
 
 	assembled := Routes[R, E]{
@@ -61,7 +61,7 @@ func NewRoutesRejecting[R, E any](
 		err := assembled.tree.insert(route.segments, route.declaration.Method,
 			route.build(reject, route.phases), pattern)
 		if err != nil {
-			return Routes[R, E]{}, faulted("assembling routes", err)
+			return Routes[R, E]{}, faultOf("assembling routes", err)
 		}
 		assembled.declarations = append(assembled.declarations, route.declaration)
 	}
@@ -120,7 +120,7 @@ func (routes Routes[R, E]) Wrapping(each Matched[R, E]) Routes[R, E] {
 	}
 	wrapped := make([]Route[R, E], 0, len(routes.assembled))
 	for _, route := range routes.assembled {
-		wrapped = append(wrapped, route.wrapping(each))
+		wrapped = append(wrapped, route.withWrapper(each))
 	}
 	// The same routes with the same patterns, so this cannot refuse what it
 	// already accepted; an error here would be a bug in the tree rather than
@@ -157,7 +157,7 @@ func (routes Routes[R, E]) Wrapping(each Matched[R, E]) Routes[R, E] {
 // large document to unmarshal is real time, and a trace that showed one bar
 // for all three could not say which of them a slow request spent it in.
 func (routes Routes[R, E]) Detailing() Routes[R, E] {
-	return routes.detailing(nil)
+	return routes.withSampling(nil)
 }
 
 // Measuring is Detailing that also hands each phase to a sampler, so a caller
@@ -177,16 +177,16 @@ func (routes Routes[R, E]) Detailing() Routes[R, E] {
 //	surface = surface.Measuring(inspect.Sampling(watched.Costs)).
 //	    Wrapping(inspect.Observing[Env, Refusal](watched.Costs))
 func (routes Routes[R, E]) Measuring(each Sampling) Routes[R, E] {
-	return routes.detailing(each)
+	return routes.withSampling(each)
 }
 
-func (routes Routes[R, E]) detailing(sample Sampling) Routes[R, E] {
+func (routes Routes[R, E]) withSampling(sample Sampling) Routes[R, E] {
 	if len(routes.assembled) == 0 {
 		return routes
 	}
 	detailing := make([]Route[R, E], 0, len(routes.assembled))
 	for _, route := range routes.assembled {
-		detailing = append(detailing, route.detailing(sample))
+		detailing = append(detailing, route.withSampling(sample))
 	}
 	rebuilt, err := NewRoutesRejecting(routes.reject, detailing...)
 	if err != nil {
@@ -205,7 +205,7 @@ func (routes Routes[R, E]) Handler() Handler[R, E] {
 		found := routes.tree.resolve(pathSegments(request.Path()), request.Method(), nil)
 		switch {
 		case found.found:
-			return found.handler(request.WithCaptures(captured(found.captures)))
+			return found.handler(request.WithCaptures(boundParameters(found.captures)))
 		case len(found.allowed) > 0:
 			// The path matched and the method did not, which is a different
 			// thing from nothing being there -- and the client is told which

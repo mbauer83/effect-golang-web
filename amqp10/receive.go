@@ -24,7 +24,7 @@ func Receive[R any](link Receiving) effect.Stream[R, Fault, Delivery] {
 			delivery, more, err := link.Receive(ctx)
 			if err != nil {
 				return effect.ExitFailure[Fault, effect.Step[Delivery]](
-					faulted("waiting for a message", link.Address(), err))
+					faultOf("waiting for a message", link.Address(), err))
 			}
 			if !more {
 				return effect.ExitSuccess[Fault](effect.EndOfStream[Delivery]())
@@ -71,7 +71,7 @@ func (received Received[A]) Read() (A, error) {
 
 // Accept says the message is done and the broker may forget it.
 func Accept[R, A any](received Received[A]) effect.Effect[R, Fault, effect.Unit] {
-	return settling[R](received, "accepting a message",
+	return settleDelivery[R](received, "accepting a message",
 		func(ctx context.Context, tag string) error { return received.from.Accept(ctx, tag) })
 }
 
@@ -80,7 +80,7 @@ func Accept[R, A any](received Received[A]) effect.Effect[R, Fault, effect.Unit]
 // The reason travels with it: the broker records it, and whoever reads the
 // dead-letter node afterwards has the only explanation there is going to be.
 func Reject[R, A any](received Received[A], reason string) effect.Effect[R, Fault, effect.Unit] {
-	return settling[R](received, "rejecting a message",
+	return settleDelivery[R](received, "rejecting a message",
 		func(ctx context.Context, tag string) error {
 			return received.from.Reject(ctx, tag, reason)
 		})
@@ -93,7 +93,7 @@ func Reject[R, A any](received Received[A], reason string) effect.Effect[R, Faul
 // move -- which is right when this receiver is shutting down or was never the
 // right one, and wrong when it tried and failed. Modify is that case.
 func Release[R, A any](received Received[A]) effect.Effect[R, Fault, effect.Unit] {
-	return settling[R](received, "releasing a message",
+	return settleDelivery[R](received, "releasing a message",
 		func(ctx context.Context, tag string) error { return received.from.Release(ctx, tag) })
 }
 
@@ -106,13 +106,13 @@ func Release[R, A any](received Received[A]) effect.Effect[R, Fault, effect.Unit
 // elsewhere, and what it found out -- which is what makes a dead-letter policy
 // something the consumer participates in rather than something done to it.
 func Modify[R, A any](received Received[A], change Change) effect.Effect[R, Fault, effect.Unit] {
-	return settling[R](received, "modifying a message",
+	return settleDelivery[R](received, "modifying a message",
 		func(ctx context.Context, tag string) error {
 			return received.from.Modify(ctx, tag, change)
 		})
 }
 
-func settling[R, A any](
+func settleDelivery[R, A any](
 	received Received[A],
 	doing string,
 	settle func(context.Context, string) error,
@@ -121,7 +121,7 @@ func settling[R, A any](
 		func(ctx context.Context, _ R) (effect.Unit, error) {
 			return effect.Unit{}, settle(ctx, received.Delivery.Tag)
 		},
-		func(err error) Fault { return faulted(doing, received.Delivery.Subject, err) },
+		func(err error) Fault { return faultOf(doing, received.Delivery.Subject, err) },
 	).Named("settle")
 }
 
@@ -132,7 +132,7 @@ func read[A any](link Receiving, delivery Delivery, shape schema.Schema[A]) Rece
 		return Received[A]{
 			Delivery: delivery,
 			from:     link,
-			refusal:  faulted("decoding a message", delivery.Subject, err),
+			refusal:  faultOf("decoding a message", delivery.Subject, err),
 		}
 	}
 	return Received[A]{Delivery: delivery, from: link, value: value}

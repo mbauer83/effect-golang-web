@@ -15,24 +15,24 @@ import (
 // It refuses an address no node is at, because that is what a real broker
 // refuses -- at attach, before a single message -- and a fake that invented the
 // node would hide a wrong address until deployment.
-func (held *Broker) Sender(address string) (amqp10.Sending, error) {
-	held.mutex.Lock()
-	defer held.mutex.Unlock()
-	if _, known := held.nodes[address]; !known {
+func (broker *Broker) Sender(address string) (amqp10.Sending, error) {
+	broker.mutex.Lock()
+	defer broker.mutex.Unlock()
+	if _, known := broker.nodes[address]; !known {
 		return nil, errNoSuchNode
 	}
-	return &sender{broker: held, address: address}, nil
+	return &sender{broker: broker, address: address}, nil
 }
 
 // Receiver attaches a link from a node.
-func (held *Broker) Receiver(address string) (amqp10.Receiving, error) {
-	held.mutex.Lock()
-	defer held.mutex.Unlock()
-	if _, known := held.nodes[address]; !known {
+func (broker *Broker) Receiver(address string) (amqp10.Receiving, error) {
+	broker.mutex.Lock()
+	defer broker.mutex.Unlock()
+	if _, known := broker.nodes[address]; !known {
 		return nil, errNoSuchNode
 	}
 	return &receiver{
-		broker:    held,
+		broker:    broker,
 		address:   address,
 		unsettled: map[string]amqp10.Delivery{},
 	}, nil

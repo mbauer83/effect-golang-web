@@ -62,13 +62,13 @@ func (transport *Dialled) Call(
 
 	answer, err := client.CallUnary(ctx, rpc.NewRequest(&payload{bytes: request}))
 	if err != nil {
-		return nil, refused(err)
+		return nil, callRefusal(err)
 	}
 	return answer.Msg.bytes, nil
 }
 
-// refused is the Failure a Connect error is.
-func refused(err error) *Failure {
+// callRefusal is the Failure a Connect error is.
+func callRefusal(err error) *Failure {
 	var refusal *rpc.Error
 	if !errors.As(err, &refusal) {
 		// Not a refusal from the peer: the call did not get through at all,
@@ -92,21 +92,21 @@ func Ask[R, In, Out any](
 	return effect.For[R, Failure]().
 		Suspend(func() effect.Effect[R, Failure, Out] {
 			if err := procedure.Fault(); err != nil {
-				return failing[R, Out](InvalidArgument, err.Error())
+				return callFault[R, Out](InvalidArgument, err.Error())
 			}
 			written, err := protobuf.Encode(procedure.request, request)
 			if err != nil {
 				// The caller's own request does not satisfy the contract, so
 				// nothing is sent: InvalidArgument is what the peer would have
 				// said, and saying it here saves a round trip.
-				return failing[R, Out](InvalidArgument, err.Error())
+				return callFault[R, Out](InvalidArgument, err.Error())
 			}
-			return asking[R](transport, procedure, written)
+			return sendRequest[R](transport, procedure, written)
 		}).
 		Named("ask")
 }
 
-func asking[R, In, Out any](
+func sendRequest[R, In, Out any](
 	transport Calling,
 	procedure Procedure[In, Out],
 	request []byte,
@@ -129,6 +129,6 @@ func asking[R, In, Out any](
 	}).Named("call")
 }
 
-func failing[R, Out any](code Code, message string) effect.Effect[R, Failure, Out] {
+func callFault[R, Out any](code Code, message string) effect.Effect[R, Failure, Out] {
 	return effect.For[R, Failure]().Fail[Out](Failure{Code: code, Message: message})
 }

@@ -107,12 +107,12 @@ func Ship(
 	return effect.CollectStreamEffect(
 		amqp091.Values[effect.Unit](channel, Shipping, OrderSchema),
 		func(received amqp091.Received[Order]) dispatching[effect.Chunk[Order]] {
-			return shipping(received, pack)
+			return shipOrder(received, pack)
 		})
 }
 
-// shipping is what happens to one delivery.
-func shipping(
+// shipOrder is what happens to one delivery.
+func shipOrder(
 	received amqp091.Received[Order],
 	pack func(Order) dispatching[effect.Unit],
 ) dispatching[effect.Chunk[Order]] {

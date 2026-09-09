@@ -28,9 +28,9 @@ type phases struct {
 }
 
 // quiet is a surface that asked for neither names nor measurements.
-func (named phases) quiet() bool {
-	return named.sample == nil &&
-		named.decoding == "" && named.handling == "" && named.encoding == ""
+func (phases phases) quiet() bool {
+	return phases.sample == nil &&
+		phases.decoding == "" && phases.handling == "" && phases.encoding == ""
 }
 
 // Sampling measures one phase of a route. It is called when the phase begins,
@@ -67,8 +67,8 @@ func PhaseNames() []string {
 	return []string{PhaseDecoding, PhaseHandling, PhaseEncoding}
 }
 
-// detailed is the naming a surface uses when it details its phases.
-func detailed() phases {
+// phaseNames is the naming a surface uses when it details its phases.
+func phaseNames() phases {
 	return phases{
 		decoding: PhaseDecoding,
 		handling: PhaseHandling,
@@ -87,25 +87,25 @@ func within[R, E, A any](
 	name string,
 	sample Sampling,
 ) effect.Effect[R, E, A] {
-	return spanned(measuring(fx, name, sample), name)
+	return withSpan(measurePhase(fx, name, sample), name)
 }
 
-// spanned names an effect when a name is given.
-func spanned[R, E, A any](fx effect.Effect[R, E, A], name string) effect.Effect[R, E, A] {
+// withSpan names an effect when a name is given.
+func withSpan[R, E, A any](fx effect.Effect[R, E, A], name string) effect.Effect[R, E, A] {
 	if name == "" {
 		return fx
 	}
 	return fx.WithSpan(name)
 }
 
-// measuring hands the phase to the sampler around the effect's run.
+// measurePhase hands the phase to the sampler around the effect's run.
 //
 // Suspended, so the sampler is called when the phase is interpreted and not
 // when the route was described -- one description run twice is two phases. The
 // second call is a finalizer, so a phase that failed or was interrupted is
 // reported too: a decoding that allocated a great deal and then refused the
 // request is exactly the one worth seeing.
-func measuring[R, E, A any](
+func measurePhase[R, E, A any](
 	fx effect.Effect[R, E, A],
 	name string,
 	sample Sampling,
@@ -119,7 +119,7 @@ func measuring[R, E, A any](
 		if ended == nil {
 			return fx
 		}
-		return fx.Ensuring(effect.Release[R](func(context.Context) error {
+		return fx.Ensuring(effect.AddFinalizer[R](func(context.Context) error {
 			ended()
 			return nil
 		}))

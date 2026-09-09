@@ -24,7 +24,7 @@ func Inbound[R any](socket Socket) effect.Stream[R, Fault, Message] {
 		return effect.From(func(ctx context.Context, _ R) effect.Exit[Fault, effect.Step[Message]] {
 			kind, data, err := socket.connection.Read(ctx)
 			if err != nil {
-				return received(err)
+				return readFrame(err)
 			}
 			return effect.ExitSuccess[Fault](effect.Emit(effect.ChunkOf(
 				Message{Kind: messageKind(kind), Data: data},
@@ -33,20 +33,20 @@ func Inbound[R any](socket Socket) effect.Stream[R, Fault, Message] {
 	})
 }
 
-// received decides what the end of a read means.
-func received(err error) effect.Exit[Fault, effect.Step[Message]] {
-	if ended(err) {
+// readFrame decides what the end of a read means.
+func readFrame(err error) effect.Exit[Fault, effect.Step[Message]] {
+	if isShutdown(err) {
 		return effect.ExitSuccess[Fault](effect.EndOfStream[Message]())
 	}
-	return effect.ExitFailure[Fault, effect.Step[Message]](faulted("reading a message", err))
+	return effect.ExitFailure[Fault, effect.Step[Message]](faultOf("reading a message", err))
 }
 
-// ended reports the ways a conversation finishes rather than breaks.
+// isShutdown reports the ways a conversation finishes rather than breaks.
 //
 // A cancelled context is one of them: the scope that owns the socket is
 // closing, so the stream is over and reporting a failure would be reporting
 // the shutdown as a fault.
-func ended(err error) bool {
+func isShutdown(err error) bool {
 	switch ws.CloseStatus(err) {
 	case ws.StatusNormalClosure, ws.StatusGoingAway:
 		return true

@@ -13,14 +13,14 @@ import (
 // A path parameter is always required: a path that did not carry it would not
 // have matched the route.
 func PathParam[A any](name string, shape schema.Schema[A]) Codec[A] {
-	return required(name, InPath, shape, func(request Request) (string, bool) {
+	return requiredParameter(name, InPath, shape, func(request Request) (string, bool) {
 		return request.Capture(name)
 	})
 }
 
 // QueryParam reads a required query-string parameter.
 func QueryParam[A any](name string, shape schema.Schema[A]) Codec[A] {
-	return required(name, InQuery, shape, queryValue(name))
+	return requiredParameter(name, InQuery, shape, queryValue(name))
 }
 
 // OptionalQueryParam reads a query-string parameter that may be absent,
@@ -34,7 +34,7 @@ func OptionalQueryParam[A any](name string, shape schema.Schema[A]) Codec[*A] {
 
 // HeaderParam reads a required header.
 func HeaderParam[A any](name string, shape schema.Schema[A]) Codec[A] {
-	return required(name, InHeader, shape, headerValue(name))
+	return requiredParameter(name, InHeader, shape, headerValue(name))
 }
 
 // OptionalHeaderParam reads a header that may be absent, yielding nil when it
@@ -51,7 +51,7 @@ func OptionalHeaderParam[A any](name string, shape schema.Schema[A]) Codec[*A] {
 // this module is.
 func (codec Codec[A]) Documented(doc string) Codec[A] {
 	if len(codec.parameters) != 1 {
-		codec.fault = faulted("describing a parameter", errNotOneParameter)
+		codec.fault = faultOf("describing a parameter", errNotOneParameter)
 		return codec
 	}
 	described := append([]Parameter{}, codec.parameters...)
@@ -60,8 +60,8 @@ func (codec Codec[A]) Documented(doc string) Codec[A] {
 	return codec
 }
 
-// required builds a codec for a parameter that must be there.
-func required[A any](
+// requiredParameter builds a codec for a parameter that must be there.
+func requiredParameter[A any](
 	name string,
 	in Location,
 	shape schema.Schema[A],
@@ -77,12 +77,12 @@ func required[A any](
 			carried, present := read(request)
 			if !present {
 				var missing A
-				return missing, rejecting(parameter, errAbsentParameter)
+				return missing, parameterRefusal(parameter, errAbsentParameter)
 			}
 			decoded, err := schema.Decode(shape, textSource{value: carried})
 			if err != nil {
 				var missing A
-				return missing, rejecting(parameter, err)
+				return missing, parameterRefusal(parameter, err)
 			}
 			return decoded, nil
 		},
@@ -109,7 +109,7 @@ func optional[A any](
 			}
 			decoded, err := schema.Decode(shape, textSource{value: carried})
 			if err != nil {
-				return nil, rejecting(parameter, err)
+				return nil, parameterRefusal(parameter, err)
 			}
 			return &decoded, nil
 		},
@@ -137,18 +137,18 @@ func headerValue(name string) func(Request) (string, bool) {
 
 func parameterFault[A any](name string, shape schema.Schema[A]) error {
 	if strings.TrimSpace(name) == "" {
-		return faulted("declaring a parameter", errNamelessParameter)
+		return faultOf("declaring a parameter", errNamelessParameter)
 	}
 	if fault := schema.Validate(shape); fault != nil {
-		return faulted("declaring the parameter "+name, fault)
+		return faultOf("declaring the parameter "+name, fault)
 	}
 	return nil
 }
 
-// rejecting names the parameter a rejection is about, because "expected a whole
+// parameterRefusal names the parameter a rejection is about, because "expected a whole
 // number" is not something a client can act on and "expected a whole number in
 // the query parameter page" is.
-func rejecting(parameter Parameter, err error) error {
+func parameterRefusal(parameter Parameter, err error) error {
 	return Fault{
 		Doing: "reading the " + string(parameter.In) + " parameter " + parameter.Name,
 		Err:   err,

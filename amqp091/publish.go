@@ -24,7 +24,7 @@ func Publish[R any](
 		func(ctx context.Context, _ R) (effect.Unit, error) {
 			return effect.Unit{}, channel.Publish(ctx, target, message)
 		},
-		func(err error) Fault { return faulted("publishing", target.Key, err) },
+		func(err error) Fault { return faultOf("publishing", target.Key, err) },
 	).Named("publish")
 }
 
@@ -41,7 +41,7 @@ func PublishValue[R, A any](
 ) effect.Effect[R, Fault, effect.Unit] {
 	return effect.Try(
 		func(context.Context, R) (Message, error) { return Encoded(shape, value) },
-		func(err error) Fault { return faulted("encoding a message", target.Key, err) },
+		func(err error) Fault { return faultOf("encoding a message", target.Key, err) },
 	).
 		FlatMap(func(message Message) effect.Effect[R, Fault, effect.Unit] {
 			return Publish[R](channel, target, message)

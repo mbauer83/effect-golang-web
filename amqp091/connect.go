@@ -39,10 +39,10 @@ func Connect[R any](scope effect.Scope, address string) effect.Effect[R, Fault, 
 			}
 			return &Connection{connection: connection}, nil
 		},
-		func(err error) Fault { return faulted("connecting", "", err) },
+		func(err error) Fault { return faultOf("connecting", "", err) },
 	).Named("connect")
 
-	return scope.AcquireRelease(acquire, disconnecting[R])
+	return scope.AcquireRelease(acquire, disconnect[R])
 }
 
 // Open takes a channel on the connection.
@@ -55,10 +55,10 @@ func Open[R any](scope effect.Scope, connection *Connection) effect.Effect[R, Fa
 			}
 			return &Channel{channel: channel}, nil
 		},
-		func(err error) Fault { return faulted("opening a channel", "", err) },
+		func(err error) Fault { return faultOf("opening a channel", "", err) },
 	).Named("open-channel")
 
-	return scope.AcquireRelease(acquire, closing[R])
+	return scope.AcquireRelease(acquire, closeConnection[R])
 }
 
 // Prefetch limits how many unacknowledged deliveries the broker will send this
@@ -73,18 +73,18 @@ func Prefetch[R any](channel *Channel, count int) effect.Effect[R, Fault, effect
 		func(context.Context, R) (effect.Unit, error) {
 			return effect.Unit{}, channel.channel.Qos(count, 0, false)
 		},
-		func(err error) Fault { return faulted("setting the prefetch", "", err) },
+		func(err error) Fault { return faultOf("setting the prefetch", "", err) },
 	).Named("prefetch")
 }
 
-func disconnecting[R any](connection *Connection) effect.Effect[R, effect.Never, effect.Unit] {
-	return effect.Release[R](func(context.Context) error {
+func disconnect[R any](connection *Connection) effect.Effect[R, effect.Never, effect.Unit] {
+	return effect.AddFinalizer[R](func(context.Context) error {
 		return closedAlready(connection.connection.Close())
 	})
 }
 
-func closing[R any](channel *Channel) effect.Effect[R, effect.Never, effect.Unit] {
-	return effect.Release[R](func(context.Context) error {
+func closeConnection[R any](channel *Channel) effect.Effect[R, effect.Never, effect.Unit] {
+	return effect.AddFinalizer[R](func(context.Context) error {
 		return closedAlready(channel.channel.Close())
 	})
 }

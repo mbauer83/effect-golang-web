@@ -31,7 +31,7 @@ func (link *receiver) Reject(_ context.Context, tag string, reason string) error
 func (link *receiver) Release(_ context.Context, tag string) error {
 	return link.settle(tag, func(settled *settlements, delivery amqp10.Delivery) {
 		settled.released = append(settled.released, tag)
-		link.returned(delivery)
+		link.settlementOf(delivery)
 	})
 }
 
@@ -44,17 +44,17 @@ func (link *receiver) Modify(_ context.Context, tag string, change amqp10.Change
 			// only one node, so it goes back and this link will see it again.
 			// A real broker would route it away from this receiver; a fake
 			// that pretended to would be pretending to be a broker.
-			link.returned(delivery)
+			link.settlementOf(delivery)
 			return
 		}
 		// Attempted and failed: the broker's count of deliveries moves, which
 		// is the whole difference from a release.
 		delivery.Attempts++
-		link.returned(delivery)
+		link.settlementOf(delivery)
 	})
 }
 
-// returned puts a delivery back at the node, at the end.
+// settlementOf puts a delivery back at the node, at the end.
 //
 // A real broker puts it back where it can, which for a single receiver means
 // straight back at the front. At the end is the honest simplification: a test
@@ -62,7 +62,7 @@ func (link *receiver) Modify(_ context.Context, tag string, change amqp10.Change
 // not promise.
 //
 // The broker's lock is already held by settle.
-func (link *receiver) returned(delivery amqp10.Delivery) {
+func (link *receiver) settlementOf(delivery amqp10.Delivery) {
 	node, known := link.broker.nodes[link.address]
 	if !known {
 		return

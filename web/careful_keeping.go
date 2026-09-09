@@ -14,7 +14,7 @@ import (
 	"github.com/mbauer83/effect-golang/effect/cache"
 )
 
-// filed is what an answer is kept under: the service, what the request was
+// cacheKey is what an answer is kept under: the service, what the request was
 // about, and the request itself.
 //
 // Readable rather than hashed, because the first thing anybody does with a
@@ -25,7 +25,7 @@ import (
 // The service's name is in it because two services read by one program answer
 // differently at the same path, and what a request was about is in it because
 // that is how everything about one thing is dropped together.
-func (careful *Careful) filed(method string, path string, requesting Requesting) string {
+func (careful *Careful) cacheKey(method string, path string, requesting Requesting) string {
 	question := method + " " + path
 	if len(requesting.Query) > 0 {
 		question += "?" + requesting.Query.Encode()
@@ -33,7 +33,7 @@ func (careful *Careful) filed(method string, path string, requesting Requesting)
 	return strings.Join([]string{careful.terms.Named, requesting.About, question}, ":")
 }
 
-// recalling asks the store, and answers "nothing kept" whether that is because
+// getCached asks the store, and answers "nothing kept" whether that is because
 // nothing is kept or because the store could not be read.
 //
 // The one absorbed failure here, and absorbed rather than ignored: a cache
@@ -42,20 +42,20 @@ func (careful *Careful) filed(method string, path string, requesting Requesting)
 // asking the service. It is logged with the key, because a cache that has been
 // unreachable for an hour is a rate limit about to be spent and has to be
 // visible before that happens.
-func recalling[R any](careful *Careful, filed string) effect.Effect[R, Fault, cache.Cached] {
+func getCached[R any](careful *Careful, filed string) effect.Effect[R, Fault, cache.Cached] {
 	return effect.Fold(
-		cache.Read[R](careful.keeping, filed).CatchAll(complaining[R, cache.Cached]("reading", filed)),
+		cache.Read[R](careful.keeping, filed).CatchAll(cacheFault[R, cache.Cached]("reading", filed)),
 		func(effect.Cause[cache.Fault]) cache.Cached { return cache.Cached{} },
-		func(kept cache.Cached) cache.Cached { return kept },
+		func(cached cache.Cached) cache.Cached { return cached },
 	).MapError(func(effect.Never) Fault { return Fault{} })
 }
 
-// filing keeps an answer worth keeping, and answers with it whether or not the
+// putCached keeps an answer worth keeping, and answers with it whether or not the
 // keeping worked -- for the same reason and with the same log as recalling.
 //
 // Only a successful answer: a path that was briefly a 500 must not be a 500
 // for the next hour.
-func filing[R any](
+func putCached[R any](
 	careful *Careful,
 	filed string,
 	about string,
@@ -68,17 +68,17 @@ func filing[R any](
 		if err != nil {
 			return effect.Fail[R, Received](asFault("keeping the answer", err))
 		}
-		kept := cache.Write[R](careful.keeping, cache.Entry{
+		writeEntry := cache.Write[R](careful.keeping, cache.Entry{
 			Key: filed, About: about, Entity: entity, Fresh: careful.terms.Fresh,
-		}).CatchAll(complaining[R, effect.Unit]("keeping", filed))
-		return effect.Fold(kept,
+		}).CatchAll(cacheFault[R, effect.Unit]("keeping", filed))
+		return effect.Fold(writeEntry,
 			func(effect.Cause[cache.Fault]) Received { return received },
 			func(effect.Unit) Received { return received },
 		).MapError(func(effect.Never) Fault { return Fault{} })
 	}
 }
 
-func complaining[R, A any](doing string, filed string) func(cache.Fault) effect.Effect[R, cache.Fault, A] {
+func cacheFault[R, A any](doing string, filed string) func(cache.Fault) effect.Effect[R, cache.Fault, A] {
 	return func(why cache.Fault) effect.Effect[R, cache.Fault, A] {
 		return effect.LogWarn[R, cache.Fault](
 			"the answer store could not be used; asking the service instead",
@@ -108,23 +108,23 @@ func written(received Received) ([]byte, error) {
 		Body:          io.NopCloser(bytes.NewReader(received.Entity)),
 		ContentLength: int64(len(received.Entity)),
 	}
-	kept := bytes.Buffer{}
-	if err := response.Write(&kept); err != nil {
+	keptValue := bytes.Buffer{}
+	if err := response.Write(&keptValue); err != nil {
 		return nil, err
 	}
-	return kept.Bytes(), nil
+	return keptValue.Bytes(), nil
 }
 
-// replayed is a kept answer as the response it was, and whether there was one.
+// responseFrom is a kept answer as the response it was, and whether there was one.
 //
 // A kept answer that cannot be read back is treated as no answer: it is this
 // program's own writing, so a failure here is a bug rather than a thing to
 // report to a caller, and the service can still be asked.
-func replayed(kept cache.Cached) (Received, bool) {
-	if !kept.Found {
+func responseFrom(cached cache.Cached) (Received, bool) {
+	if !cached.Found {
 		return Received{}, false
 	}
-	response, err := http.ReadResponse(bufio.NewReader(bytes.NewReader(kept.Entity)), nil)
+	response, err := http.ReadResponse(bufio.NewReader(bytes.NewReader(cached.Entity)), nil)
 	if err != nil {
 		return Received{}, false
 	}

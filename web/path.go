@@ -34,7 +34,7 @@ type segment struct {
 // redirected between them would be guessing.
 func parsePattern(path string) ([]segment, error) {
 	if !strings.HasPrefix(path, "/") {
-		return nil, faulted("reading the path "+path, errUnrootedPath)
+		return nil, faultOf("reading the path "+path, errUnrootedPath)
 	}
 	parts := strings.Split(strings.TrimPrefix(path, "/"), "/")
 	segments := make([]segment, 0, len(parts))
@@ -43,11 +43,11 @@ func parsePattern(path string) ([]segment, error) {
 	for index, part := range parts {
 		parsed, err := parseSegment(part, index == len(parts)-1)
 		if err != nil {
-			return nil, faulted("reading the path "+path, err)
+			return nil, faultOf("reading the path "+path, err)
 		}
 		if parsed.kind != literalSegment {
 			if captured[parsed.text] {
-				return nil, faulted("reading the path "+path,
+				return nil, faultOf("reading the path "+path,
 					errors.New("two segments are captured as "+parsed.text))
 			}
 			captured[parsed.text] = true

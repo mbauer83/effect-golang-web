@@ -20,7 +20,7 @@ func Send[R any](link Sending, message Message) effect.Effect[R, Fault, effect.U
 		func(ctx context.Context, _ R) (effect.Unit, error) {
 			return effect.Unit{}, link.Send(ctx, message)
 		},
-		func(err error) Fault { return faulted("sending", link.Address(), err) },
+		func(err error) Fault { return faultOf("sending", link.Address(), err) },
 	).Named("send")
 }
 
@@ -36,7 +36,7 @@ func SendValue[R, A any](
 ) effect.Effect[R, Fault, effect.Unit] {
 	return effect.Try(
 		func(context.Context, R) (Message, error) { return Encoded(shape, value) },
-		func(err error) Fault { return faulted("encoding a message", link.Address(), err) },
+		func(err error) Fault { return faultOf("encoding a message", link.Address(), err) },
 	).
 		FlatMap(func(message Message) effect.Effect[R, Fault, effect.Unit] {
 			return Send[R](link, message)

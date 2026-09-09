@@ -111,7 +111,7 @@ func responses(declared contributed, shapes *cursor) []Response {
 	for _, failure := range declared.declaration.Failures {
 		described = append(described, Response{
 			Status:      failure.Status,
-			Description: describing(failure.Status, failure.Doc),
+			Description: describeParameters(failure.Status, failure.Doc),
 		})
 	}
 	slices.SortStableFunc(described, func(first Response, second Response) int {
@@ -123,7 +123,7 @@ func responses(declared contributed, shapes *cursor) []Response {
 func success(declared contributed, shapes *cursor) Response {
 	answered := Response{
 		Status:      declared.declaration.Status,
-		Description: describing(declared.declaration.Status, ""),
+		Description: describeParameters(declared.declaration.Status, ""),
 	}
 	if declared.declaration.Content != nil {
 		answered.MediaType = declared.declaration.Content.MediaType
@@ -135,9 +135,9 @@ func success(declared contributed, shapes *cursor) Response {
 	return answered
 }
 
-// describing supplies the description the specification requires, from the
+// describeParameters supplies the description the specification requires, from the
 // status itself when the endpoint said nothing.
-func describing(status int, doc string) string {
+func describeParameters(status int, doc string) string {
 	if doc != "" {
 		return doc
 	}

@@ -18,7 +18,7 @@ import (
 func Entity[A any](shape schema.Schema[A]) Codec[A] {
 	content := &Content{MediaType: "application/json", Node: shape.Structure()}
 	if fault := schema.Validate(shape); fault != nil {
-		return Codec[A]{entity: content, fault: faulted("declaring the request body", fault)}
+		return Codec[A]{entity: content, fault: faultOf("declaring the request body", fault)}
 	}
 	return Codec[A]{
 		entity: content,

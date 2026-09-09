@@ -41,10 +41,10 @@ func Connect[R any](scope effect.Scope, address string, options *broker.ConnOpti
 			}
 			return &Connection{connection: connection}, nil
 		},
-		func(err error) Fault { return faulted("connecting", address, err) },
+		func(err error) Fault { return faultOf("connecting", address, err) },
 	).Named("connect")
 
-	return scope.AcquireRelease(acquire, disconnecting[R])
+	return scope.AcquireRelease(acquire, disconnect[R])
 }
 
 // Open starts a session on the connection.
@@ -57,7 +57,7 @@ func Open[R any](scope effect.Scope, connection *Connection) effect.Effect[R, Fa
 			}
 			return &Session{session: session}, nil
 		},
-		func(err error) Fault { return faulted("opening a session", "", err) },
+		func(err error) Fault { return faultOf("opening a session", "", err) },
 	).Named("open-session")
 
 	return scope.AcquireRelease(acquire, endingSession[R])
@@ -77,7 +77,7 @@ func Sender[R any](
 			}
 			return &sending{sender: sender, address: address}, nil
 		},
-		func(err error) Fault { return faulted("attaching a sender", address, err) },
+		func(err error) Fault { return faultOf("attaching a sender", address, err) },
 	).Named("attach-sender")
 
 	return scope.AcquireRelease(acquire, detachingSender[R])
@@ -105,32 +105,32 @@ func Receiver[R any](
 			}
 			return newReceiving(receiver, address), nil
 		},
-		func(err error) Fault { return faulted("attaching a receiver", address, err) },
+		func(err error) Fault { return faultOf("attaching a receiver", address, err) },
 	).Named("attach-receiver")
 
 	return scope.AcquireRelease(acquire, detachingReceiver[R])
 }
 
-func disconnecting[R any](connection *Connection) effect.Effect[R, effect.Never, effect.Unit] {
-	return effect.Release[R](func(context.Context) error {
+func disconnect[R any](connection *Connection) effect.Effect[R, effect.Never, effect.Unit] {
+	return effect.AddFinalizer[R](func(context.Context) error {
 		return closedAlready(connection.connection.Close())
 	})
 }
 
 func endingSession[R any](session *Session) effect.Effect[R, effect.Never, effect.Unit] {
-	return effect.Release[R](func(ctx context.Context) error {
+	return effect.AddFinalizer[R](func(ctx context.Context) error {
 		return closedAlready(session.session.Close(ctx))
 	})
 }
 
 func detachingSender[R any](link Sending) effect.Effect[R, effect.Never, effect.Unit] {
-	return effect.Release[R](func(ctx context.Context) error {
+	return effect.AddFinalizer[R](func(ctx context.Context) error {
 		return closedAlready(link.Close(ctx))
 	})
 }
 
 func detachingReceiver[R any](link Receiving) effect.Effect[R, effect.Never, effect.Unit] {
-	return effect.Release[R](func(ctx context.Context) error {
+	return effect.AddFinalizer[R](func(ctx context.Context) error {
 		return closedAlready(link.Close(ctx))
 	})
 }

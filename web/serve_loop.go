@@ -13,7 +13,7 @@ import (
 	"github.com/mbauer83/effect-golang/effect"
 )
 
-// reporting registers the finalizer that surfaces a shutdown which gave up on
+// logServing registers the finalizer that surfaces a shutdown which gave up on
 // requests still in flight.
 //
 // It has to be a finalizer rather than the serve fiber's own outcome. A forked
@@ -22,12 +22,12 @@ import (
 // would be exactly the one that is. A scope composes its finalizers' faults
 // into the closing cause whatever happened to the body, which is where this
 // belongs.
-func reporting[R any](scope effect.Scope) effect.Effect[R, Fault, chan error] {
+func logServing[R any](scope effect.Scope) effect.Effect[R, Fault, chan error] {
 	abandoned := make(chan error, 1)
 	return scope.AcquireRelease(
 		effect.For[R, Fault]().Succeed(abandoned),
 		func(reported chan error) effect.Effect[R, effect.Never, effect.Unit] {
-			return effect.Release[R](func(context.Context) error {
+			return effect.AddFinalizer[R](func(context.Context) error {
 				// The scope has already awaited the serve fiber, so whatever it
 				// had to say has been said by now.
 				select {
@@ -41,9 +41,9 @@ func reporting[R any](scope effect.Scope) effect.Effect[R, Fault, chan error] {
 	)
 }
 
-// listening opens the socket as a scoped resource, so a server that fails
+// listen opens the socket as a scoped resource, so a server that fails
 // between binding and serving still gives the port back.
-func listening[R any](scope effect.Scope, settings Settings) effect.Effect[R, Fault, net.Listener] {
+func listen[R any](scope effect.Scope, settings Settings) effect.Effect[R, Fault, net.Listener] {
 	acquire := effect.Try(
 		func(context.Context, R) (net.Listener, error) {
 			if settings.Listener != nil {
@@ -63,7 +63,7 @@ func listening[R any](scope effect.Scope, settings Settings) effect.Effect[R, Fa
 // closingListener releases the socket. A shutdown has usually closed it
 // already, which is not a failure: it is the ordinary path.
 func closingListener[R any](listener net.Listener) effect.Effect[R, effect.Never, effect.Unit] {
-	return effect.Release[R](func(context.Context) error {
+	return effect.AddFinalizer[R](func(context.Context) error {
 		if err := listener.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
 			return err
 		}
@@ -81,12 +81,12 @@ type acceptLoop struct {
 	abandoned chan<- error
 }
 
-// serving runs the accept loop until it stops or its context is cancelled.
+// serveLoop runs the accept loop until it stops or its context is cancelled.
 //
 // net/http's Serve blocks and does not take a context, so the goroutine here is
 // the ordinary adapter for a blocking library call: its lifetime is bounded by
 // this effect, and nothing outlives the fiber that owns it.
-func serving[R any](
+func serveLoop[R any](
 	server *http.Server,
 	listener net.Listener,
 	grace time.Duration,
@@ -103,7 +103,7 @@ func serving[R any](
 
 		select {
 		case err := <-loop.stopped:
-			return served(err)
+			return serveRequest(err)
 		case <-ctx.Done():
 			loop.shutDown(ctx)
 			// Being shut down is how a server is meant to end, so the loop
@@ -135,9 +135,9 @@ func (loop acceptLoop) shutDown(ctx context.Context) {
 	<-loop.stopped
 }
 
-// served reports why the accept loop stopped. A closed server is the ordinary
+// serveRequest reports why the accept loop stopped. A closed server is the ordinary
 // end of one, not a failure.
-func served(err error) effect.Exit[Fault, effect.Unit] {
+func serveRequest(err error) effect.Exit[Fault, effect.Unit] {
 	if err == nil || errors.Is(err, http.ErrServerClosed) {
 		return effect.ExitSuccess[Fault](effect.Unit{})
 	}

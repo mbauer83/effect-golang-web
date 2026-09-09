@@ -30,7 +30,7 @@ func (from *subscription) Next(ctx context.Context) (amqp091.Delivery, bool, err
 	case delivery := <-from.queue.waiting:
 		from.broker.mutex.Lock()
 		defer from.broker.mutex.Unlock()
-		from.queue.held[delivery.Tag] = delivery
+		from.queue.unsettled[delivery.Tag] = delivery
 		return delivery, true, nil
 	case <-ctx.Done():
 		return amqp091.Delivery{}, false, ctx.Err()
@@ -88,11 +88,11 @@ func (from *subscription) settle(
 	from.broker.mutex.Lock()
 	defer from.broker.mutex.Unlock()
 
-	delivery, unsettled := from.queue.held[tag]
+	delivery, unsettled := from.queue.unsettled[tag]
 	if !unsettled {
 		return errUnknownTag
 	}
-	delete(from.queue.held, tag)
+	delete(from.queue.unsettled, tag)
 	decide(&from.broker.settled, delivery)
 	return nil
 }

@@ -24,10 +24,10 @@ import (
 func Consume[R any](channel Consuming, queue string) effect.Stream[R, Fault, Received[[]byte]] {
 	return effect.StreamFromResource(
 		func(scope effect.Scope) effect.Effect[R, Fault, Deliveries] {
-			return subscribing[R](scope, channel, queue)
+			return subscribe[R](scope, channel, queue)
 		},
 		func(from Deliveries) effect.Stream[R, Fault, Received[[]byte]] {
-			return effect.MapStream(arriving[R](from, queue),
+			return effect.MapStream(nextDelivery[R](from, queue),
 				func(delivery Delivery) Received[[]byte] {
 					return Received[[]byte]{Delivery: delivery, from: from, value: delivery.Body}
 				})
@@ -52,10 +52,10 @@ func Values[R, A any](
 ) effect.Stream[R, Fault, Received[A]] {
 	return effect.StreamFromResource(
 		func(scope effect.Scope) effect.Effect[R, Fault, Deliveries] {
-			return subscribing[R](scope, channel, queue)
+			return subscribe[R](scope, channel, queue)
 		},
 		func(from Deliveries) effect.Stream[R, Fault, Received[A]] {
-			return effect.MapStream(arriving[R](from, queue),
+			return effect.MapStream(nextDelivery[R](from, queue),
 				func(delivery Delivery) Received[A] { return read(from, delivery, shape) })
 		},
 	)
@@ -83,14 +83,14 @@ func (received Received[A]) Read() (A, error) {
 
 // Ack accepts a delivery, so the broker may forget it.
 func Ack[R, A any](received Received[A]) effect.Effect[R, Fault, effect.Unit] {
-	return answering[R](received, "accepting a delivery", received.from.Ack)
+	return handleDelivery[R](received, "accepting a delivery", received.from.Ack)
 }
 
 // Discard rejects a delivery without return. The broker drops it, or routes it
 // wherever the queue's dead-letter configuration says -- which is where a
 // message nobody can read belongs.
 func Discard[R, A any](received Received[A]) effect.Effect[R, Fault, effect.Unit] {
-	return answering[R](received, "discarding a delivery", received.from.Discard)
+	return handleDelivery[R](received, "discarding a delivery", received.from.Discard)
 }
 
 // Requeue rejects a delivery and asks for it back, for a consumer that cannot
@@ -101,10 +101,10 @@ func Discard[R, A any](received Received[A]) effect.Effect[R, Fault, effect.Unit
 // caller's decision to make, which is the whole reason acknowledgement is
 // explicit.
 func Requeue[R, A any](received Received[A]) effect.Effect[R, Fault, effect.Unit] {
-	return answering[R](received, "requeueing a delivery", received.from.Requeue)
+	return handleDelivery[R](received, "requeueing a delivery", received.from.Requeue)
 }
 
-func answering[R, A any](
+func handleDelivery[R, A any](
 	received Received[A],
 	doing string,
 	answer func(uint64) error,
@@ -113,7 +113,7 @@ func answering[R, A any](
 		func(context.Context, R) (effect.Unit, error) {
 			return effect.Unit{}, answer(received.Delivery.Tag)
 		},
-		func(err error) Fault { return faulted(doing, received.Delivery.Key, err) },
+		func(err error) Fault { return faultOf(doing, received.Delivery.Key, err) },
 	).Named("acknowledge")
 }
 
@@ -124,14 +124,14 @@ func read[A any](from Deliveries, delivery Delivery, shape schema.Schema[A]) Rec
 		return Received[A]{
 			Delivery: delivery,
 			from:     from,
-			refusal:  faulted("decoding a delivery", delivery.Key, err),
+			refusal:  faultOf("decoding a delivery", delivery.Key, err),
 		}
 	}
 	return Received[A]{Delivery: delivery, from: from, value: value}
 }
 
-// subscribing starts the subscription and gives the scope the ending of it.
-func subscribing[R any](
+// subscribe starts the subscription and gives the scope the ending of it.
+func subscribe[R any](
 	scope effect.Scope,
 	channel Consuming,
 	queue string,
@@ -140,24 +140,24 @@ func subscribing[R any](
 		func(ctx context.Context, _ R) (Deliveries, error) {
 			return channel.Consume(ctx, queue)
 		},
-		func(err error) Fault { return faulted("consuming", queue, err) },
+		func(err error) Fault { return faultOf("consuming", queue, err) },
 	).Named("consume")
 
-	return scope.AcquireRelease(acquire, unsubscribing[R])
+	return scope.AcquireRelease(acquire, unsubscribe[R])
 }
 
-func unsubscribing[R any](from Deliveries) effect.Effect[R, effect.Never, effect.Unit] {
-	return effect.Release[R](func(context.Context) error { return from.Close() })
+func unsubscribe[R any](from Deliveries) effect.Effect[R, effect.Never, effect.Unit] {
+	return effect.AddFinalizer[R](func(context.Context) error { return from.Close() })
 }
 
-// arriving pulls the subscription one delivery at a time.
-func arriving[R any](from Deliveries, queue string) effect.Stream[R, Fault, Delivery] {
+// nextDelivery pulls the subscription one delivery at a time.
+func nextDelivery[R any](from Deliveries, queue string) effect.Stream[R, Fault, Delivery] {
 	return effect.StreamFromSteps(func() effect.Effect[R, Fault, effect.Step[Delivery]] {
 		return effect.From(func(ctx context.Context, _ R) effect.Exit[Fault, effect.Step[Delivery]] {
 			delivery, more, err := from.Next(ctx)
 			if err != nil {
 				return effect.ExitFailure[Fault, effect.Step[Delivery]](
-					faulted("waiting for a delivery", queue, err))
+					faultOf("waiting for a delivery", queue, err))
 			}
 			if !more {
 				return effect.ExitSuccess[Fault](effect.EndOfStream[Delivery]())

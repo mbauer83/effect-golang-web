@@ -32,12 +32,12 @@ import (
 // be tested from outside the package is a boundary nobody has checked. Its
 // signature says map[string]any rather than the library's named type, so
 // nothing above this package acquires the dependency by calling it.
-func Properties(named dynamic.Object) (map[string]any, error) {
-	if len(named.Fields) == 0 {
+func Properties(object dynamic.Object) (map[string]any, error) {
+	if len(object.Fields) == 0 {
 		return nil, nil
 	}
-	made := make(map[string]any, len(named.Fields))
-	for _, property := range named.Fields {
+	made := make(map[string]any, len(object.Fields))
+	for _, property := range object.Fields {
 		crossed, err := propertyOf(property.Value)
 		if err != nil {
 			return nil, fmt.Errorf("property %q: %w", property.Name, err)
@@ -53,12 +53,12 @@ func Properties(named dynamic.Object) (map[string]any, error) {
 // why this is a second function and not a cast: the library's Annotations type
 // is keyed by the top type, and the keys this produces are the strings the
 // representation had.
-func Annotations(named dynamic.Object) (broker.Annotations, error) {
-	if len(named.Fields) == 0 {
+func Annotations(object dynamic.Object) (broker.Annotations, error) {
+	if len(object.Fields) == 0 {
 		return nil, nil
 	}
-	made := make(broker.Annotations, len(named.Fields))
-	for _, annotation := range named.Fields {
+	made := make(broker.Annotations, len(object.Fields))
+	for _, annotation := range object.Fields {
 		crossed, err := propertyOf(annotation.Value)
 		if err != nil {
 			return nil, fmt.Errorf("annotation %q: %w", annotation.Name, err)
@@ -69,25 +69,25 @@ func Annotations(named dynamic.Object) (broker.Annotations, error) {
 }
 
 func propertyOf(value dynamic.Value) (any, error) {
-	switch held := value.(type) {
+	switch shape := value.(type) {
 	case dynamic.Absent:
 		return nil, nil
 	case dynamic.Boolean:
-		return held.Value, nil
+		return shape.Value, nil
 	case dynamic.Integer:
-		return held.Value, nil
+		return shape.Value, nil
 	case dynamic.Number:
-		return held.Value, nil
+		return shape.Value, nil
 	case dynamic.Text:
-		return held.Value, nil
+		return shape.Value, nil
 	case dynamic.Bytes:
-		return held.Value, nil
+		return shape.Value, nil
 	case dynamic.Timestamp:
-		return held.Value, nil
+		return shape.Value, nil
 	case dynamic.Object:
-		return Properties(held)
+		return Properties(shape)
 	case dynamic.List:
-		return propertiesOf(held)
+		return propertiesOf(shape)
 	default:
 		// Unreachable from outside: dynamic.Value is sealed by an unexported
 		// method, so this guards against a case being added to the sum without
@@ -116,7 +116,7 @@ func propertiesOf(list dynamic.List) ([]any, error) {
 func Named(received map[string]any) (dynamic.Object, error) {
 	object := dynamic.Object{Fields: make([]dynamic.Field, 0, len(received))}
 	for _, name := range sortedNames(received) {
-		value, err := carried(received[name])
+		value, err := propertyValue(received[name])
 		if err != nil {
 			return dynamic.Object{}, fmt.Errorf("property %q: %w", name, err)
 		}
@@ -125,7 +125,7 @@ func Named(received map[string]any) (dynamic.Object, error) {
 	return object, nil
 }
 
-func carried(received any) (dynamic.Value, error) {
+func propertyValue(received any) (dynamic.Value, error) {
 	switch value := received.(type) {
 	case nil:
 		return dynamic.Absent{}, nil
@@ -173,7 +173,7 @@ func carried(received any) (dynamic.Value, error) {
 func elements(received []any) (dynamic.Value, error) {
 	list := dynamic.List{Elements: make([]dynamic.Value, 0, len(received))}
 	for index, element := range received {
-		value, err := carried(element)
+		value, err := propertyValue(element)
 		if err != nil {
 			return nil, fmt.Errorf("element %d: %w", index, err)
 		}

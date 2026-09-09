@@ -18,7 +18,7 @@ type Route[R, E any] struct {
 	// surface and not of one route -- and because a build that closed over
 	// them would close over the values they had when the route was declared,
 	// which is before a surface has said what it wants.
-	build func(reject func(error) Response, named phases) Handler[R, E]
+	build func(reject func(error) Response, phases phases) Handler[R, E]
 	// phases is how the parts of the route's own work are named and
 	// measured, or is the zero value. Its shape and its default are in
 	// phase.go.
@@ -32,21 +32,21 @@ func (route Route[R, E]) Declaration() Declaration {
 	return route.declaration
 }
 
-// wrapping returns the route with each built handler passed through the
+// withWrapper returns the route with each built handler passed through the
 // wrapper, together with the declaration it belongs to.
 //
 // The wrapper sees the route's whole work: the codecs as well as the handler,
 // because it wraps what dispatch calls. That is the useful boundary -- a route
 // whose response is expensive to encode is expensive to serve, whatever the
 // handler cost.
-func (route Route[R, E]) wrapping(each Matched[R, E]) Route[R, E] {
+func (route Route[R, E]) withWrapper(each Matched[R, E]) Route[R, E] {
 	if route.fault != nil || route.build == nil {
 		return route
 	}
 	inner := route.build
 	declaration := route.declaration
-	route.build = func(reject func(error) Response, named phases) Handler[R, E] {
-		return each(declaration, inner(reject, named))
+	route.build = func(reject func(error) Response, phases phases) Handler[R, E] {
+		return each(declaration, inner(reject, phases))
 	}
 	return route
 }
@@ -74,9 +74,9 @@ func Handle[R, E, In, Out any](
 	if route.fault != nil {
 		return route
 	}
-	route.build = func(reject func(error) Response, named phases) Handler[R, E] {
+	route.build = func(reject func(error) Response, phases phases) Handler[R, E] {
 		operations := effect.For[R, E]()
-		encode := encoding[R, E](endpoint.output)
+		encode := encodeOutput[R, E](endpoint.output)
 
 		// Decode, handle, encode -- as three steps, so each can be a span of
 		// its own.
@@ -85,14 +85,14 @@ func Handle[R, E, In, Out any](
 				input, err := Decode(endpoint.input, request)
 				return operations.Succeed(read[In]{value: input, refusal: err})
 			})
-			return within(reading, named.decoding, named.sample).
+			return within(reading, phases.decoding, phases.sample).
 				FlatMap(func(decoded read[In]) effect.Effect[R, E, Response] {
 					if decoded.refusal != nil {
 						return operations.Succeed(reject(decoded.refusal))
 					}
-					return within(handle(decoded.value), named.handling, named.sample).
+					return within(handle(decoded.value), phases.handling, phases.sample).
 						FlatMap(func(value Out) effect.Effect[R, E, Response] {
-							return within(encode(value), named.encoding, named.sample)
+							return within(encode(value), phases.encoding, phases.sample)
 						})
 				})
 		}
@@ -118,7 +118,7 @@ func Handle[R, E, In, Out any](
 			})
 		}
 
-		if named.quiet() {
+		if phases.quiet() {
 			return plain
 		}
 		return phased
@@ -136,25 +136,25 @@ type read[In any] struct {
 	refusal error
 }
 
-// detailing returns the route with its own parts named, so a trace shows
+// withSampling returns the route with its own parts named, so a trace shows
 // decoding and encoding beside the handler, and measured by the sampler if one
 // was given.
-func (route Route[R, E]) detailing(sample Sampling) Route[R, E] {
+func (route Route[R, E]) withSampling(sample Sampling) Route[R, E] {
 	if route.fault != nil {
 		return route
 	}
-	route.phases = detailed()
+	route.phases = phaseNames()
 	route.phases.sample = sample
 	return route
 }
 
-// encoding turns the handler's output value into the response the endpoint
+// encodeOutput turns the handler's output value into the response the endpoint
 // declared.
 //
-// An encoding failure is a defect rather than a typed failure: the value came
+// An encodeOutput failure is a defect rather than a typed failure: the value came
 // from this program, so a schema that cannot describe it is a mistake here and
 // not something a client can be told about or act on.
-func encoding[R, E, Out any](output Output[Out]) func(Out) effect.Effect[R, E, Response] {
+func encodeOutput[R, E, Out any](output Output[Out]) func(Out) effect.Effect[R, E, Response] {
 	return func(value Out) effect.Effect[R, E, Response] {
 		response, err := output.encode(value)
 		if err != nil {
@@ -176,14 +176,14 @@ func firstRouteFault[R, E, In, Out any](
 		return fault
 	}
 	if handle == nil {
-		return faulted("handling "+endpoint.method+" "+renderPattern(endpoint.segments), errNoHandler)
+		return faultOf("handling "+endpoint.method+" "+renderPattern(endpoint.segments), errNoHandler)
 	}
 	return nil
 }
 
-// rejected is the default answer to a request a codec refused. It says which
+// rejectRequest is the default answer to a request a codec refused. It says which
 // part was wrong, because a client that is not told cannot fix its request.
-func rejected(err error) Response {
+func rejectRequest(err error) Response {
 	return Text(http.StatusBadRequest, err.Error())
 }
 

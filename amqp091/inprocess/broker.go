@@ -28,8 +28,8 @@ type Broker struct {
 // a consumer that has not subscribed yet, which is the ordinary shape of a test:
 // publish three, then read them.
 type queue struct {
-	waiting chan amqp091.Delivery
-	held    map[uint64]amqp091.Delivery
+	waiting   chan amqp091.Delivery
+	unsettled map[uint64]amqp091.Delivery
 }
 
 // offer puts a message on the queue without waiting for room.
@@ -65,42 +65,42 @@ func NewBroker() *Broker {
 // Accepted, Discarded and Requeued are the delivery tags the consumers settled
 // each way. They are what a test asks about, because acknowledgement is the
 // decision the caller makes and a library should not.
-func (held *Broker) Accepted() []uint64 {
-	return held.settledAs(func(settled settlements) []uint64 { return settled.accepted })
+func (broker *Broker) Accepted() []uint64 {
+	return broker.settledAs(func(settled settlements) []uint64 { return settled.accepted })
 }
 
 // Discarded is the tags rejected without return.
-func (held *Broker) Discarded() []uint64 {
-	return held.settledAs(func(settled settlements) []uint64 { return settled.discarded })
+func (broker *Broker) Discarded() []uint64 {
+	return broker.settledAs(func(settled settlements) []uint64 { return settled.discarded })
 }
 
 // Requeued is the tags asked for again.
-func (held *Broker) Requeued() []uint64 {
-	return held.settledAs(func(settled settlements) []uint64 { return settled.requeued })
+func (broker *Broker) Requeued() []uint64 {
+	return broker.settledAs(func(settled settlements) []uint64 { return settled.requeued })
 }
 
 // Waiting is how many messages a queue is holding that nobody has taken.
-func (held *Broker) Waiting(name string) int {
-	held.mutex.Lock()
-	defer held.mutex.Unlock()
-	waiting, known := held.queues[name]
+func (broker *Broker) Waiting(name string) int {
+	broker.mutex.Lock()
+	defer broker.mutex.Unlock()
+	waiting, known := broker.queues[name]
 	if !known {
 		return 0
 	}
 	return len(waiting.waiting)
 }
 
-func (held *Broker) settledAs(which func(settlements) []uint64) []uint64 {
-	held.mutex.Lock()
-	defer held.mutex.Unlock()
-	return append([]uint64(nil), which(held.settled)...)
+func (broker *Broker) settledAs(which func(settlements) []uint64) []uint64 {
+	broker.mutex.Lock()
+	defer broker.mutex.Unlock()
+	return append([]uint64(nil), which(broker.settled)...)
 }
 
 // queueNamed is the queue of that name, or the refusal that there is none.
 // Declaring first is the broker's rule, not this package's: a real one refuses
 // a binding or a consumer on a queue it does not hold.
-func (held *Broker) queueNamed(name string) (*queue, error) {
-	waiting, known := held.queues[name]
+func (broker *Broker) queueNamed(name string) (*queue, error) {
+	waiting, known := broker.queues[name]
 	if !known {
 		return nil, errNoSuchQueue
 	}
