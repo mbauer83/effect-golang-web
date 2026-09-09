@@ -42,11 +42,11 @@ func (careful *Careful) filed(method string, path string, requesting Requesting)
 // asking the service. It is logged with the key, because a cache that has been
 // unreachable for an hour is a rate limit about to be spent and has to be
 // visible before that happens.
-func recalling[R any](careful *Careful, filed string) effect.Effect[R, Fault, cache.Kept] {
+func recalling[R any](careful *Careful, filed string) effect.Effect[R, Fault, cache.Cached] {
 	return effect.Fold(
-		cache.Read[R](careful.keeping, filed).CatchAll(complaining[R, cache.Kept]("reading", filed)),
-		func(effect.Cause[cache.Fault]) cache.Kept { return cache.Kept{} },
-		func(kept cache.Kept) cache.Kept { return kept },
+		cache.Read[R](careful.keeping, filed).CatchAll(complaining[R, cache.Cached]("reading", filed)),
+		func(effect.Cause[cache.Fault]) cache.Cached { return cache.Cached{} },
+		func(kept cache.Cached) cache.Cached { return kept },
 	).MapError(func(effect.Never) Fault { return Fault{} })
 }
 
@@ -68,7 +68,7 @@ func filing[R any](
 		if err != nil {
 			return effect.Fail[R, Received](asFault("keeping the answer", err))
 		}
-		kept := cache.Write[R](careful.keeping, cache.Filing{
+		kept := cache.Write[R](careful.keeping, cache.Entry{
 			Key: filed, About: about, Entity: entity, Fresh: careful.terms.Fresh,
 		}).CatchAll(complaining[R, effect.Unit]("keeping", filed))
 		return effect.Fold(kept,
@@ -120,7 +120,7 @@ func written(received Received) ([]byte, error) {
 // A kept answer that cannot be read back is treated as no answer: it is this
 // program's own writing, so a failure here is a bug rather than a thing to
 // report to a caller, and the service can still be asked.
-func replayed(kept cache.Kept) (Received, bool) {
+func replayed(kept cache.Cached) (Received, bool) {
 	if !kept.Found {
 		return Received{}, false
 	}

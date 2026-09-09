@@ -115,7 +115,7 @@ func FetchCarefully[R any](
 ) effect.Effect[R, Fault, Received] {
 	filed := careful.filed(method, path, requesting)
 	return recalling[R](careful, filed).
-		FlatMap(func(kept cache.Kept) effect.Effect[R, Fault, Received] {
+		FlatMap(func(kept cache.Cached) effect.Effect[R, Fault, Received] {
 			if received, replayed := replayed(kept); replayed {
 				return effect.Succeed[R, Fault](received)
 			}
