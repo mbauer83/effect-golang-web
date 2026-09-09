@@ -84,11 +84,13 @@ jobs:
           check-latest: true
 
       # -run selects them by name so the job says what it established rather
-      # than running the whole suite again with one variable set.
+      # than running the whole suite again with one variable set. A
+      # broker-gated case that is not named here never runs anywhere, which
+      # makes adding one to this list part of adding one at all.
       - name: AMQP 0-9-1 against a broker
         env:
           EFFECT_GOLANG_AMQP_URL: amqp://guest:guest@127.0.0.1:5672/
         run: >-
           go test -count=1 -v
-          -run 'CrossesARealBroker|StoppingEarlyStopsTheBroker'
+          -run 'CrossesARealBroker|StoppingEarlyStopsTheBroker|ArrivesWhereTheQueueSaysItShould'
           ./test/acceptance/
