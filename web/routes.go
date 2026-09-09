@@ -157,12 +157,36 @@ func (routes Routes[R, E]) Wrapping(each Matched[R, E]) Routes[R, E] {
 // large document to unmarshal is real time, and a trace that showed one bar
 // for all three could not say which of them a slow request spent it in.
 func (routes Routes[R, E]) Detailing() Routes[R, E] {
+	return routes.detailing(nil)
+}
+
+// Measuring is Detailing that also hands each phase to a sampler, so a caller
+// who can measure the process -- which this module cannot; it reads no
+// counters and depends on nothing that does -- accounts for the phases as well
+// as naming them.
+//
+// It names them too, because a phase that was measured and not named is one
+// nobody can find: the account is keyed by the phase's name, and the timeline
+// is what somebody looking for it is reading.
+//
+// The seam costs 1.5µs and forty allocations per request on top of detailing --
+// three suspensions and three finalizers -- before the sampler does anything at
+// all. What the sampler itself costs is the sampler's business. The measurement
+// is in test/unit/web_cost_test.go.
+//
+//	surface = surface.Measuring(inspect.Sampling(watched.Costs)).
+//	    Wrapping(inspect.Observing[Env, Refusal](watched.Costs))
+func (routes Routes[R, E]) Measuring(each Sampling) Routes[R, E] {
+	return routes.detailing(each)
+}
+
+func (routes Routes[R, E]) detailing(sample Sampling) Routes[R, E] {
 	if len(routes.assembled) == 0 {
 		return routes
 	}
 	detailing := make([]Route[R, E], 0, len(routes.assembled))
 	for _, route := range routes.assembled {
-		detailing = append(detailing, route.detailing())
+		detailing = append(detailing, route.detailing(sample))
 	}
 	rebuilt, err := NewRoutesRejecting(routes.reject, detailing...)
 	if err != nil {

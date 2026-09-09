@@ -372,6 +372,29 @@ which is how the largest thing in an aggregate ends up being `other`.
 An upgraded route stays one span whatever the surface details: there are no
 codecs to name, because the exchange after the upgrade is not described here.
 
+### Measuring them, without measuring them here
+
+```go
+type Sampling func(phase string) func()
+
+surface = surface.Measuring(sampler).Wrapping(observing)
+```
+
+`Measuring` is `Detailing` that also hands each phase to a sampler: it is
+called when the phase begins and the function it returns when the phase ends,
+however it ended — a failure and an interruption included.
+
+A pair of callbacks rather than an effect wrapper, and the reason is Go: the
+three phases carry three different value types, so a single value that wrapped
+"an effect of any type" would need a method with type parameters of its own.
+A pair of callbacks also keeps the direction right — reading a counter is not
+this module's business, so the naming is here and the measuring is whoever is
+watching. `inspect.Sampling` in `effect-golang-observe-web` is one.
+
+It names the phases as well, because a phase measured and not named is one
+nobody can find: an account is keyed by the phase's name, and a timeline is
+what somebody looking for it is reading.
+
 ### What it costs, measured
 
 On one machine, a route that answers from memory:
@@ -380,6 +403,11 @@ On one machine, a route that answers from memory:
 |---|---|---|
 | not detailing | 2.04µs | 39 |
 | detailing | 5.51µs | 79 |
+| measuring, with a sampler that does nothing | 7.10µs | 119 |
+
+The seam is 1.5µs and forty allocations on top of detailing — three
+suspensions and three finalizers, one pair per phase — before a sampler does
+anything at all. What a sampler costs is the sampler's business.
 
 Three spans cost about 3.5µs and forty allocations, and **that cost falls
 inside the route and outside its phases** — so a detailed trace of very fast

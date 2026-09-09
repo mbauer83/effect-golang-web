@@ -19,64 +19,11 @@ type Route[R, E any] struct {
 	// them would close over the values they had when the route was declared,
 	// which is before a surface has said what it wants.
 	build func(reject func(error) Response, named phases) Handler[R, E]
-	// phases names the parts of the route's own work, or is empty. Empty
-	// names mean no spans, which is the default: a surface nobody is watching
-	// should not pay for three spans per request instead of none.
+	// phases is how the parts of the route's own work are named and
+	// measured, or is the zero value. Its shape and its default are in
+	// phase.go.
 	phases phases
 	fault  error
-}
-
-// phases are the names a route's own parts are spanned under.
-//
-// Decoding and encoding are the route's work as much as the handler is, and a
-// trace that showed one bar for all three could not say which of them a slow
-// request spent its time in. A large document to unmarshal is real time, and
-// so is a large one to write back.
-type phases struct {
-	decoding string
-	handling string
-	encoding string
-}
-
-// The names a detailing surface spans its phases under.
-//
-// Exported because anything keyed by operation needs them: a metric
-// vocabulary that does not declare them measures three spans per request as
-// "an operation nobody declared", which is how the largest thing in an
-// aggregate came to be a bucket with no name on it.
-const (
-	PhaseDecoding = "decoding"
-	PhaseHandling = "handling"
-	PhaseEncoding = "encoding"
-)
-
-// PhaseNames are the three, for a caller assembling a vocabulary.
-//
-//	metrics.Naming(append(inspect.Names(surface.Declarations()), web.PhaseNames()...)...)
-func PhaseNames() []string {
-	return []string{PhaseDecoding, PhaseHandling, PhaseEncoding}
-}
-
-// detailed is the naming a surface uses when it details its phases.
-func detailed() phases {
-	return phases{
-		decoding: PhaseDecoding,
-		handling: PhaseHandling,
-		encoding: PhaseEncoding,
-	}
-}
-
-// spanned names an effect when a name is given and returns it untouched when
-// none is.
-//
-// One shape for both, so the composition below is written once: a surface that
-// is not detailing pays for no spans, and neither path is a second copy of the
-// other that could drift from it.
-func spanned[R, E, A any](fx effect.Effect[R, E, A], name string) effect.Effect[R, E, A] {
-	if name == "" {
-		return fx
-	}
-	return fx.WithSpan(name)
 }
 
 // Declaration is what the route says about itself, which is what a published
@@ -138,14 +85,14 @@ func Handle[R, E, In, Out any](
 				input, err := Decode(endpoint.input, request)
 				return operations.Succeed(read[In]{value: input, refusal: err})
 			})
-			return spanned(reading, named.decoding).
+			return within(reading, named.decoding, named.sample).
 				FlatMap(func(decoded read[In]) effect.Effect[R, E, Response] {
 					if decoded.refusal != nil {
 						return operations.Succeed(reject(decoded.refusal))
 					}
-					return spanned(handle(decoded.value), named.handling).
+					return within(handle(decoded.value), named.handling, named.sample).
 						FlatMap(func(value Out) effect.Effect[R, E, Response] {
-							return spanned(encode(value), named.encoding)
+							return within(encode(value), named.encoding, named.sample)
 						})
 				})
 		}
@@ -171,7 +118,7 @@ func Handle[R, E, In, Out any](
 			})
 		}
 
-		if named == (phases{}) {
+		if named.quiet() {
 			return plain
 		}
 		return phased
@@ -190,12 +137,14 @@ type read[In any] struct {
 }
 
 // detailing returns the route with its own parts named, so a trace shows
-// decoding and encoding beside the handler.
-func (route Route[R, E]) detailing() Route[R, E] {
+// decoding and encoding beside the handler, and measured by the sampler if one
+// was given.
+func (route Route[R, E]) detailing(sample Sampling) Route[R, E] {
 	if route.fault != nil {
 		return route
 	}
 	route.phases = detailed()
+	route.phases.sample = sample
 	return route
 }
 
