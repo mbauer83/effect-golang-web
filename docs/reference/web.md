@@ -272,6 +272,67 @@ what the endpoint contributes is everything that has exactly one answer. Making
 codecs invertible would let `Call` take an `In` directly, and it would mean an
 inverse on every `Convert` — worth doing when a caller wants it, not before.
 
+## Asking carefully
+
+```go
+careful, err := web.Carefully(client, web.Terms{
+    Named:    "tmdb",
+    Allowed:  rate.Allowance{Name: "tmdb", Most: 40, Every: 10 * time.Second},
+    Fresh:    time.Hour,
+    Patience: web.Patience{First: 200 * time.Millisecond, Longest: time.Second, Retries: 2},
+}, keeping, pacing)                                    // cache.Store, rate.Limiter
+
+web.FetchCarefully[R](careful, "GET", "/3/movie/603",  // Effect[R, Fault, Received]
+    web.Requesting{About: "film:603"})
+web.CallCarefully[R](careful, FindFilm, requesting)    // Effect[R, Fault, Film]
+```
+
+Reading a service this program does not own has three concerns that have
+nothing to do with what is being read: **not asking twice** for an answer that
+has not changed, **not asking faster** than the service agreed to be asked, and
+**asking again** when the answer was that nobody could answer. Every program
+that reads one meets all three and writes them again, so they are here — over
+the [`cache.Store` and `rate.Limiter`](https://github.com/mbauer83/effect-golang/blob/main/docs/reference/cache.md)
+ports, which already say what keeping and pacing are.
+
+Both are ports because both are shared: two instances of a program that each
+kept their own count would together ask at twice the rate one of them agreed
+to. In one process the runtime's own adapters are the right answer; between
+processes [`effect-golang-cache`](https://github.com/mbauer83/effect-golang-cache)
+is, and neither this module nor a caller's code changes to say so.
+
+**The status is still data.** A refused request is a `Received` carrying that
+status, exactly as with `Fetch`, so a caller decides what a 404 means about what
+it asked for — an absence to one caller and a failure to another. Only a
+successful answer is kept: a path that was briefly a 500 must not be a 500 for
+the next hour. And only a 5xx or a request that got no response is asked again;
+every other status is an answer, and asking again would spend an allowance to
+be told it twice.
+
+**A kept answer is the whole response**, written in the form `net/http` writes
+one, because that format already round-trips a status, a set of headers and a
+body and is read back by the library that wrote it. Keeping only the entity
+would lose the content type; inventing a format for all three would be
+inventing one that exists.
+
+**`Requesting.About` is what the request is about** — a film, an order, a
+customer — and it is what everything kept about one thing is dropped by. A
+person pressing "refresh" means "find out about this thing again", not "drop
+these four keys". `Fetch` and `Call` keep nothing and read nothing from it, in
+the same way `Fetch` reads nothing from `Path`.
+
+**A cache that cannot be read is absorbed; a limiter that cannot be consulted
+is not.** An unreadable cache costs latency, and the alternative — failing a
+request because a cache is down — is worse than asking the service; it is
+logged, because a cache unreachable for an hour is a rate limit about to be
+spent. An unenforced rate limit costs a service's goodwill and this program its
+access, so a pace this program cannot consult is a request this program does
+not make.
+
+Terms that say nothing are refused by `Carefully` rather than at the first
+request: a service asked at an unstated rate is one that eventually blocks the
+program asking, and that is a mistake worth catching where it is made.
+
 ## Matching
 
 ```text
@@ -448,6 +509,13 @@ needs a scope to own the body and a `Stream` to pull it, which is a shape worth
 settling against a caller rather than guessing at.
 
 **Invertible request codecs**, for the reason the calling section gives.
+
+**Conditional requests.** A kept answer carries the response's own headers, so
+an `ETag` or a `Last-Modified` is there; revalidating with `If-None-Match` and
+reading a 304 as "what you have is still good" is the obvious next step and
+nothing has asked for it yet. Nor is `Cache-Control` read: how long one of a
+service's answers is worth keeping is stated in the terms, where whoever knows
+the service says it.
 
 **Publisher-side content negotiation.** One media type per entity, declared.
 A route that answered three depending on `Accept` would need three schemas and

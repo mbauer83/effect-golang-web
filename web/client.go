@@ -59,6 +59,14 @@ type Requesting struct {
 	// is. Carrying fills both from a value and its schema.
 	Entity    []byte
 	MediaType string
+	// About is what this request is about -- a film, an order, a customer --
+	// so that everything a careful client has kept about one thing can be
+	// dropped together when somebody asks for it to be looked up again.
+	//
+	// Read only by FetchCarefully and CallCarefully. Fetch and Call keep
+	// nothing and so have nothing to file it under, in the same way that
+	// Fetch takes the path whole and reads nothing from Path.
+	About string
 }
 
 // Received is one response, read whole.
