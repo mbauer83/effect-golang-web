@@ -148,7 +148,7 @@ func FetchFromUpstream[R any](
 				askUpstream[R](upstream, method, path, requesting).
 					FlatMap(putCached[R](upstream, filed, requesting.About)))
 		}).
-		Named("fetch carefully")
+		Named("upstream read")
 }
 
 // CallUpstream reads an endpoint under the same terms, and reads the answer
