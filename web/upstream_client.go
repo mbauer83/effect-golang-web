@@ -1,12 +1,13 @@
 package web
 
-// A client that is careful with somebody else's service.
+// Reading a service this program does not own.
 //
-// Reading a service this program does not own has three concerns that have
-// nothing to do with what is being read: not asking twice for an answer that
-// has not changed, not asking faster than the service agreed to be asked, and
-// asking again when the answer was that nobody could answer. Every program
-// that reads one meets all three and writes them again.
+// Doing so has four concerns that have nothing to do with what is being read:
+// not asking twice for an answer that has not changed, not asking faster than
+// the service agreed to be asked, asking again when the answer was that
+// nobody could answer, and asking once when ten callers want the same answer
+// at the same moment. Every program that reads somebody else's service meets
+// all four and writes them again.
 //
 // So they are here, beside Fetch and Call, over the two ports in the runtime
 // that already say what keeping and pacing are. Both are ports because both
@@ -29,16 +30,25 @@ import (
 	"github.com/mbauer83/effect-golang/effect/rate"
 )
 
-// Careful is a client read under terms.
-type Careful struct {
+// UpstreamClient reads one service this program does not own, on the terms
+// that service is read under.
+//
+// Named for what it reads rather than for how it behaves: an upstream is by
+// definition somebody else's, which is the whole reason the terms exist. The
+// plain Client beside it is the transport; this is the transport plus what
+// this program owes whoever is being asked.
+type UpstreamClient struct {
 	client  *Client
-	terms   Terms
+	terms   UpstreamTerms
 	keeping cache.Store
 	pacing  rate.Limiter
+	sharing *underwayReadings
 }
 
-// Terms are what a service is read under.
-type Terms struct {
+// UpstreamTerms are what a service is read under: how long its answers are
+// worth keeping, how often it may be asked, how long this caller will queue
+// for a turn, and how it is asked again when it could not answer.
+type UpstreamTerms struct {
 	// Named identifies the service in the keys its answers are kept under.
 	// Two services read by one program must not share it, or one would be
 	// served the other's answer to the same path.
@@ -56,7 +66,7 @@ type Terms struct {
 }
 
 // IsStated reports whether these terms say enough to read a service by.
-func (terms Terms) IsStated() bool {
+func (terms UpstreamTerms) IsStated() bool {
 	return terms.Named != "" && terms.Allowed.IsStated() && terms.Fresh > 0
 }
 
@@ -76,13 +86,18 @@ func (patience Patience) IsPatient() bool {
 	return patience.Retries > 0 && patience.First > 0
 }
 
-// Carefully is a client read under terms, or a refusal to read one whose terms
-// are not stated.
+// NewUpstreamClient is a service read under these terms, or a refusal to read
+// one whose terms are not stated.
 //
 // A refusal here rather than at the first request, because a service asked at
 // an unstated rate is a service that eventually blocks this program, and that
 // is a mistake worth catching where it is made.
-func Carefully(client *Client, terms Terms, keeping cache.Store, pacing rate.Limiter) (*Careful, error) {
+func NewUpstreamClient(
+	client *Client,
+	terms UpstreamTerms,
+	keeping cache.Store,
+	pacing rate.Limiter,
+) (*UpstreamClient, error) {
 	switch {
 	case client == nil || client.client == nil:
 		return nil, errNoHTTPClient
@@ -91,13 +106,19 @@ func Carefully(client *Client, terms Terms, keeping cache.Store, pacing rate.Lim
 	case keeping == nil || pacing == nil:
 		return nil, ErrUnstatedTerms
 	}
-	return &Careful{client: client, terms: terms, keeping: keeping, pacing: pacing}, nil
+	return &UpstreamClient{
+		client:  client,
+		terms:   terms,
+		keeping: keeping,
+		pacing:  pacing,
+		sharing: newUnderwayReadings(),
+	}, nil
 }
 
 // Named is the service's own name, as the terms gave it.
-func (careful *Careful) Named() string { return careful.terms.Named }
+func (upstream *UpstreamClient) Named() string { return upstream.terms.Named }
 
-// FetchCarefully reads a path: the answer this program already has while it is
+// FetchFromUpstream reads a path: the answer this program already has while it is
 // worth keeping, and the service's otherwise.
 //
 // Fetch with the three concerns applied, and it answers the same way. The
@@ -107,32 +128,37 @@ func (careful *Careful) Named() string { return careful.terms.Named }
 //
 // Only a successful answer is kept. A path that was briefly a 500 must not be
 // a 500 for the next hour.
-func FetchCarefully[R any](
-	careful *Careful,
+//
+// One reading serves every caller that wants the same key at the same moment.
+// The keeping is inside that, not around it, so the caller that started the
+// reading is not the only one whose answer got kept.
+func FetchFromUpstream[R any](
+	upstream *UpstreamClient,
 	method string,
 	path string,
 	requesting Requesting,
 ) effect.Effect[R, Fault, Received] {
-	filed := careful.cacheKey(method, path, requesting)
-	return getCached[R](careful, filed).
+	filed := upstream.cacheKey(method, path, requesting)
+	return getCached[R](upstream, filed).
 		FlatMap(func(cached cache.Cached) effect.Effect[R, Fault, Received] {
 			if received, replayed := responseFrom(cached); replayed {
 				return effect.Succeed[R, Fault](received)
 			}
-			return askUpstream[R](careful, method, path, requesting).
-				FlatMap(putCached[R](careful, filed, requesting.About))
+			return readOnceForEveryCaller[R](upstream, filed,
+				askUpstream[R](upstream, method, path, requesting).
+					FlatMap(putCached[R](upstream, filed, requesting.About)))
 		}).
 		Named("fetch carefully")
 }
 
-// CallCarefully reads an endpoint under the same terms, and reads the answer
+// CallUpstream reads an endpoint under the same terms, and reads the answer
 // the endpoint declared.
 //
 // Everything Call says holds here: the method, the path, the status and the
 // shape all come from the declaration, and a status it did not declare is a
 // Fault carrying a Refusal.
-func CallCarefully[R, In, Out any](
-	careful *Careful,
+func CallUpstream[R, In, Out any](
+	upstream *UpstreamClient,
 	endpoint Endpoint[In, Out],
 	requesting Requesting,
 ) effect.Effect[R, Fault, Out] {
@@ -143,7 +169,7 @@ func CallCarefully[R, In, Out any](
 	if err != nil {
 		return effect.Fail[R, Out](asFault("building the path", err))
 	}
-	return FetchCarefully[R](careful, endpoint.method, path, requesting).
+	return FetchFromUpstream[R](upstream, endpoint.method, path, requesting).
 		FlatMap(func(received Received) effect.Effect[R, Fault, Out] {
 			return decodeResponse[R](endpoint.output, received, endpoint.method+" "+path)
 		})
@@ -153,24 +179,24 @@ func CallCarefully[R, In, Out any](
 //
 // The turn is inside the retry rather than around it, so a second attempt
 // waits for its own turn: askUpstream again past the rate a service agreed to is
-// how a program that meant to be careful gets itself blocked.
+// how a program that meant to stay within the terms gets itself blocked.
 //
 // A status worth askUpstream again about is carried as a failure while the retry is
 // running and handed back as the Received it came from once the patience is
 // spent, because a schedule retries a failure and this function answers with a
 // status. Both are true of the same response.
 func askUpstream[R any](
-	careful *Careful,
+	upstream *UpstreamClient,
 	method string,
 	path string,
 	requesting Requesting,
 ) effect.Effect[R, Fault, Received] {
-	return awaitTurn[R](careful).
+	return awaitTurn[R](upstream).
 		FlatMap(func(effect.Unit) effect.Effect[R, Fault, Received] {
-			return Fetch[R](careful.client, method, path, requesting).
+			return Fetch[R](upstream.client, method, path, requesting).
 				FlatMap(askRefusal[R](method + " " + path))
 		}).
-		Retry(retrySchedule(careful.terms.Patience)).
+		Retry(retrySchedule(upstream.terms.Patience)).
 		CatchAll(staleAnswer[R])
 }
 
@@ -180,10 +206,10 @@ func askUpstream[R any](
 // and that asymmetry with the cache is deliberate: an unreadable cache costs
 // latency, and an unenforced rate limit costs a service's goodwill and this
 // program its access.
-func awaitTurn[R any](careful *Careful) effect.Effect[R, Fault, effect.Unit] {
-	return rate.AwaitTurn[R](careful.pacing, careful.terms.Allowed, careful.terms.Longest).
+func awaitTurn[R any](upstream *UpstreamClient) effect.Effect[R, Fault, effect.Unit] {
+	return rate.AwaitTurn[R](upstream.pacing, upstream.terms.Allowed, upstream.terms.Longest).
 		MapError(func(failed rate.Fault) Fault {
-			return Fault{Doing: "waiting for a turn at " + careful.terms.Named, Err: failed}
+			return Fault{Doing: "waiting for a turn at " + upstream.terms.Named, Err: failed}
 		})
 }
 

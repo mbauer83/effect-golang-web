@@ -25,12 +25,12 @@ import (
 // The service's name is in it because two services read by one program answer
 // differently at the same path, and what a request was about is in it because
 // that is how everything about one thing is dropped together.
-func (careful *Careful) cacheKey(method string, path string, requesting Requesting) string {
+func (upstream *UpstreamClient) cacheKey(method string, path string, requesting Requesting) string {
 	question := method + " " + path
 	if len(requesting.Query) > 0 {
 		question += "?" + requesting.Query.Encode()
 	}
-	return strings.Join([]string{careful.terms.Named, requesting.About, question}, ":")
+	return strings.Join([]string{upstream.terms.Named, requesting.About, question}, ":")
 }
 
 // getCached asks the store, and answers "nothing kept" whether that is because
@@ -42,9 +42,9 @@ func (careful *Careful) cacheKey(method string, path string, requesting Requesti
 // asking the service. It is logged with the key, because a cache that has been
 // unreachable for an hour is a rate limit about to be spent and has to be
 // visible before that happens.
-func getCached[R any](careful *Careful, filed string) effect.Effect[R, Fault, cache.Cached] {
+func getCached[R any](upstream *UpstreamClient, filed string) effect.Effect[R, Fault, cache.Cached] {
 	return effect.Fold(
-		cache.Read[R](careful.keeping, filed).CatchAll(cacheFault[R, cache.Cached]("reading", filed)),
+		cache.Read[R](upstream.keeping, filed).CatchAll(cacheFault[R, cache.Cached]("reading", filed)),
 		func(effect.Cause[cache.Fault]) cache.Cached { return cache.Cached{} },
 		func(cached cache.Cached) cache.Cached { return cached },
 	).MapError(func(effect.Never) Fault { return Fault{} })
@@ -56,7 +56,7 @@ func getCached[R any](careful *Careful, filed string) effect.Effect[R, Fault, ca
 // Only a successful answer: a path that was briefly a 500 must not be a 500
 // for the next hour.
 func putCached[R any](
-	careful *Careful,
+	upstream *UpstreamClient,
 	filed string,
 	about string,
 ) func(Received) effect.Effect[R, Fault, Received] {
@@ -68,8 +68,8 @@ func putCached[R any](
 		if err != nil {
 			return effect.Fail[R, Received](asFault("keeping the answer", err))
 		}
-		writeEntry := cache.Write[R](careful.keeping, cache.Entry{
-			Key: filed, About: about, Entity: entity, Fresh: careful.terms.Fresh,
+		writeEntry := cache.Write[R](upstream.keeping, cache.Entry{
+			Key: filed, About: about, Entity: entity, Fresh: upstream.terms.Fresh,
 		}).CatchAll(cacheFault[R, effect.Unit]("keeping", filed))
 		return effect.Fold(writeEntry,
 			func(effect.Cause[cache.Fault]) Received { return received },

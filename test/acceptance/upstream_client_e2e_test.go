@@ -1,6 +1,6 @@
 package acceptance
 
-// A client that is careful with somebody else's service.
+// Reading a service this program does not own.
 //
 // Against the in-process adapters in the runtime, which is the point of them:
 // what is being stated here is that an answer already held is not asked for
@@ -43,14 +43,14 @@ func answers(t *testing.T, status int, entity string) *asked {
 	return service
 }
 
-// carefully is the service under stated terms, keeping and pacing in this
+// readingUnderTerms is the service under stated terms, keeping and pacing in this
 // process.
-func carefully(t *testing.T, service *asked, patience web.Patience) (*web.Careful, cache.Store) {
+func readingUnderTerms(t *testing.T, service *asked, patience web.Patience) (*web.UpstreamClient, cache.Store) {
 	t.Helper()
 	keeping := cache.NewHeld(64, time.Now)
-	careful, err := web.Carefully(
+	upstream, err := web.NewUpstreamClient(
 		web.Dial(http.DefaultClient, service.server.URL),
-		web.Terms{
+		web.UpstreamTerms{
 			Named:    "a service",
 			Allowed:  rate.Allowance{Name: "a service", Most: 10, Every: time.Second},
 			Fresh:    time.Minute,
@@ -62,12 +62,12 @@ func carefully(t *testing.T, service *asked, patience web.Patience) (*web.Carefu
 	if err != nil {
 		t.Fatal(err)
 	}
-	return careful, keeping
+	return upstream, keeping
 }
 
-func fetched(t *testing.T, careful *web.Careful, requesting web.Requesting) web.Received {
+func fetched(t *testing.T, upstream *web.UpstreamClient, requesting web.Requesting) web.Received {
 	t.Helper()
-	exit := called(t, web.FetchCarefully[effect.Unit](careful, http.MethodGet, "/film/603", requesting))
+	exit := called(t, web.FetchFromUpstream[effect.Unit](upstream, http.MethodGet, "/film/603", requesting))
 	received, ok := exit.Value()
 	if !ok {
 		t.Fatalf("unexpected exit: %+v", exit)
@@ -81,10 +81,10 @@ func aboutOne() web.Requesting {
 
 func TestAnAnswerAlreadyHeldIsNotAskedForAgain(t *testing.T) {
 	service := answers(t, http.StatusOK, `{"said":"once"}`)
-	careful, _ := carefully(t, service, web.Patience{})
+	upstream, _ := readingUnderTerms(t, service, web.Patience{})
 
-	first := fetched(t, careful, aboutOne())
-	second := fetched(t, careful, aboutOne())
+	first := fetched(t, upstream, aboutOne())
+	second := fetched(t, upstream, aboutOne())
 
 	if string(first.Entity) != string(second.Entity) {
 		t.Fatalf("expected the same answer twice, got %q then %q", first.Entity, second.Entity)
@@ -106,10 +106,10 @@ func TestTwoQuestionsAreTwoAnswers(t *testing.T) {
 	// The request is part of what an answer is kept under, so a search for one
 	// thing cannot be served the answer for another.
 	service := answers(t, http.StatusOK, `{}`)
-	careful, _ := carefully(t, service, web.Patience{})
+	upstream, _ := readingUnderTerms(t, service, web.Patience{})
 
 	for _, words := range []string{"alien", "aliens"} {
-		_ = fetched(t, careful, web.Requesting{
+		_ = fetched(t, upstream, web.Requesting{
 			About: "search", Query: url.Values{"q": {words}},
 		})
 	}
@@ -123,14 +123,14 @@ func TestEverythingKeptAboutOneThingIsDroppedAtOnce(t *testing.T) {
 	// What somebody asking for a thing to be looked up again means, and the
 	// reason a request says what it is about.
 	service := answers(t, http.StatusOK, `{}`)
-	careful, keeping := carefully(t, service, web.Patience{})
-	_ = fetched(t, careful, aboutOne())
+	upstream, keeping := readingUnderTerms(t, service, web.Patience{})
+	_ = fetched(t, upstream, aboutOne())
 
 	if _, ok := called(t, cache.Drop[effect.Unit](keeping, "film:603").
 		MapError(func(cache.Fault) web.Fault { return web.Fault{} })).Value(); !ok {
 		t.Fatal("expected what was kept about it to be dropped")
 	}
-	_ = fetched(t, careful, aboutOne())
+	_ = fetched(t, upstream, aboutOne())
 
 	if service.asked != 2 {
 		t.Fatalf("expected the service asked again, got %d", service.asked)
@@ -142,9 +142,9 @@ func TestARefusalIsAnAnswerAndIsNotKept(t *testing.T) {
 	// one caller and a failure to another. And a path that was briefly a 404
 	// must not be a 404 for the next minute.
 	service := answers(t, http.StatusNotFound, `{"why":"no such film"}`)
-	careful, _ := carefully(t, service, web.Patience{})
+	upstream, _ := readingUnderTerms(t, service, web.Patience{})
 
-	received := fetched(t, careful, aboutOne())
+	received := fetched(t, upstream, aboutOne())
 	if received.Status != http.StatusNotFound {
 		t.Fatalf("expected the status as data, got %d", received.Status)
 	}
@@ -152,7 +152,7 @@ func TestARefusalIsAnAnswerAndIsNotKept(t *testing.T) {
 		t.Fatalf("expected the body it refused with, got %q", received.Entity)
 	}
 
-	_ = fetched(t, careful, aboutOne())
+	_ = fetched(t, upstream, aboutOne())
 	if service.asked != 2 {
 		t.Fatalf("expected the refusal not to have been kept, asked %d times", service.asked)
 	}
@@ -160,11 +160,11 @@ func TestARefusalIsAnAnswerAndIsNotKept(t *testing.T) {
 
 func TestAServiceThatCouldNotAnswerIsAskedAgain(t *testing.T) {
 	service := answers(t, http.StatusInternalServerError, `{}`)
-	careful, _ := carefully(t, service, web.Patience{
+	upstream, _ := readingUnderTerms(t, service, web.Patience{
 		First: time.Millisecond, Longest: 5 * time.Millisecond, Retries: 2,
 	})
 
-	received := fetched(t, careful, aboutOne())
+	received := fetched(t, upstream, aboutOne())
 
 	// One attempt and two more, and then the status handed back as the answer
 	// it is rather than as a failure.
@@ -180,11 +180,11 @@ func TestAnAnswerIsNotAskedForTwice(t *testing.T) {
 	// Every other status is an answer: it will be the same answer next time,
 	// and asking again would spend an allowance to be told it twice.
 	service := answers(t, http.StatusTooManyRequests, `{}`)
-	careful, _ := carefully(t, service, web.Patience{
+	upstream, _ := readingUnderTerms(t, service, web.Patience{
 		First: time.Millisecond, Longest: 5 * time.Millisecond, Retries: 2,
 	})
 
-	_ = fetched(t, careful, aboutOne())
+	_ = fetched(t, upstream, aboutOne())
 
 	if service.asked != 1 {
 		t.Fatalf("expected one attempt, got %d", service.asked)
@@ -195,9 +195,9 @@ func TestATurnIsWaitedForBeforeAsking(t *testing.T) {
 	// Three every three hundred milliseconds: the burst goes at once and the
 	// fourth waits a spacing.
 	service := answers(t, http.StatusOK, `{}`)
-	careful, err := web.Carefully(
+	upstream, err := web.NewUpstreamClient(
 		web.Dial(http.DefaultClient, service.server.URL),
-		web.Terms{
+		web.UpstreamTerms{
 			Named:   "a slow service",
 			Allowed: rate.Allowance{Name: "a slow service", Most: 3, Every: 300 * time.Millisecond},
 			Fresh:   time.Minute,
@@ -211,7 +211,7 @@ func TestATurnIsWaitedForBeforeAsking(t *testing.T) {
 
 	started := time.Now()
 	for turn := range 4 {
-		_ = fetched(t, careful, web.Requesting{
+		_ = fetched(t, upstream, web.Requesting{
 			About: "film:603", Query: url.Values{"turn": {string(rune('a' + turn))}},
 		})
 	}
@@ -229,12 +229,12 @@ func TestTermsThatSayNothingAreRefusedWhereTheyAreWritten(t *testing.T) {
 	service := answers(t, http.StatusOK, `{}`)
 	client := web.Dial(http.DefaultClient, service.server.URL)
 
-	for _, terms := range []web.Terms{
+	for _, terms := range []web.UpstreamTerms{
 		{Named: "a service", Fresh: time.Minute},
 		{Allowed: rate.Allowance{Name: "a service", Most: 1, Every: time.Second}, Fresh: time.Minute},
 		{Named: "a service", Allowed: rate.Allowance{Name: "a service", Most: 1, Every: time.Second}},
 	} {
-		if _, err := web.Carefully(client, terms, cache.NewHeld(8, time.Now), rate.NewHeld(time.Now)); err == nil {
+		if _, err := web.NewUpstreamClient(client, terms, cache.NewHeld(8, time.Now), rate.NewHeld(time.Now)); err == nil {
 			t.Fatalf("expected %+v to be refused", terms)
 		}
 	}

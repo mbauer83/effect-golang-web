@@ -55,4 +55,4 @@ func staleAnswer[R any](failed Fault) effect.Effect[R, Fault, Received] {
 // refusal to make before it can build one, and a second sentence saying the
 // same thing would be a second sentence to keep in step.
 var ErrUnstatedTerms = errors.New(
-	"a careful client needs a name, an allowance and a lifetime; see web.Carefully")
+	"a upstream client needs a name, an allowance and a lifetime; see web.Carefully")
