@@ -23,6 +23,7 @@ type Adapter[R, E any] struct {
 	onDefect    func(effect.Cause[E]) Response
 	report      func(context.Context, error)
 	sharing     CrossOrigin
+	quiet       bool
 }
 
 // NewAdapter builds an adapter. A nil runtime or failure mapping is a
@@ -156,15 +157,49 @@ func (adapter Adapter[R, E]) answer(handler Handler[R, E], request *http.Request
 // responseForCause decides what a failed outcome answers with. A defect
 // outranks an interruption, which outranks nothing: the precedence is the
 // runtime's own, so a boundary does not invent a second one.
+//
+// Every one of them is recorded, which it was not before: a typed failure
+// became a status and left nothing behind, so the only account of why a client
+// got a 404 was the client's. Anybody asking why had to reproduce it. What a
+// cause carries -- the line that raised it and the span it was raised inside
+// -- is exactly what makes recording it worth doing rather than noise.
 func (adapter Adapter[R, E]) responseForCause(cause effect.Cause[E]) Response {
 	if cause.ContainsDefect() {
 		adapter.report(context.Background(), causeError[E](cause))
 		return adapter.onDefect(cause)
 	}
 	if failures := cause.Failures(); len(failures) > 0 {
+		adapter.recordRefusal(cause)
 		return adapter.onFailure(failures[0])
 	}
 	return adapter.onDefect(cause)
+}
+
+// recordRefusal notes a typed failure that became a status.
+//
+// Through the same sink a defect goes to, because the question they answer is
+// the same one -- why did this request end that way -- and an operator reading
+// one wants the other in the same place. A refusal is not a fault of this
+// program, so the text says refused rather than unhandled: a log full of
+// "error" for a client sending a bad body is a log nobody reads.
+func (adapter Adapter[R, E]) recordRefusal(cause effect.Cause[E]) {
+	if adapter.quiet {
+		return
+	}
+	adapter.report(context.Background(),
+		errors.New("web: refused: "+cause.String()))
+}
+
+// Quietly stops this boundary recording the refusals it answers with.
+//
+// For a surface where a refusal is the ordinary case and the volume would bury
+// everything else -- a validating endpoint behind a form, a health check
+// somebody polls. Off by default, because a refusal nobody recorded is a
+// question nobody can answer afterwards, and that was the state this started
+// in.
+func (adapter Adapter[R, E]) Quietly() Adapter[R, E] {
+	adapter.quiet = true
+	return adapter
 }
 
 // defectResponse is the default answer to something the application did not
