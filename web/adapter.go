@@ -22,6 +22,7 @@ type Adapter[R, E any] struct {
 	onFailure   func(E) Response
 	onDefect    func(effect.Cause[E]) Response
 	report      func(context.Context, error)
+	sharing     CrossOrigin
 }
 
 // NewAdapter builds an adapter. A nil runtime or failure mapping is a
@@ -71,6 +72,28 @@ func (adapter Adapter[R, E]) WithReport(report func(context.Context, error)) Ada
 	return adapter
 }
 
+// Sharing declares which other origins a browser may let read these answers.
+//
+// At the boundary because this is the only place that sees every answer: a
+// page has to be able to read a 401 to know to sign in again, and a 401 is
+// produced after a handler has failed -- past where anything wrapping the
+// handler can still add a header. It also answers the permission a browser
+// asks for before it will send a token at all, which no route declares
+// because no route is being asked for.
+//
+//	boundary = boundary.Sharing(web.CrossOrigin{
+//	    Origins:  []string{"https://films.example"},
+//	    Headers:  []string{"Authorization", "Content-Type"},
+//	    Remember: 10 * time.Minute,
+//	})
+//
+// Declaring nothing shares nothing, which is what a surface only its own
+// origin reads wants.
+func (adapter Adapter[R, E]) Sharing(across CrossOrigin) Adapter[R, E] {
+	adapter.sharing = across
+	return adapter
+}
+
 // Interpret runs an effect the way this boundary runs a handler, and records
 // what it could not answer with.
 //
@@ -95,20 +118,39 @@ func (adapter Adapter[R, E]) Interpret(ctx context.Context, fx effect.Effect[R, 
 // Handler interprets one handler as an http.Handler.
 func (adapter Adapter[R, E]) Handler(handler Handler[R, E]) http.Handler {
 	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		// The request's context carries the cancellation, so a client that goes
-		// away interrupts the handler without any mechanism of its own.
-		exit := adapter.runtime.Run(
-			request.Context(),
-			adapter.environment,
-			handler(RequestFrom(request)),
-		)
-		response := exit.Fold(adapter.responseForCause, sameResponse)
+		response := adapter.answer(handler, request)
 
 		if err := response.WriteTo(writer, request); err != nil {
 			// The status has already gone out, so this can only be recorded.
 			adapter.report(request.Context(), faultOf("writing the response", err))
 		}
 	})
+}
+
+// answer is what this boundary replies to one request, shared with the page
+// that asked when the surface shares with its origin.
+//
+// A browser asking permission is answered here and not routed: it is asking
+// about a method the path may well not have, and routing it would answer 405
+// -- which a browser reads as "no" and then never sends the request it was
+// asking about.
+func (adapter Adapter[R, E]) answer(handler Handler[R, E], request *http.Request) Response {
+	origin, shared := adapter.sharing.asked(request)
+	if shared && isPreflight(request) {
+		return adapter.sharing.permitting(request, origin)
+	}
+	// The request's context carries the cancellation, so a client that goes
+	// away interrupts the handler without any mechanism of its own.
+	exit := adapter.runtime.Run(
+		request.Context(),
+		adapter.environment,
+		handler(RequestFrom(request)),
+	)
+	response := exit.Fold(adapter.responseForCause, sameResponse)
+	if !shared {
+		return response
+	}
+	return adapter.sharing.sharedWith(response, origin)
 }
 
 // responseForCause decides what a failed outcome answers with. A defect
