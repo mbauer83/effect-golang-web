@@ -16,8 +16,10 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/mbauer83/effect-golang-schema/schema"
 	"github.com/mbauer83/effect-golang-web/web"
 	"github.com/mbauer83/effect-golang/effect"
+	"github.com/mbauer83/effect-golang/effect/capability"
 )
 
 // recorded is where a boundary's reports go, kept so a test can read them.
@@ -123,4 +125,87 @@ func TestABoundaryToldToBeQuietRecordsNothing(t *testing.T) {
 	if said := sink.all(); len(said) != 0 {
 		t.Fatalf("expected nothing recorded, got %v", said)
 	}
+}
+
+func TestARequestRefusedByACodecIsNoted(t *testing.T) {
+	// The one refusal that left nothing behind. A typed failure reaches the
+	// boundary as a cause and is recorded there; a codec refusal is answered
+	// before any failure exists, so a client getting a 400 for a body nobody
+	// could read produced no account of it anywhere -- and a four-hundred is
+	// the commonest thing a client gets wrong.
+	//
+	// Through the program's logger rather than the boundary's report sink,
+	// because a body a client sent wrong is a fact about that client where a
+	// defect is a fact about this program.
+	logged := &recordedLines{}
+	runtime, err := effect.NewRuntime(effect.WithLogger(logged))
+	if err != nil {
+		t.Fatal(err)
+	}
+	boundary, err := web.NewAdapter(runtime, effect.Unit{},
+		func(refused error) web.Response {
+			return web.Text(http.StatusInternalServerError, refused.Error())
+		})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A route whose parameter is required, so asking without it is refused by
+	// the codec rather than by the handler.
+	route := web.Handle(
+		web.GET("/thing", web.QueryParam("q", schema.Text()),
+			web.ReturnsNothing(http.StatusOK)).Summary("Read a thing"),
+		func(string) effect.Effect[effect.Unit, error, effect.Unit] {
+			return effect.For[effect.Unit, error]().Succeed(effect.Unit{})
+		},
+	)
+	surface, err := web.NewRoutes(route)
+	if err != nil {
+		t.Fatal(err)
+	}
+	front := httptest.NewServer(boundary.Handler(surface.Handler()))
+	t.Cleanup(front.Close)
+
+	response, err := http.Get(front.URL + "/thing")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = response.Body.Close() }()
+	if response.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected the codec's refusal answered as a bad request, got %d",
+			response.StatusCode)
+	}
+
+	said := logged.all()
+	if len(said) != 1 {
+		t.Fatalf("expected the refusal noted once, got %v", said)
+	}
+	for _, wanted := range []string{"refused by this route's codecs", "GET", "/thing", "q"} {
+		if !strings.Contains(said[0], wanted) {
+			t.Errorf("expected %q in the note, got %q", wanted, said[0])
+		}
+	}
+}
+
+// recordedLines is where a program's log records go, kept so a test can read
+// them.
+type recordedLines struct {
+	mutex sync.Mutex
+	said  []string
+}
+
+func (sink *recordedLines) Log(_ context.Context, record capability.LogRecord) error {
+	sink.mutex.Lock()
+	defer sink.mutex.Unlock()
+	rendered := record.Message
+	for _, field := range record.Fields {
+		rendered += " " + field.Key + "=" + field.Value.String()
+	}
+	sink.said = append(sink.said, rendered)
+	return nil
+}
+
+func (sink *recordedLines) all() []string {
+	sink.mutex.Lock()
+	defer sink.mutex.Unlock()
+	return append([]string(nil), sink.said...)
 }

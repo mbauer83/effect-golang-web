@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/mbauer83/effect-golang/effect"
@@ -88,7 +89,8 @@ func Handle[R, E, In, Out any](
 			return within(reading, phases.decoding, phases.sample).
 				FlatMap(func(decoded read[In]) effect.Effect[R, E, Response] {
 					if decoded.refusal != nil {
-						return operations.Succeed(reject(decoded.refusal))
+						return refusedRequest[R, E](route.declaration, decoded.refusal).
+							As(reject(decoded.refusal))
 					}
 					return within(handle(decoded.value), phases.handling, phases.sample).
 						FlatMap(func(value Out) effect.Effect[R, E, Response] {
@@ -112,7 +114,7 @@ func Handle[R, E, In, Out any](
 			return operations.Suspend(func() effect.Effect[R, E, Response] {
 				input, err := Decode(endpoint.input, request)
 				if err != nil {
-					return operations.Succeed(reject(err))
+					return refusedRequest[R, E](route.declaration, err).As(reject(err))
 				}
 				return handle(input).FlatMap(encode)
 			})
@@ -188,3 +190,32 @@ func rejectRequest(err error) Response {
 }
 
 var errNoHandler = errors.New("a route has a handler")
+
+// refusedRequest notes a request a codec would not read.
+//
+// Through the program's own logger rather than the boundary's report sink, and
+// the difference is deliberate: a body a client sent wrong is a fact about
+// that client, where a defect is a fact about this program, and an operator
+// filtering the second does not want the first mixed into it. The logger has
+// levels for exactly this, so a deployment drowning in them turns warnings
+// down rather than turning a feature off.
+//
+// It exists because these were the one refusal that left nothing behind. A
+// typed failure reaches the boundary as a cause and is recorded there; a codec
+// refusal is answered before any failure exists, so a client getting a 400 for
+// a body nobody could read produced no account of it anywhere -- and a
+// four-hundred is the commonest thing a client gets wrong.
+//
+// The route's pattern and not the path asked for: the pattern is what
+// aggregates, and a path carries whatever identities the caller put in it.
+func refusedRequest[R, E any](
+	declaration Declaration,
+	refusal error,
+) effect.Effect[R, E, effect.Unit] {
+	return effect.LogWarn[R, E](
+		"a request was refused by this route's codecs; the client was told why",
+		slog.String("method", declaration.Method),
+		slog.String("route", declaration.Path),
+		slog.String("refusal", refusal.Error()),
+	)
+}
