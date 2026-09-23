@@ -64,7 +64,7 @@ func TestARequestExposesItsPartsAsValues(t *testing.T) {
 	if _, matched := request.Capture("missing"); matched {
 		t.Fatal("expected an unmatched capture to say so")
 	}
-	if request.Underlying() != underlying {
+	if request.Source() != underlying {
 		t.Fatal("expected the original request to stay reachable")
 	}
 }

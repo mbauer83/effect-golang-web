@@ -17,12 +17,12 @@ import (
 type Routes[R, E any] struct {
 	declarations []Declaration
 	tree         *treeNode[R, E]
-	// assembled and reject are what this was made from, kept so the surface
+	// routes and reject are what this was made from, kept so the surface
 	// can be rebuilt with a wrapper around every route. A Routes that could
 	// not be re-derived from its own parts would force a caller to keep the
 	// parts itself, which is a worse place for them.
-	assembled []Route[R, E]
-	reject    func(error) Response
+	routes []Route[R, E]
+	reject func(error) Response
 }
 
 // NewRoutes assembles routes, answering a malformed request with 400 and the
@@ -48,24 +48,24 @@ func NewRoutesWithRejection[R, E any](
 		return Routes[R, E]{}, faultOf("assembling routes", errNoRoutes)
 	}
 
-	assembled := Routes[R, E]{
-		tree:      newTreeNode[R, E](),
-		assembled: slices.Clone(routes),
-		reject:    reject,
+	surface := Routes[R, E]{
+		tree:   newTreeNode[R, E](),
+		routes: slices.Clone(routes),
+		reject: reject,
 	}
 	for _, route := range routes {
 		if route.fault != nil {
 			return Routes[R, E]{}, route.fault
 		}
 		pattern := renderPattern(route.segments)
-		err := assembled.tree.insert(route.segments, route.declaration.Method,
+		err := surface.tree.insert(route.segments, route.declaration.Method,
 			route.build(reject, route.phases), pattern)
 		if err != nil {
 			return Routes[R, E]{}, faultOf("assembling routes", err)
 		}
-		assembled.declarations = append(assembled.declarations, route.declaration)
+		surface.declarations = append(surface.declarations, route.declaration)
 	}
-	return assembled, nil
+	return surface, nil
 }
 
 // Declarations are what the routes say about themselves, in declared order.
@@ -115,21 +115,21 @@ type RouteMiddleware[R, E any] func(Declaration, Handler[R, E]) Handler[R, E]
 // wrapper does not change them, so there is nothing left to refuse. A zero
 // Routes wraps nothing and stays itself.
 func (routes Routes[R, E]) WithMiddleware(each RouteMiddleware[R, E]) Routes[R, E] {
-	if each == nil || len(routes.assembled) == 0 {
+	if each == nil || len(routes.routes) == 0 {
 		return routes
 	}
-	wrapped := make([]Route[R, E], 0, len(routes.assembled))
-	for _, route := range routes.assembled {
-		wrapped = append(wrapped, route.withMiddleware(each))
+	copies := make([]Route[R, E], 0, len(routes.routes))
+	for _, route := range routes.routes {
+		copies = append(copies, route.withMiddleware(each))
 	}
 	// The same routes with the same patterns, so this cannot refuse what it
 	// already accepted; an error here would be a bug in the tree rather than
 	// a caller's mistake, and reporting it as the caller's would be a lie.
-	rebuilt, err := NewRoutesWithRejection(routes.reject, wrapped...)
+	surface, err := NewRoutesWithRejection(routes.reject, copies...)
 	if err != nil {
 		return routes
 	}
-	return rebuilt
+	return surface
 }
 
 // WithPhaseSpans makes every route name the parts of its own work -- decoding,
@@ -181,18 +181,18 @@ func (routes Routes[R, E]) WithPhaseSampler(sampler PhaseSampler) Routes[R, E] {
 }
 
 func (routes Routes[R, E]) withPhases(sampler PhaseSampler) Routes[R, E] {
-	if len(routes.assembled) == 0 {
+	if len(routes.routes) == 0 {
 		return routes
 	}
-	copies := make([]Route[R, E], 0, len(routes.assembled))
-	for _, route := range routes.assembled {
+	copies := make([]Route[R, E], 0, len(routes.routes))
+	for _, route := range routes.routes {
 		copies = append(copies, route.withPhases(sampler))
 	}
-	rebuilt, err := NewRoutesWithRejection(routes.reject, copies...)
+	surface, err := NewRoutesWithRejection(routes.reject, copies...)
 	if err != nil {
 		return routes
 	}
-	return rebuilt
+	return surface
 }
 
 // Handler dispatches a request to the route that matches it.
@@ -202,15 +202,15 @@ func (routes Routes[R, E]) withPhases(sampler PhaseSampler) Routes[R, E] {
 func (routes Routes[R, E]) Handler() Handler[R, E] {
 	operations := effect.For[R, E]()
 	return func(request Request) effect.Effect[R, E, Response] {
-		found := routes.tree.resolve(pathSegments(request.Path()), request.Method(), nil)
+		match := routes.tree.resolve(pathSegments(request.Path()), request.Method(), nil)
 		switch {
-		case found.found:
-			return found.handler(request.WithCaptures(boundParameters(found.captures)))
-		case len(found.allowed) > 0:
+		case match.found:
+			return match.handler(request.WithCaptures(captureValues(match.captures)))
+		case len(match.methods) > 0:
 			// The path matched and the method did not, which is a different
 			// thing from nothing being there -- and the client is told which
 			// methods it could have used, as the specification requires.
-			return operations.Succeed(methodNotAllowed(found.allowed))
+			return operations.Succeed(methodNotAllowed(match.methods))
 		default:
 			return operations.Succeed(Empty(http.StatusNotFound))
 		}
@@ -219,9 +219,9 @@ func (routes Routes[R, E]) Handler() Handler[R, E] {
 
 // methodNotAllowed answers 405 with the Allow header, sorted so the same
 // mismatch always produces the same answer.
-func methodNotAllowed(allowed []string) Response {
+func methodNotAllowed(methods []string) Response {
 	return Empty(http.StatusMethodNotAllowed).
-		WithHeader("Allow", strings.Join(slices.Sorted(slices.Values(allowed)), ", "))
+		WithHeader("Allow", strings.Join(slices.Sorted(slices.Values(methods)), ", "))
 }
 
 var (

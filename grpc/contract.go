@@ -36,7 +36,7 @@ type Declaration interface {
 // appears once -- and the order is the order the procedures were given, so the
 // same set always produces the same file and the file can be checked in.
 func Contract(packageName string, procedures ...Declaration) (protobuf.Document, error) {
-	declared := make([]protobuf.Procedure, 0, len(procedures))
+	protoProcedures := make([]protobuf.Procedure, 0, len(procedures))
 	for _, procedure := range procedures {
 		if err := procedure.Fault(); err != nil {
 			return protobuf.Document{}, err
@@ -46,7 +46,7 @@ func Contract(packageName string, procedures ...Declaration) (protobuf.Document,
 			return protobuf.Document{}, err
 		}
 		request, response := procedure.Shapes()
-		declared = append(declared, protobuf.Procedure{
+		protoProcedures = append(protoProcedures, protobuf.Procedure{
 			Service:  bare,
 			Method:   procedure.Method(),
 			Doc:      procedure.Doc(),
@@ -54,7 +54,7 @@ func Contract(packageName string, procedures ...Declaration) (protobuf.Document,
 			Response: response,
 		})
 	}
-	return protobuf.ProjectServices(packageName, declared...)
+	return protobuf.ProjectServices(packageName, protoProcedures...)
 }
 
 // bareServiceName is the service's own name inside the package that declares it.

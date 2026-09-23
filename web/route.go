@@ -81,18 +81,18 @@ func Handle[R, E, In, Out any](
 
 		// Decode, handle, encode -- as three steps, so each can be a span of
 		// its own.
-		phased := func(request Request) effect.Effect[R, E, Response] {
+		phaseHandler := func(request Request) effect.Effect[R, E, Response] {
 			decode := operations.Suspend(func() effect.Effect[R, E, decodeResult[In]] {
 				input, err := Decode(endpoint.input, request)
 				return operations.Succeed(decodeResult[In]{value: input, refusal: err})
 			})
 			return instrumentPhase(decode, phases.decodeSpan, phases.sampler).
-				FlatMap(func(decoded decodeResult[In]) effect.Effect[R, E, Response] {
-					if decoded.refusal != nil {
-						return logRefusal[R, E](route.declaration, decoded.refusal).
-							As(reject(decoded.refusal))
+				FlatMap(func(result decodeResult[In]) effect.Effect[R, E, Response] {
+					if result.refusal != nil {
+						return logRefusal[R, E](route.declaration, result.refusal).
+							As(reject(result.refusal))
 					}
-					return instrumentPhase(handle(decoded.value), phases.handleSpan, phases.sampler).
+					return instrumentPhase(handle(result.value), phases.handleSpan, phases.sampler).
 						FlatMap(func(value Out) effect.Effect[R, E, Response] {
 							return instrumentPhase(encode(value), phases.encodeSpan, phases.sampler)
 						})
@@ -123,7 +123,7 @@ func Handle[R, E, In, Out any](
 		if phases.isQuiet() {
 			return plain
 		}
-		return phased
+		return phaseHandler
 	}
 	return route
 }

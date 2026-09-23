@@ -15,15 +15,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mbauer83/effect-golang-web/examples/quoting"
+	"github.com/mbauer83/effect-golang-web/examples/quote"
 	"github.com/mbauer83/effect-golang-web/grpc"
 	"github.com/mbauer83/effect-golang/effect"
 )
 
 // breaking is a handler that panics, which is what a defect is.
-func breaking(quoting.Enquiry) effect.Effect[effect.Unit, quoting.Refusal, quoting.Rate] {
+func breaking(quote.Enquiry) effect.Effect[effect.Unit, quote.Refusal, quote.Rate] {
 	return effect.From(
-		func(context.Context, effect.Unit) effect.Exit[quoting.Refusal, quoting.Rate] {
+		func(context.Context, effect.Unit) effect.Exit[quote.Refusal, quote.Rate] {
 			panic("the rate table is not there")
 		})
 }
@@ -34,7 +34,7 @@ func breaking(quoting.Enquiry) effect.Effect[effect.Unit, quoting.Refusal, quoti
 // choose is the boundary's answer for a defect, or nil to keep the default.
 func broken(
 	t *testing.T,
-	choose func(effect.Cause[quoting.Refusal]) grpc.Failure,
+	choose func(effect.Cause[quote.Refusal]) grpc.Failure,
 ) (*grpc.ConnectClient, chan error) {
 	t.Helper()
 	runtime, err := effect.NewRuntime(effect.WithDebugTracking())
@@ -42,7 +42,7 @@ func broken(
 		t.Fatal(err)
 	}
 	boundary, err := grpc.NewBoundary(runtime, effect.Unit{},
-		grpc.NewConnectServer(), quoting.FailureFor)
+		grpc.NewConnectServer(), quote.FailureFor)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +57,7 @@ func broken(
 	if choose != nil {
 		boundary = boundary.WithDefectFailure(choose)
 	}
-	if err := grpc.Answer(boundary, quoting.Quote, breaking); err != nil {
+	if err := grpc.Answer(boundary, quote.Quote, breaking); err != nil {
 		t.Fatal(err)
 	}
 	handler, err := boundary.Handler()
@@ -84,8 +84,8 @@ func broken(
 // askedOfBroken calls the procedure and returns the failure it answered with.
 func askedOfBroken(t *testing.T, client *grpc.ConnectClient) grpc.Failure {
 	t.Helper()
-	exit := ranCall(t, grpc.Ask[effect.Unit](client, quoting.Quote,
-		quoting.Enquiry{Origin: "Kiel", Destination: "Hamburg", Kilos: 1}))
+	exit := ranCall(t, grpc.Ask[effect.Unit](client, quote.Quote,
+		quote.Enquiry{Origin: "Kiel", Destination: "Hamburg", Kilos: 1}))
 
 	cause, failed := exit.Cause()
 	if !failed {
@@ -135,7 +135,7 @@ func TestABoundaryCanChooseWhatADefectAnswersWith(t *testing.T) {
 	// answer the caller actually receives.
 	chosen := grpc.Failure{Code: grpc.Internal, Message: "see trace 4711"}
 	client, reported := broken(t,
-		func(effect.Cause[quoting.Refusal]) grpc.Failure { return chosen })
+		func(effect.Cause[quote.Refusal]) grpc.Failure { return chosen })
 
 	failure := askedOfBroken(t, client)
 	if failure.Code != chosen.Code || failure.Message != chosen.Message {

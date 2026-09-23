@@ -42,7 +42,7 @@ examples/bookstore/         a complete HTTP program on the web core
 examples/tally/             a websocket conversation, with shared state
 examples/dispatch/          a producer and a consumer over the broker port
 examples/consign/           the four dispositions AMQP 1.0 settles a message by
-examples/quoting/           a gRPC service, and the .proto file it implies
+examples/quote/           a gRPC service, and the .proto file it implies
 examples/cmd/webdemo/       the examples as a runnable command
 test/unit/                  behaviour of the public API
 test/acceptance/            the example programs, end to end
@@ -85,7 +85,7 @@ go run ./examples/cmd/webdemo
 ```
 
 `examples/bookstore` serves a small collection over JSON on a port the operating
-system chooses; `examples/quoting` answers a gRPC procedure and prints the
+system chooses; `examples/quote` answers a gRPC procedure and prints the
 `.proto` file it implies; `examples/dispatch` and `examples/consign` are a
 producer and a consumer over each AMQP protocol. `test/acceptance` composes the
 same programs, so an example and its test cannot drift apart.

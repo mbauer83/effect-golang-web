@@ -51,7 +51,7 @@ const (
 // Topology is what this program needs the broker to hold.
 var Topology = amqp091.Topology{
 	Exchanges: []amqp091.Exchange{
-		{Name: Orders, Routing: amqp091.Direct, Durability: amqp091.Durable},
+		{Name: Orders, Kind: amqp091.Direct, Durability: amqp091.Durable},
 	},
 	Queues: []amqp091.Queue{
 		{Name: Shipping, Durability: amqp091.Durable},
@@ -106,25 +106,25 @@ func Ship(
 ) effect.Stream[effect.Unit, amqp091.Fault, Order] {
 	return effect.CollectStreamEffect(
 		amqp091.Values[effect.Unit](channel, Shipping, OrderSchema),
-		func(received amqp091.Envelope[Order]) dispatchEffect[effect.Chunk[Order]] {
-			return shipOrder(received, pack)
+		func(envelope amqp091.Envelope[Order]) dispatchEffect[effect.Chunk[Order]] {
+			return shipOrder(envelope, pack)
 		})
 }
 
 // shipOrder is what happens to one delivery.
 func shipOrder(
-	received amqp091.Envelope[Order],
+	envelope amqp091.Envelope[Order],
 	pack func(Order) dispatchEffect[effect.Unit],
 ) dispatchEffect[effect.Chunk[Order]] {
-	order, err := received.Read()
+	order, err := envelope.Read()
 	if err != nil {
-		return amqp091.Discard[effect.Unit](received).As(effect.ChunkOf[Order]())
+		return amqp091.Discard[effect.Unit](envelope).As(effect.ChunkOf[Order]())
 	}
 	return pack(order).
 		FlatMap(func(effect.Unit) dispatchEffect[effect.Chunk[Order]] {
-			return amqp091.Ack[effect.Unit](received).As(effect.ChunkOf(order))
+			return amqp091.Ack[effect.Unit](envelope).As(effect.ChunkOf(order))
 		}).
 		CatchAll(func(amqp091.Fault) dispatchEffect[effect.Chunk[Order]] {
-			return amqp091.Requeue[effect.Unit](received).As(effect.ChunkOf[Order]())
+			return amqp091.Requeue[effect.Unit](envelope).As(effect.ChunkOf[Order]())
 		})
 }

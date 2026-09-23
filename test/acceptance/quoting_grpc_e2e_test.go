@@ -22,7 +22,7 @@ import (
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 
-	"github.com/mbauer83/effect-golang-web/examples/quoting"
+	"github.com/mbauer83/effect-golang-web/examples/quote"
 	"github.com/mbauer83/effect-golang-web/grpc"
 	"github.com/mbauer83/effect-golang/effect"
 )
@@ -56,11 +56,11 @@ func overGRPC(t *testing.T) (*grpc.ConnectClient, *seen) {
 		t.Fatal(err)
 	}
 	transport := grpc.NewConnectServer()
-	boundary, err := grpc.NewBoundary(runtime, effect.Unit{}, transport, quoting.FailureFor)
+	boundary, err := grpc.NewBoundary(runtime, effect.Unit{}, transport, quote.FailureFor)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := quoting.Answer(boundary, routes); err != nil {
+	if err := quote.Answer(boundary, routes); err != nil {
 		t.Fatal(err)
 	}
 	answering, err := boundary.Handler()
@@ -113,8 +113,8 @@ func overGRPC(t *testing.T) (*grpc.ConnectClient, *seen) {
 func TestTheProcedureIsAnsweredOverTheGRPCProtocolItself(t *testing.T) {
 	client, noted := overGRPC(t)
 
-	exit := ranCall(t, grpc.Ask[effect.Unit](client, quoting.Quote,
-		quoting.Enquiry{Origin: "Kiel", Destination: "Rotterdam", Kilos: 200}))
+	exit := ranCall(t, grpc.Ask[effect.Unit](client, quote.Quote,
+		quote.Enquiry{Origin: "Kiel", Destination: "Rotterdam", Kilos: 200}))
 	rate, ok := exit.Value()
 	if !ok {
 		t.Fatalf("unexpected exit: %+v", exit)
@@ -140,8 +140,8 @@ func TestARefusalCarriesItsCodeOverTheGRPCProtocolToo(t *testing.T) {
 	// this is a different path through the transport and not the same test
 	// twice.
 	client, _ := overGRPC(t)
-	exit := ranCall(t, grpc.Ask[effect.Unit](client, quoting.Quote,
-		quoting.Enquiry{Origin: "Kiel", Destination: "Lima", Kilos: 10}))
+	exit := ranCall(t, grpc.Ask[effect.Unit](client, quote.Quote,
+		quote.Enquiry{Origin: "Kiel", Destination: "Lima", Kilos: 10}))
 
 	cause, failed := exit.Cause()
 	if !failed {

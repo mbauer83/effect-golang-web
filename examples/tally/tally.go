@@ -38,7 +38,7 @@ var ChangeSchema = schema.Struct[Change]("Change",
 var TotalSchema = schema.Struct[Total]("Total",
 	schema.FieldOf("total", schema.Int64(),
 		func(total Total) int64 { return total.Total },
-		func(total *Total, running int64) { total.Total = running }),
+		func(total *Total, value int64) { total.Total = value }),
 ).WithDescription("the tally after the change")
 
 type tallyEffect[A any] = effect.Effect[effect.Unit, websocket.Fault, A]

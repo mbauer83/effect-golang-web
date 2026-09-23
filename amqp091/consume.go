@@ -82,15 +82,15 @@ func (envelope Envelope[A]) Read() (A, error) {
 }
 
 // Ack accepts a delivery, so the broker may forget it.
-func Ack[R, A any](received Envelope[A]) effect.Effect[R, Fault, effect.Unit] {
-	return settle[R](received, "accepting a delivery", received.deliveries.Ack)
+func Ack[R, A any](envelope Envelope[A]) effect.Effect[R, Fault, effect.Unit] {
+	return settle[R](envelope, "accepting a delivery", envelope.deliveries.Ack)
 }
 
 // Discard rejects a delivery without return. The broker drops it, or routes it
 // wherever the queue's dead-letter configuration says -- which is where a
 // message nobody can read belongs.
-func Discard[R, A any](received Envelope[A]) effect.Effect[R, Fault, effect.Unit] {
-	return settle[R](received, "discarding a delivery", received.deliveries.Discard)
+func Discard[R, A any](envelope Envelope[A]) effect.Effect[R, Fault, effect.Unit] {
+	return settle[R](envelope, "discarding a delivery", envelope.deliveries.Discard)
 }
 
 // Requeue rejects a delivery and asks for it back, for a consumer that cannot
@@ -100,20 +100,20 @@ func Discard[R, A any](received Envelope[A]) effect.Effect[R, Fault, effect.Unit
 // consumer that requeues unconditionally has written a loop. That is the
 // caller's decision to make, which is the whole reason acknowledgement is
 // explicit.
-func Requeue[R, A any](received Envelope[A]) effect.Effect[R, Fault, effect.Unit] {
-	return settle[R](received, "requeueing a delivery", received.deliveries.Requeue)
+func Requeue[R, A any](envelope Envelope[A]) effect.Effect[R, Fault, effect.Unit] {
+	return settle[R](envelope, "requeueing a delivery", envelope.deliveries.Requeue)
 }
 
 func settle[R, A any](
-	received Envelope[A],
+	envelope Envelope[A],
 	op string,
 	answer func(uint64) error,
 ) effect.Effect[R, Fault, effect.Unit] {
 	return effect.Try(
 		func(context.Context, R) (effect.Unit, error) {
-			return effect.Unit{}, answer(received.Delivery.Tag)
+			return effect.Unit{}, answer(envelope.Delivery.Tag)
 		},
-		func(err error) Fault { return faultOf(op, received.Delivery.Key, err) },
+		func(err error) Fault { return faultOf(op, envelope.Delivery.Key, err) },
 	).WithName("acknowledge")
 }
 

@@ -11,15 +11,15 @@ import (
 	"github.com/mbauer83/effect-golang-web/web"
 )
 
-func operation(declared entry, shapes *cursor) Operation {
+func operation(endpoint entry, shapes *cursor) Operation {
 	return Operation{
-		Method:      declared.declaration.Method,
-		ID:          identify(declared.declaration),
-		Summary:     declared.declaration.Summary,
-		Description: declared.declaration.Doc,
-		Parameters:  withPathTemplate(declared.declaration, parameters(declared, shapes)),
-		RequestBody: requestBody(declared, shapes),
-		Responses:   responses(declared, shapes),
+		Method:      endpoint.declaration.Method,
+		ID:          identify(endpoint.declaration),
+		Summary:     endpoint.declaration.Summary,
+		Description: endpoint.declaration.Doc,
+		Parameters:  withPathTemplate(endpoint.declaration, parameters(endpoint, shapes)),
+		RequestBody: requestBody(endpoint, shapes),
+		Responses:   responses(endpoint, shapes),
 	}
 }
 
@@ -31,22 +31,22 @@ func operation(declared entry, shapes *cursor) Operation {
 // value its handler has no use for. Such a segment is still part of the path, so
 // it is described as the string it is rather than left out to make the document
 // invalid.
-func withPathTemplate(declared web.Declaration, described []Parameter) []Parameter {
-	read := make(map[string]bool, len(described))
-	for _, parameter := range described {
+func withPathTemplate(declaration web.Declaration, list []Parameter) []Parameter {
+	inPath := make(map[string]bool, len(list))
+	for _, parameter := range list {
 		if parameter.In == string(web.InPath) {
-			read[parameter.Name] = true
+			inPath[parameter.Name] = true
 		}
 	}
-	for _, name := range templateParameters(declared.Path) {
-		if !read[name] {
-			described = append(described, Parameter{
+	for _, name := range templateParameters(declaration.Path) {
+		if !inPath[name] {
+			list = append(list, Parameter{
 				Name: name, In: string(web.InPath), Required: true,
 				Schema: jsonschema.Node{Type: "string"},
 			})
 		}
 	}
-	return described
+	return list
 }
 
 // templateParameters names the captured segments of a path template.
@@ -76,11 +76,11 @@ func templatePath(path string) string {
 	return strings.Join(parts, "/")
 }
 
-func parameters(declared entry, shapes *cursor) []Parameter {
-	described := make([]Parameter, 0, declared.parameters)
-	for index := 0; index < declared.parameters; index++ {
-		parameter := declared.declaration.Parameters[index]
-		described = append(described, Parameter{
+func parameters(endpoint entry, shapes *cursor) []Parameter {
+	list := make([]Parameter, 0, endpoint.parameters)
+	for index := 0; index < endpoint.parameters; index++ {
+		parameter := endpoint.declaration.Parameters[index]
+		list = append(list, Parameter{
 			Name:        parameter.Name,
 			In:          string(parameter.In),
 			Required:    parameter.Required,
@@ -88,47 +88,47 @@ func parameters(declared entry, shapes *cursor) []Parameter {
 			Schema:      shapes.next(),
 		})
 	}
-	return described
+	return list
 }
 
-func requestBody(declared entry, shapes *cursor) *RequestBody {
-	if !declared.hasEntity {
+func requestBody(endpoint entry, shapes *cursor) *RequestBody {
+	if !endpoint.hasEntity {
 		return nil
 	}
 	// A declared entity is required. A codec that read an optional body would
 	// be describing two shapes, and would say so itself.
 	return &RequestBody{
 		Required:  true,
-		MediaType: declared.declaration.Entity.MediaType,
+		MediaType: endpoint.declaration.Entity.MediaType,
 		Schema:    shapes.next(),
 	}
 }
 
 // responses lists the success the endpoint declared and the failures it
 // documented, ordered by status so the same routes render identically.
-func responses(declared entry, shapes *cursor) []Response {
-	described := []Response{success(declared, shapes)}
-	for _, failure := range declared.declaration.Failures {
-		described = append(described, Response{
+func responses(endpoint entry, shapes *cursor) []Response {
+	list := []Response{success(endpoint, shapes)}
+	for _, failure := range endpoint.declaration.Failures {
+		list = append(list, Response{
 			Status:      failure.Status,
 			Description: responseDescription(failure.Status, failure.Doc),
 		})
 	}
-	slices.SortStableFunc(described, func(first Response, second Response) int {
+	slices.SortStableFunc(list, func(first Response, second Response) int {
 		return first.Status - second.Status
 	})
-	return described
+	return list
 }
 
-func success(declared entry, shapes *cursor) Response {
+func success(endpoint entry, shapes *cursor) Response {
 	response := Response{
-		Status:      declared.declaration.Status,
-		Description: responseDescription(declared.declaration.Status, ""),
+		Status:      endpoint.declaration.Status,
+		Description: responseDescription(endpoint.declaration.Status, ""),
 	}
-	if declared.declaration.Content != nil {
-		response.MediaType = declared.declaration.Content.MediaType
+	if endpoint.declaration.Content != nil {
+		response.MediaType = endpoint.declaration.Content.MediaType
 	}
-	if declared.hasContent {
+	if endpoint.hasContent {
 		shape := shapes.next()
 		response.Schema = &shape
 	}
@@ -152,9 +152,9 @@ func responseDescription(status int, doc string) string {
 // It is derived rather than declared so that it exists at all and is stable:
 // GET /books/{title} is getBooksByTitle every time, whoever generates the
 // document.
-func identify(declared web.Declaration) string {
-	parts := []string{strings.ToLower(declared.Method)}
-	for _, part := range strings.Split(strings.TrimPrefix(declared.Path, "/"), "/") {
+func identify(declaration web.Declaration) string {
+	parts := []string{strings.ToLower(declaration.Method)}
+	for _, part := range strings.Split(strings.TrimPrefix(declaration.Path, "/"), "/") {
 		switch {
 		case part == "":
 			continue

@@ -59,11 +59,11 @@ func readOnce[R any](
 ) effect.Effect[R, Fault, ClientResponse] {
 	operations := effect.For[R, Fault]()
 	return operations.WidenError(joinOrStart[R](upstream, key)).
-		FlatMap(func(claimed claim) effect.Effect[R, Fault, ClientResponse] {
-			if !claimed.leader {
-				return claimed.answer.Await[R]()
+		FlatMap(func(ticket claim) effect.Effect[R, Fault, ClientResponse] {
+			if !ticket.leader {
+				return ticket.answer.Await[R]()
 			}
-			return forkRead[R](upstream, key, claimed.answer, read)
+			return forkRead[R](upstream, key, ticket.answer, read)
 		})
 }
 

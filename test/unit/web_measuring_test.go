@@ -78,10 +78,10 @@ func TestMeasuringClosesAPhaseThatRefusedTheRequest(t *testing.T) {
 	// handler is never reached.
 	answer(t, surface, "/books/Zionomicon")
 
-	if !slices.Contains(record.closed, web.PhaseDecoding) {
+	if !slices.Contains(record.closed, web.PhaseDecode) {
 		t.Fatalf("expected the refused decoding closed, got %v", record.closed)
 	}
-	if slices.Contains(record.opened, web.PhaseHandling) {
+	if slices.Contains(record.opened, web.PhaseHandle) {
 		t.Fatalf("expected no handling phase for a refused request, got %v",
 			record.opened)
 	}
@@ -107,11 +107,11 @@ func TestMeasuringClosesAPhaseThatFailed(t *testing.T) {
 
 	answer(t, failing.WithPhaseSampler(record.sampling()), "/books/Zionomicon")
 
-	if !slices.Contains(record.closed, web.PhaseHandling) {
+	if !slices.Contains(record.closed, web.PhaseHandle) {
 		t.Fatalf("expected the failed handling closed, got %v", record.closed)
 	}
 	// The encoding never ran: there was no value to encode.
-	if slices.Contains(record.opened, web.PhaseEncoding) {
+	if slices.Contains(record.opened, web.PhaseEncode) {
 		t.Fatalf("expected no encoding after a failure, got %v", record.opened)
 	}
 }

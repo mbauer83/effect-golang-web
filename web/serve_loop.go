@@ -13,7 +13,7 @@ import (
 	"github.com/mbauer83/effect-golang/effect"
 )
 
-// reportAbandoned registers the finalizer that surfaces a shutdown which gave up on
+// reportAbandonment registers the finalizer that surfaces a shutdown which gave up on
 // requests still in flight.
 //
 // It has to be a finalizer rather than the serve fiber's own outcome. A forked
@@ -22,16 +22,16 @@ import (
 // would be exactly the one that is. A scope composes its finalizers' faults
 // into the closing cause whatever happened to the body, which is where this
 // belongs.
-func reportAbandoned[R any](scope effect.Scope) effect.Effect[R, Fault, chan error] {
-	abandoned := make(chan error, 1)
+func reportAbandonment[R any](scope effect.Scope) effect.Effect[R, Fault, chan error] {
+	abandonment := make(chan error, 1)
 	return scope.AcquireRelease(
-		effect.For[R, Fault]().Succeed(abandoned),
-		func(reported chan error) effect.Effect[R, effect.Never, effect.Unit] {
+		effect.For[R, Fault]().Succeed(abandonment),
+		func(abandonment chan error) effect.Effect[R, effect.Never, effect.Unit] {
 			return effect.AddFinalizer[R](func(context.Context) error {
 				// The scope has already awaited the serve fiber, so whatever it
 				// had to say has been said by now.
 				select {
-				case err := <-reported:
+				case err := <-abandonment:
 					return err
 				default:
 					return nil
@@ -75,10 +75,10 @@ func closeListener[R any](listener net.Listener) effect.Effect[R, effect.Never, 
 // it, how long a shutdown may wait, and where a shutdown that gave up reports.
 // Keeping them together is what leaves the two functions below narrow.
 type acceptLoop struct {
-	server    *http.Server
-	stopped   chan error
-	grace     time.Duration
-	abandoned chan<- error
+	server      *http.Server
+	end         chan error
+	grace       time.Duration
+	abandonment chan<- error
 }
 
 // serveLoop runs the accept loop until it stops or its context is cancelled.
@@ -90,19 +90,19 @@ func serveLoop[R any](
 	server *http.Server,
 	listener net.Listener,
 	grace time.Duration,
-	abandoned chan<- error,
+	abandonment chan<- error,
 ) effect.Effect[R, Fault, effect.Unit] {
 	return effect.From(func(ctx context.Context, _ R) effect.Exit[Fault, effect.Unit] {
 		loop := acceptLoop{
-			server:    server,
-			stopped:   make(chan error, 1),
-			grace:     grace,
-			abandoned: abandoned,
+			server:      server,
+			end:         make(chan error, 1),
+			grace:       grace,
+			abandonment: abandonment,
 		}
-		go func() { loop.stopped <- server.Serve(listener) }()
+		go func() { loop.end <- server.Serve(listener) }()
 
 		select {
-		case err := <-loop.stopped:
+		case err := <-loop.end:
 			return loopExit(err)
 		case <-ctx.Done():
 			loop.shutDown(ctx)
@@ -121,18 +121,18 @@ func (loop acceptLoop) shutDown(ctx context.Context) {
 	// Cleanup keeps the context's values and drops its cancellation, because a
 	// shutdown that began with a cancelled context must still be allowed to
 	// finish.
-	closing := context.WithoutCancel(ctx)
+	cleanup := context.WithoutCancel(ctx)
 	if loop.grace > 0 {
-		bounded, done := context.WithTimeout(closing, loop.grace)
-		defer done()
-		closing = bounded
+		deadline, cancel := context.WithTimeout(cleanup, loop.grace)
+		defer cancel()
+		cleanup = deadline
 	}
 
-	if err := loop.server.Shutdown(closing); err != nil {
-		loop.abandoned <- Fault{Op: "waiting for in-flight requests", Err: err}
+	if err := loop.server.Shutdown(cleanup); err != nil {
+		loop.abandonment <- Fault{Op: "waiting for in-flight requests", Err: err}
 		return
 	}
-	<-loop.stopped
+	<-loop.end
 }
 
 // loopExit reports why the accept loop stopped. A closed server is the ordinary
@@ -154,9 +154,9 @@ func httpServer(settings Settings, handler http.Handler) *http.Server {
 	}
 }
 
-func orElse(chosen time.Duration, fallback time.Duration) time.Duration {
-	if chosen > 0 {
-		return chosen
+func orElse(value time.Duration, fallback time.Duration) time.Duration {
+	if value > 0 {
+		return value
 	}
 	return fallback
 }

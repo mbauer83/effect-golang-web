@@ -15,14 +15,14 @@ type Fault struct {
 }
 
 func (fault Fault) Error() string {
-	rendered := "amqp: " + fault.Op
+	message := "amqp: " + fault.Op
 	if fault.Subject != "" {
-		rendered += " [" + fault.Subject + "]"
+		message += " [" + fault.Subject + "]"
 	}
 	if fault.Err != nil {
-		rendered += ": " + fault.Err.Error()
+		message += ": " + fault.Err.Error()
 	}
-	return rendered
+	return message
 }
 
 // Unwrap keeps errors.Is and errors.As working through the boundary, so a

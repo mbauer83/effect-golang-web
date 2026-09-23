@@ -74,17 +74,17 @@ func requiredParameter[A any](
 	return Codec[A]{
 		parameters: []Parameter{parameter},
 		decode: func(request Request) (A, error) {
-			carried, present := read(request)
+			text, present := read(request)
 			if !present {
-				var missing A
-				return missing, parameterRefusal(parameter, errAbsentParameter)
+				var zero A
+				return zero, parameterRefusal(parameter, errAbsentParameter)
 			}
-			decoded, err := schema.Decode(shape, textSource{value: carried})
+			value, err := schema.Decode(shape, textSource{value: text})
 			if err != nil {
-				var missing A
-				return missing, parameterRefusal(parameter, err)
+				var zero A
+				return zero, parameterRefusal(parameter, err)
 			}
-			return decoded, nil
+			return value, nil
 		},
 	}
 }
@@ -103,15 +103,15 @@ func optionalParameter[A any](
 	return Codec[*A]{
 		parameters: []Parameter{parameter},
 		decode: func(request Request) (*A, error) {
-			carried, present := read(request)
+			text, present := read(request)
 			if !present {
 				return nil, nil
 			}
-			decoded, err := schema.Decode(shape, textSource{value: carried})
+			value, err := schema.Decode(shape, textSource{value: text})
 			if err != nil {
 				return nil, parameterRefusal(parameter, err)
 			}
-			return &decoded, nil
+			return &value, nil
 		},
 	}
 }

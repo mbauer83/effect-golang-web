@@ -15,14 +15,14 @@ import (
 // and an adapter can always reach the original. What it adds is the path
 // captures a route matched, which http.Request has no place for.
 type Request struct {
-	underlying *http.Request
-	captures   map[string]string
+	source   *http.Request
+	captures map[string]string
 }
 
 // RequestFrom adapts net/http's request. It is what an adapter calls at the
 // boundary; a handler receives the result.
-func RequestFrom(underlying *http.Request) Request {
-	return Request{underlying: underlying}
+func RequestFrom(source *http.Request) Request {
+	return Request{source: source}
 }
 
 // WithCaptures returns the request with the segments a route matched.
@@ -43,38 +43,38 @@ func (request Request) Capture(name string) (string, bool) {
 
 // Method is the request method.
 func (request Request) Method() string {
-	return request.underlying.Method
+	return request.source.Method
 }
 
 // URL is the requested URL.
 func (request Request) URL() *url.URL {
-	return request.underlying.URL
+	return request.source.URL
 }
 
 // Path is the request path, without the query.
 func (request Request) Path() string {
-	return request.underlying.URL.Path
+	return request.source.URL.Path
 }
 
 // Query is the parsed query string.
 func (request Request) Query() url.Values {
-	return request.underlying.URL.Query()
+	return request.source.URL.Query()
 }
 
 // Header is the request's headers.
 func (request Request) Header() http.Header {
-	return request.underlying.Header
+	return request.source.Header
 }
 
 // Context is the request's context. Cancellation reaches a handler through it,
 // which is why a handler never needs a cancellation mechanism of its own.
 func (request Request) Context() context.Context {
-	return request.underlying.Context()
+	return request.source.Context()
 }
 
-// Underlying is net/http's own request, for the cases this type does not cover.
-func (request Request) Underlying() *http.Request {
-	return request.underlying
+// Source is net/http's own request, for the cases this type does not cover.
+func (request Request) Source() *http.Request {
+	return request.source
 }
 
 // Body reads the whole entity.
@@ -88,10 +88,10 @@ func (request Request) Underlying() *http.Request {
 func Body[R any](request Request) effect.Effect[R, Fault, []byte] {
 	return effect.Try(
 		func(context.Context, R) ([]byte, error) {
-			if request.underlying.Body == nil {
+			if request.source.Body == nil {
 				return nil, nil
 			}
-			return io.ReadAll(request.underlying.Body)
+			return io.ReadAll(request.source.Body)
 		},
 		func(err error) Fault { return Fault{Op: "reading the request body", Err: err} },
 	).WithName("read-body")

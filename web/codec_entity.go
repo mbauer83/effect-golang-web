@@ -23,17 +23,17 @@ func Entity[A any](shape schema.Schema[A]) Codec[A] {
 	return Codec[A]{
 		entity: content,
 		decode: func(request Request) (A, error) {
-			body := request.Underlying().Body
+			body := request.Source().Body
 			if body == nil {
-				var missing A
-				return missing, Fault{Op: "reading the request body", Err: errNoEntity}
+				var zero A
+				return zero, Fault{Op: "reading the request body", Err: errNoEntity}
 			}
-			decoded, err := schema.DecodeJSONFrom(shape, body)
+			value, err := schema.DecodeJSONFrom(shape, body)
 			if err != nil {
-				var missing A
-				return missing, Fault{Op: "reading the request body", Err: err}
+				var zero A
+				return zero, Fault{Op: "reading the request body", Err: err}
 			}
-			return decoded, nil
+			return value, nil
 		},
 	}
 }

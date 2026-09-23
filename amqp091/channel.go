@@ -57,7 +57,7 @@ var consumers atomic.Uint64
 
 // DeclareExchange states one exchange.
 func (channel *Channel) DeclareExchange(_ context.Context, exchange Exchange) error {
-	return channel.channel.ExchangeDeclare(exchange.Name, routingKind(exchange.Routing),
+	return channel.channel.ExchangeDeclare(exchange.Name, kindName(exchange.Kind),
 		exchange.Durability == Durable, false, false, false, nil)
 }
 
@@ -95,7 +95,7 @@ func deliveryMode(durability Durability) uint8 {
 	return broker.Transient
 }
 
-func routingKind(routing Routing) string {
+func kindName(routing ExchangeKind) string {
 	switch routing {
 	case Topic:
 		return "topic"

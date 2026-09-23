@@ -64,15 +64,15 @@ func fieldOf(value dynamic.Value) (any, error) {
 		return shape.Value, nil
 	case dynamic.Object:
 		// The library's named type and not the map underneath it: its
-		// validator switches on the exact type, so a nested map[string]any is
+		// validator switches on the exact type, so a table map[string]any is
 		// refused at publish with "value map[string]interface {} not
 		// supported". The top-level map converts implicitly on the way in,
 		// which is why only the nesting has to say so.
-		nested, err := Table(shape)
+		table, err := Table(shape)
 		if err != nil {
 			return nil, err
 		}
-		return broker.Table(nested), nil
+		return broker.Table(table), nil
 	case dynamic.List:
 		return fieldsOf(shape)
 	default:
@@ -102,7 +102,7 @@ func fieldsOf(list dynamic.List) ([]any, error) {
 // on the headers it could see would be acting on half the message.
 func Headers(raw map[string]any) (dynamic.Object, error) {
 	object := dynamic.Object{Fields: make([]dynamic.Field, 0, len(raw))}
-	for _, name := range sortedNames(raw) {
+	for _, name := range nameOrder(raw) {
 		value, err := fieldValue(raw[name])
 		if err != nil {
 			return dynamic.Object{}, fmt.Errorf("header %q: %w", name, err)
@@ -163,14 +163,14 @@ func elements(raw []any) (dynamic.Value, error) {
 	return list, nil
 }
 
-// sortedNames is the order the headers are read in.
+// nameOrder is the order the headers are read in.
 //
 // A field table is a map and has no order; the representation's Object has one,
 // because a description declares its members in an order. By name is the only
 // order available here, and a deterministic one matters: a consumer that
 // forwards the headers it received would otherwise send them differently each
 // time.
-func sortedNames(raw map[string]any) []string {
+func nameOrder(raw map[string]any) []string {
 	names := make([]string, 0, len(raw))
 	for name := range raw {
 		names = append(names, name)

@@ -16,12 +16,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mbauer83/effect-golang-web/examples/quoting"
+	"github.com/mbauer83/effect-golang-web/examples/quote"
 	"github.com/mbauer83/effect-golang-web/grpc"
 	"github.com/mbauer83/effect-golang/effect"
 )
 
-var routes = map[string]quoting.Rate{
+var routes = map[string]quote.Rate{
 	"Kiel-Hamburg":   {Carrier: "overland", Currency: "EUR", Cents: 4000},
 	"Kiel-Rotterdam": {Carrier: "coastal", Currency: "EUR", Cents: 19000},
 }
@@ -40,11 +40,11 @@ func quoted(t *testing.T) *grpc.ConnectClient {
 		t.Fatal(err)
 	}
 	transport := grpc.NewConnectServer()
-	boundary, err := grpc.NewBoundary(runtime, effect.Unit{}, transport, quoting.FailureFor)
+	boundary, err := grpc.NewBoundary(runtime, effect.Unit{}, transport, quote.FailureFor)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := quoting.Answer(boundary, routes); err != nil {
+	if err := quote.Answer(boundary, routes); err != nil {
 		t.Fatal(err)
 	}
 	handler, err := boundary.Handler()
@@ -81,8 +81,8 @@ func ranCall[A any](t *testing.T, work calling[A]) effect.Exit[grpc.Failure, A] 
 
 func TestAProcedureAnswersOverTheWire(t *testing.T) {
 	client := quoted(t)
-	exit := ranCall(t, grpc.Ask[effect.Unit](client, quoting.Quote,
-		quoting.Enquiry{Origin: "Kiel", Destination: "Hamburg", Kilos: 100}))
+	exit := ranCall(t, grpc.Ask[effect.Unit](client, quote.Quote,
+		quote.Enquiry{Origin: "Kiel", Destination: "Hamburg", Kilos: 100}))
 
 	rate, ok := exit.Value()
 	if !ok {
@@ -104,19 +104,19 @@ func TestAnApplicationRefusalBecomesItsCodeAndNothingElse(t *testing.T) {
 	// on its own -- and this is where it is checked to be the one that arrives.
 	client := quoted(t)
 	for named, expected := range map[string]struct {
-		enquiry quoting.Enquiry
+		enquiry quote.Enquiry
 		code    grpc.Code
 	}{
 		"no route": {
-			enquiry: quoting.Enquiry{Origin: "Kiel", Destination: "Lima", Kilos: 10},
+			enquiry: quote.Enquiry{Origin: "Kiel", Destination: "Lima", Kilos: 10},
 			code:    grpc.NotFound,
 		},
 		"too heavy": {
-			enquiry: quoting.Enquiry{Origin: "Kiel", Destination: "Hamburg", Kilos: 30000},
+			enquiry: quote.Enquiry{Origin: "Kiel", Destination: "Hamburg", Kilos: 30000},
 			code:    grpc.FailedPrecondition,
 		},
 	} {
-		exit := ranCall(t, grpc.Ask[effect.Unit](client, quoting.Quote, expected.enquiry))
+		exit := ranCall(t, grpc.Ask[effect.Unit](client, quote.Quote, expected.enquiry))
 		cause, failed := exit.Cause()
 		if !failed {
 			t.Errorf("%s: expected a refusal, got %+v", named, exit)
@@ -143,8 +143,8 @@ func TestARequestTheDescriptionRefusesNeverReachesTheHandler(t *testing.T) {
 	// happens on the caller's side, before anything is sent, because the caller
 	// holds the same description.
 	client := quoted(t)
-	exit := ranCall(t, grpc.Ask[effect.Unit](client, quoting.Quote,
-		quoting.Enquiry{Origin: "Kiel", Destination: "Hamburg", Kilos: 0}))
+	exit := ranCall(t, grpc.Ask[effect.Unit](client, quote.Quote,
+		quote.Enquiry{Origin: "Kiel", Destination: "Hamburg", Kilos: 0}))
 
 	cause, failed := exit.Cause()
 	if !failed {
@@ -177,7 +177,7 @@ func TestTheServerRefusesARequestItsOwnDescriptionRejects(t *testing.T) {
 		0x12, 0x07, 'H', 'a', 'm', 'b', 'u', 'r', 'g', // field 2: destination
 	}
 
-	answer, failure := client.Call(context.Background(), quoting.Quote.Path(), sent)
+	answer, failure := client.Call(context.Background(), quote.Quote.Path(), sent)
 	if failure == nil {
 		t.Fatalf("expected the server to refuse it, got %d bytes", len(answer))
 	}
@@ -190,7 +190,7 @@ func TestTheServerRefusesARequestItsOwnDescriptionRejects(t *testing.T) {
 	}
 	// And the procedure named, because a caller talking to twelve of them
 	// needs to know which refused.
-	if !strings.Contains(failure.Message, quoting.Quote.Path()) {
+	if !strings.Contains(failure.Message, quote.Quote.Path()) {
 		t.Errorf("expected the procedure named, got %q", failure.Message)
 	}
 }

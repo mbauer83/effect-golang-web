@@ -44,7 +44,7 @@ func TestAnUndecodedDeliveryCanStillBeAcknowledged(t *testing.T) {
 	if err != nil || string(body) != "one" {
 		t.Fatalf("unexpected read: %q %v", body, err)
 	}
-	if accepted := broker.Accepted(); len(accepted) != 1 ||
+	if accepted := broker.Acks(); len(accepted) != 1 ||
 		accepted[0] != arrived[0].Delivery.Tag {
 		t.Fatalf("expected the delivery accepted, got %v", accepted)
 	}

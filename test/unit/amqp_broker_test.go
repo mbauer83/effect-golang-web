@@ -38,7 +38,7 @@ func TestTheBrokerRefusesWhatHasNotBeenDeclared(t *testing.T) {
 	// would still pass with the rule removed.
 	broker := inprocess.NewBroker()
 	declared := amqp091.Declare[effect.Unit](broker, amqp091.Topology{
-		Exchanges: []amqp091.Exchange{{Name: "known", Routing: amqp091.Direct}},
+		Exchanges: []amqp091.Exchange{{Name: "known", Kind: amqp091.Direct}},
 		Queues:    []amqp091.Queue{{Name: "known"}},
 	})
 	if exit := ran(t, declared); !exit.IsSuccess() {
@@ -117,8 +117,8 @@ func TestFanoutReachesEveryBoundQueueAndDirectOnlyTheMatchingOne(t *testing.T) {
 	broker := inprocess.NewBroker()
 	topology := amqp091.Topology{
 		Exchanges: []amqp091.Exchange{
-			{Name: "everywhere", Routing: amqp091.Fanout},
-			{Name: "somewhere", Routing: amqp091.Direct},
+			{Name: "everywhere", Kind: amqp091.Fanout},
+			{Name: "somewhere", Kind: amqp091.Direct},
 		},
 		Queues: []amqp091.Queue{{Name: "first"}, {Name: "second"}},
 		Bindings: []amqp091.Binding{
@@ -164,7 +164,7 @@ func TestTheBrokerSaysWhatItDoesNotImplement(t *testing.T) {
 	// be a real one. What it must not do is answer differently and quietly.
 	broker := inprocess.NewBroker()
 	program := amqp091.DeclareExchange[effect.Unit](broker,
-		amqp091.Exchange{Name: "patterned", Routing: amqp091.Topic}).
+		amqp091.Exchange{Name: "patterned", Kind: amqp091.Topic}).
 		FlatMap(func(effect.Unit) queueing[effect.Unit] {
 			return amqp091.DeclareQueue[effect.Unit](broker, amqp091.Queue{Name: "matched"})
 		}).

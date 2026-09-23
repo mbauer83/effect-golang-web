@@ -33,7 +33,7 @@ func StatusFor(fault Fault) web.Response {
 
 ## The request
 
-`Request` wraps `*http.Request`, so nothing is lost and `Underlying()` always
+`Request` wraps `*http.Request`, so nothing is lost and `Source()` always
 reaches the original. What it adds is the path captures a route matched, which
 `http.Request` has no place for. `WithCaptures` returns a new request rather
 than altering the one it was given.
@@ -416,8 +416,8 @@ vocabulary has its traffic lumped in with everything undeclared.
 surface = surface.WithPhaseSpans().WithMiddleware(observing)
 ```
 
-`WithPhaseSpans` makes every route span its own phases: `web.PhaseDecoding`,
-`web.PhaseHandling`, `web.PhaseEncoding`. Decoding and encoding are the route's
+`WithPhaseSpans` makes every route span its own phases: `web.PhaseDecode`,
+`web.PhaseHandle`, `web.PhaseEncode`. Decoding and encoding are the route's
 work as much as the handler is — a large document to unmarshal is real time —
 and one bar for all three cannot say which of them a slow request spent it in.
 

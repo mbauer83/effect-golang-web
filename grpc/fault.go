@@ -15,14 +15,14 @@ type Fault struct {
 }
 
 func (fault Fault) Error() string {
-	rendered := "grpc: " + fault.Op
+	message := "grpc: " + fault.Op
 	if fault.Procedure != "" {
-		rendered += " [" + fault.Procedure + "]"
+		message += " [" + fault.Procedure + "]"
 	}
 	if fault.Err != nil {
-		rendered += ": " + fault.Err.Error()
+		message += ": " + fault.Err.Error()
 	}
-	return rendered
+	return message
 }
 
 // Unwrap keeps errors.Is and errors.As working through the boundary.

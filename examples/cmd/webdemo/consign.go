@@ -66,13 +66,13 @@ func runConsign(runtime *effect.Runtime) {
 	})
 
 	exit := runtime.Run(context.Background(), effect.Unit{}, program)
-	collected, succeeded := exit.Value()
+	shipments, succeeded := exit.Value()
 	if !succeeded {
 		fail(fmt.Errorf("consign: %v", exit))
 	}
 
 	fmt.Printf("consign: collected %d, accepted %d, rejected %d, given back %d\n",
-		len(collected), len(broker.Accepted()), len(broker.Rejected()), len(broker.Modified()))
+		len(shipments), len(broker.Accepted()), len(broker.Rejected()), len(broker.Modified()))
 	for _, rejection := range broker.Rejected() {
 		fmt.Printf("  rejected: %s\n", rejection.Reason)
 	}

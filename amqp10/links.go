@@ -25,11 +25,11 @@ type senderLink struct {
 func (link *senderLink) Address() string { return link.address }
 
 func (link *senderLink) Send(ctx context.Context, message Message) error {
-	sent, err := brokerMessage(message)
+	native, err := brokerMessage(message)
 	if err != nil {
 		return err
 	}
-	return link.sender.Send(ctx, sent, nil)
+	return link.sender.Send(ctx, native, nil)
 }
 
 func (link *senderLink) Close(ctx context.Context) error {
@@ -63,8 +63,8 @@ func (link *receiverLink) Address() string { return link.address }
 func (link *receiverLink) Receive(ctx context.Context) (Delivery, bool, error) {
 	message, err := link.receiver.Receive(ctx, nil)
 	if err != nil {
-		var detached *broker.LinkError
-		if errors.As(err, &detached) {
+		var linkError *broker.LinkError
+		if errors.As(err, &linkError) {
 			return Delivery{}, false, nil
 		}
 		return Delivery{}, false, err

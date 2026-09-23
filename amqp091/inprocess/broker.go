@@ -19,7 +19,7 @@ type Broker struct {
 	queues    map[string]*queue
 	bindings  []amqp091.Binding
 	tag       uint64
-	settled   settlements
+	outcomes  settlements
 }
 
 // queue is one place messages wait.
@@ -49,9 +49,9 @@ func (queue *queue) offer(delivery amqp091.Delivery) error {
 
 // settlements is what the consumers decided, in the order they decided it.
 type settlements struct {
-	accepted  []uint64
-	discarded []uint64
-	requeued  []uint64
+	acks     []uint64
+	discards []uint64
+	requeues []uint64
 }
 
 // NewBroker makes an empty broker.
@@ -62,21 +62,21 @@ func NewBroker() *Broker {
 	}
 }
 
-// Accepted, Discarded and Requeued are the delivery tags the consumers settled
+// Acks, Discards and Requeues are the delivery tags the consumers settled
 // each way. They are what a test asks about, because acknowledgement is the
 // decision the caller makes and a library should not.
-func (broker *Broker) Accepted() []uint64 {
-	return broker.tagsOf(func(settled settlements) []uint64 { return settled.accepted })
+func (broker *Broker) Acks() []uint64 {
+	return broker.tagsOf(func(outcomes settlements) []uint64 { return outcomes.acks })
 }
 
-// Discarded is the tags rejected without return.
-func (broker *Broker) Discarded() []uint64 {
-	return broker.tagsOf(func(settled settlements) []uint64 { return settled.discarded })
+// Discards is the tags rejected without return.
+func (broker *Broker) Discards() []uint64 {
+	return broker.tagsOf(func(outcomes settlements) []uint64 { return outcomes.discards })
 }
 
-// Requeued is the tags asked for again.
-func (broker *Broker) Requeued() []uint64 {
-	return broker.tagsOf(func(settled settlements) []uint64 { return settled.requeued })
+// Requeues is the tags asked for again.
+func (broker *Broker) Requeues() []uint64 {
+	return broker.tagsOf(func(outcomes settlements) []uint64 { return outcomes.requeues })
 }
 
 // Depth is how many messages a queue is holding that nobody has taken.
@@ -93,13 +93,13 @@ func (broker *Broker) Depth(name string) int {
 func (broker *Broker) tagsOf(which func(settlements) []uint64) []uint64 {
 	broker.mutex.Lock()
 	defer broker.mutex.Unlock()
-	return append([]uint64(nil), which(broker.settled)...)
+	return append([]uint64(nil), which(broker.outcomes)...)
 }
 
-// queueNamed is the queue of that name, or the refusal that there is none.
+// findQueue is the queue of that name, or the refusal that there is none.
 // Declaring first is the broker's rule, not this package's: a real one refuses
 // a binding or a consumer on a queue it does not hold.
-func (broker *Broker) queueNamed(name string) (*queue, error) {
+func (broker *Broker) findQueue(name string) (*queue, error) {
 	queue, known := broker.queues[name]
 	if !known {
 		return nil, errNoSuchQueue

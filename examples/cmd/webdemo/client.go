@@ -26,10 +26,10 @@ type callEffect[A any] = effect.Effect[effect.Unit, web.Fault, A]
 // server is serving, and then asks for one that is not there.
 func runClient(runtime *effect.Runtime, base string) {
 	client := web.Dial(http.DefaultClient, base)
-	added := bookstore.Book{Title: "Called", Authors: []string{"A Client"}, Pages: 12}
+	sample := bookstore.Book{Title: "Called", Authors: []string{"A Client"}, Pages: 12}
 
 	program := effect.Gen(func(do *effect.Do[effect.Unit, web.Fault]) bookstore.Book {
-		request, err := web.WithEntity(web.ClientRequest{}, bookstore.BookSchema, added)
+		request, err := web.WithEntity(web.ClientRequest{}, bookstore.BookSchema, sample)
 		if err != nil {
 			do.Await(effect.Fail[effect.Unit, bookstore.Book](
 				web.Fault{Op: "encoding the book", Err: err}))
@@ -38,7 +38,7 @@ func runClient(runtime *effect.Runtime, base string) {
 		// The title fills the endpoint's captured segment by name, so the path
 		// is built from the declaration rather than pasted together here.
 		return do.Await(web.Call[effect.Unit](client, bookstore.FindBook,
-			web.ClientRequest{Path: map[string]string{"title": added.Title}}))
+			web.ClientRequest{Path: map[string]string{"title": sample.Title}}))
 	})
 
 	book, ok := runtime.Run(context.Background(), effect.Unit{}, program).Value()
@@ -50,9 +50,9 @@ func runClient(runtime *effect.Runtime, base string) {
 
 	// A status the endpoint did not declare arrives as a Refusal, which
 	// carries what the server said about it.
-	missing := web.Call[effect.Unit](client, bookstore.FindBook,
+	lookup := web.Call[effect.Unit](client, bookstore.FindBook,
 		web.ClientRequest{Path: map[string]string{"title": "Missing"}})
-	if fault, refused := runtime.Run(context.Background(), effect.Unit{}, missing).Cause(); refused {
+	if fault, refused := runtime.Run(context.Background(), effect.Unit{}, lookup).Cause(); refused {
 		if failure, is := fault.Failure(); is {
 			fmt.Printf("calling: asking for one that is not there -- %v\n", failure.Err)
 		}

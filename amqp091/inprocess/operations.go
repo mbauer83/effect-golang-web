@@ -53,7 +53,7 @@ func (broker *Broker) queuesFor(
 	}
 	placements := make([]placement, 0, len(names))
 	for _, name := range names {
-		queue, err := broker.queueNamed(name)
+		queue, err := broker.findQueue(name)
 		if err != nil {
 			return nil, err
 		}
@@ -82,7 +82,7 @@ func (broker *Broker) routeTargets(target amqp091.Target) ([]string, error) {
 	if !known {
 		return nil, errNoSuchExchange
 	}
-	if exchange.Routing != amqp091.Direct && exchange.Routing != amqp091.Fanout {
+	if exchange.Kind != amqp091.Direct && exchange.Kind != amqp091.Fanout {
 		return nil, errNotRoutable
 	}
 
@@ -91,7 +91,7 @@ func (broker *Broker) routeTargets(target amqp091.Target) ([]string, error) {
 		if binding.Exchange != target.Exchange {
 			continue
 		}
-		if exchange.Routing == amqp091.Fanout || binding.Key == target.Key {
+		if exchange.Kind == amqp091.Fanout || binding.Key == target.Key {
 			queues = append(queues, binding.Queue)
 		}
 	}
@@ -103,7 +103,7 @@ func (broker *Broker) Consume(_ context.Context, name string) (amqp091.Deliverie
 	broker.mutex.Lock()
 	defer broker.mutex.Unlock()
 
-	queue, err := broker.queueNamed(name)
+	queue, err := broker.findQueue(name)
 	if err != nil {
 		return nil, err
 	}
@@ -123,13 +123,13 @@ func (broker *Broker) DeclareExchange(_ context.Context, exchange amqp091.Exchan
 // Declaring one that is already there leaves it as it is, which is the
 // idempotence a real broker gives a program that declares its topology at every
 // start-up.
-func (broker *Broker) DeclareQueue(_ context.Context, declared amqp091.Queue) error {
+func (broker *Broker) DeclareQueue(_ context.Context, declaration amqp091.Queue) error {
 	broker.mutex.Lock()
 	defer broker.mutex.Unlock()
-	if _, already := broker.queues[declared.Name]; already {
+	if _, already := broker.queues[declaration.Name]; already {
 		return nil
 	}
-	broker.queues[declared.Name] = &queue{
+	broker.queues[declaration.Name] = &queue{
 		// Bounded, because an unbounded one would let a test that published in
 		// a loop grow until the box noticed rather than until the test failed.
 		backlog:   make(chan amqp091.Delivery, 1024),
@@ -145,7 +145,7 @@ func (broker *Broker) Bind(_ context.Context, binding amqp091.Binding) error {
 	if _, known := broker.exchanges[binding.Exchange]; !known {
 		return errNoSuchExchange
 	}
-	if _, err := broker.queueNamed(binding.Queue); err != nil {
+	if _, err := broker.findQueue(binding.Queue); err != nil {
 		return err
 	}
 	broker.bindings = append(broker.bindings, binding)

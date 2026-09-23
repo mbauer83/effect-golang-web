@@ -105,12 +105,12 @@ const (
 	Durable
 )
 
-// Routing is how an exchange decides where a message goes.
-type Routing uint8
+// ExchangeKind is how an exchange decides where a message goes.
+type ExchangeKind uint8
 
 const (
 	// Direct routes to the queues bound by exactly this key.
-	Direct Routing = iota
+	Direct ExchangeKind = iota
 	// Topic routes by pattern, where * is one word and # is any number.
 	Topic
 	// Fanout routes to every bound queue and ignores the key.
@@ -122,7 +122,7 @@ const (
 // Exchange is a place messages are published to.
 type Exchange struct {
 	Name       string
-	Routing    Routing
+	Kind       ExchangeKind
 	Durability Durability
 }
 

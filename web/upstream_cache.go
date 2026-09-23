@@ -60,11 +60,11 @@ func writeCache[R any](
 	key string,
 	about string,
 ) func(ClientResponse) effect.Effect[R, Fault, ClientResponse] {
-	return func(received ClientResponse) effect.Effect[R, Fault, ClientResponse] {
-		if !received.IsSuccessful() {
-			return effect.Succeed[R, Fault](received)
+	return func(response ClientResponse) effect.Effect[R, Fault, ClientResponse] {
+		if !response.IsSuccessful() {
+			return effect.Succeed[R, Fault](response)
 		}
-		entity, err := marshalResponse(received)
+		entity, err := marshalResponse(response)
 		if err != nil {
 			return effect.Fail[R, ClientResponse](asFault("keeping the answer", err))
 		}
@@ -72,8 +72,8 @@ func writeCache[R any](
 			Key: key, About: about, Entity: entity, Fresh: upstream.terms.TimeToLive,
 		}).CatchAll(logCacheFault[R, effect.Unit]("keeping", key))
 		return effect.Fold(writeEntry,
-			func(effect.Cause[cache.Fault]) ClientResponse { return received },
-			func(effect.Unit) ClientResponse { return received },
+			func(effect.Cause[cache.Fault]) ClientResponse { return response },
+			func(effect.Unit) ClientResponse { return response },
 		).MapError(func(effect.Never) Fault { return Fault{} })
 	}
 }
@@ -97,19 +97,19 @@ func logCacheFault[R, A any](op string, key string) func(cache.Fault) effect.Eff
 // headers and a body, and is read back by the same standard library that wrote
 // it. Keeping only the entity would lose the content type, and inventing a
 // format to keep all three would be inventing one that already exists.
-func marshalResponse(received ClientResponse) ([]byte, error) {
-	response := http.Response{
-		Status:        http.StatusText(received.Status),
-		StatusCode:    received.Status,
+func marshalResponse(response ClientResponse) ([]byte, error) {
+	httpResponse := http.Response{
+		Status:        http.StatusText(response.Status),
+		StatusCode:    response.Status,
 		Proto:         "HTTP/1.1",
 		ProtoMajor:    1,
 		ProtoMinor:    1,
-		Header:        received.Header,
-		Body:          io.NopCloser(bytes.NewReader(received.Entity)),
-		ContentLength: int64(len(received.Entity)),
+		Header:        response.Header,
+		Body:          io.NopCloser(bytes.NewReader(response.Entity)),
+		ContentLength: int64(len(response.Entity)),
 	}
 	buffer := bytes.Buffer{}
-	if err := response.Write(&buffer); err != nil {
+	if err := httpResponse.Write(&buffer); err != nil {
 		return nil, err
 	}
 	return buffer.Bytes(), nil

@@ -68,7 +68,7 @@ func (store *Store) All() storeEffect[[]Book] {
 // rather than as an error a caller has to interrogate; nothing here knows it
 // will become a status.
 func (store *Store) Add(book Book) storeEffect[effect.Unit] {
-	added := effect.Modify[effect.Unit](store.books, func(books []Book) ([]Book, bool) {
+	insertion := effect.Modify[effect.Unit](store.books, func(books []Book) ([]Book, bool) {
 		if slices.ContainsFunc(books, sameTitle(book.Title)) {
 			return books, false
 		}
@@ -80,7 +80,7 @@ func (store *Store) Add(book Book) storeEffect[effect.Unit] {
 	// anything else, because awaiting one abandons the body, which is what a
 	// refusal means.
 	return effect.Gen(func(do *storeDo) effect.Unit {
-		if do.Await(widenFault(added)) {
+		if do.Await(widenFault(insertion)) {
 			return effect.Unit{}
 		}
 		do.Await(effect.For[effect.Unit, Fault]().Fail[effect.Unit](Fault{

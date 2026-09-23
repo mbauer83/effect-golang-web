@@ -157,11 +157,11 @@ func (document Document) writeComponents(encoder *jsontext.Encoder) error {
 // is one renderer for a shape and this one never has to know what a shape can
 // contain.
 func writeSchema(encoder *jsontext.Encoder, node jsonschema.Node) error {
-	rendered, err := node.Render()
+	value, err := node.Render()
 	if err != nil {
 		return err
 	}
-	return encoder.WriteValue(rendered)
+	return encoder.WriteValue(value)
 }
 
 func componentNames(components map[string]jsonschema.Node) []string {

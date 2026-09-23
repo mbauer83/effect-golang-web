@@ -83,10 +83,10 @@ func TestAnOrderPlacedIsShippedAndAccepted(t *testing.T) {
 	}
 	// Accepted, so the broker may forget them. That is the assertion a real
 	// broker could not answer.
-	if accepted := broker.Accepted(); len(accepted) != 2 {
+	if accepted := broker.Acks(); len(accepted) != 2 {
 		t.Fatalf("expected both accepted, got %v", accepted)
 	}
-	if requeued := broker.Requeued(); len(requeued) != 0 {
+	if requeued := broker.Requeues(); len(requeued) != 0 {
 		t.Fatalf("expected nothing sent back, got %v", requeued)
 	}
 }
@@ -114,10 +114,10 @@ func TestAMessageTheSchemaRefusesIsDiscardedAndTheNextOneIsRead(t *testing.T) {
 	if len(shipped) != 1 || shipped[0] != placed[0] {
 		t.Fatalf("expected the readable order shipped, got %#v", shipped)
 	}
-	if discarded := broker.Discarded(); len(discarded) != 1 {
+	if discarded := broker.Discards(); len(discarded) != 1 {
 		t.Fatalf("expected the unreadable message discarded, got %v", discarded)
 	}
-	if accepted := broker.Accepted(); len(accepted) != 1 {
+	if accepted := broker.Acks(); len(accepted) != 1 {
 		t.Fatalf("expected only the readable one accepted, got %v", accepted)
 	}
 }
@@ -155,10 +155,10 @@ func TestAnOrderThePackingRefusesComesBackAndIsShippedWhenItCan(t *testing.T) {
 	if len(shipped) != 1 || shipped[0] != placed[0] {
 		t.Fatalf("expected the order shipped on the third attempt, got %#v", shipped)
 	}
-	if requeued := broker.Requeued(); len(requeued) != 2 {
+	if requeued := broker.Requeues(); len(requeued) != 2 {
 		t.Fatalf("expected two refusals sent back, got %v", requeued)
 	}
-	if accepted := broker.Accepted(); len(accepted) != 1 {
+	if accepted := broker.Acks(); len(accepted) != 1 {
 		t.Fatalf("expected one acceptance, got %v", accepted)
 	}
 	// Nothing left waiting: the order was taken, sent back twice, and settled.

@@ -39,8 +39,8 @@ func (subscription *subscription) Next(ctx context.Context) (amqp091.Delivery, b
 
 // Ack accepts a delivery, so the broker may forget it.
 func (subscription *subscription) Ack(tag uint64) error {
-	return subscription.settle(tag, func(settled *settlements, _ amqp091.Delivery) {
-		settled.accepted = append(settled.accepted, tag)
+	return subscription.settle(tag, func(outcomes *settlements, _ amqp091.Delivery) {
+		outcomes.acks = append(outcomes.acks, tag)
 	})
 }
 
@@ -48,8 +48,8 @@ func (subscription *subscription) Ack(tag uint64) error {
 // here, so the message is gone -- which is what a queue with no dead-letter
 // configuration does.
 func (subscription *subscription) Discard(tag uint64) error {
-	return subscription.settle(tag, func(settled *settlements, _ amqp091.Delivery) {
-		settled.discarded = append(settled.discarded, tag)
+	return subscription.settle(tag, func(outcomes *settlements, _ amqp091.Delivery) {
+		outcomes.discards = append(outcomes.discards, tag)
 	})
 }
 
@@ -61,8 +61,8 @@ func (subscription *subscription) Discard(tag uint64) error {
 // does not promise.
 func (subscription *subscription) Requeue(tag uint64) error {
 	var again amqp091.Delivery
-	err := subscription.settle(tag, func(settled *settlements, delivery amqp091.Delivery) {
-		settled.requeued = append(settled.requeued, tag)
+	err := subscription.settle(tag, func(outcomes *settlements, delivery amqp091.Delivery) {
+		outcomes.requeues = append(outcomes.requeues, tag)
 		delivery.Redelivered = true
 		again = delivery
 	})
@@ -93,6 +93,6 @@ func (subscription *subscription) settle(
 		return errUnknownTag
 	}
 	delete(subscription.queue.unsettled, tag)
-	decide(&subscription.broker.settled, delivery)
+	decide(&subscription.broker.outcomes, delivery)
 	return nil
 }

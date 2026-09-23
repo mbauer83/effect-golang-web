@@ -63,11 +63,11 @@ func runBookstore(runtime *effect.Runtime) {
 		fail(err)
 	}
 
-	serving, stop := context.WithCancel(context.Background())
+	serverCtx, stop := context.WithCancel(context.Background())
 	stopped := make(chan struct{})
 	go func() {
 		defer close(stopped)
-		runtime.Run(serving, effect.Unit{}, bookstore.Serve(listener, boundary, surface))
+		runtime.Run(serverCtx, effect.Unit{}, bookstore.Serve(listener, boundary, surface))
 	}()
 
 	base := "http://" + listener.Addr().String()
@@ -118,10 +118,10 @@ func report(what string, response *http.Response) {
 }
 
 func reportShutdown(runtime *effect.Runtime) {
-	remaining := runtime.LiveWork()
+	work := runtime.LiveWork()
 	cleanup := runtime.Close(context.Background())
 	fmt.Printf("shutdown: %d fibers and %d resources still owned at Close\n",
-		remaining.Fibers, remaining.Resources)
+		work.Fibers, work.Resources)
 	if !cleanup.IsEmpty() {
 		fmt.Printf("shutdown cleanup: %s\n", cleanup)
 	}

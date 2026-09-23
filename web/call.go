@@ -65,8 +65,8 @@ func Call[R, In, Out any](
 		return effect.Fail[R, Out](asFault("building the path", err))
 	}
 	return Fetch[R](client, endpoint.method, path, request).
-		FlatMap(func(received ClientResponse) effect.Effect[R, Fault, Out] {
-			return decodeResponse[R](endpoint.output, received, endpoint.method+" "+path)
+		FlatMap(func(response ClientResponse) effect.Effect[R, Fault, Out] {
+			return decodeResponse[R](endpoint.output, response, endpoint.method+" "+path)
 		})
 }
 
@@ -74,17 +74,17 @@ func Call[R, In, Out any](
 // instead.
 func decodeResponse[R, Out any](
 	output Output[Out],
-	received ClientResponse,
+	response ClientResponse,
 	target string,
 ) effect.Effect[R, Fault, Out] {
 	operations := effect.For[R, Fault]()
-	if received.Status != output.status {
+	if response.Status != output.status {
 		return operations.Fail[Out](Fault{
 			Op:  "calling " + target,
-			Err: Refusal{Status: received.Status, Entity: received.Entity},
+			Err: Refusal{Status: response.Status, Entity: response.Entity},
 		})
 	}
-	value, err := output.decode(received.Entity)
+	value, err := output.decode(response.Entity)
 	if err != nil {
 		return operations.Fail[Out](Fault{Op: "reading the response body", Err: err})
 	}
@@ -101,10 +101,10 @@ func fillPattern(segments []segment, captures map[string]string) (string, error)
 	if len(segments) == 0 {
 		return "", errUnpatternedEndpoint
 	}
-	written := make([]string, 0, len(segments))
+	parts := make([]string, 0, len(segments))
 	for _, part := range segments {
 		if part.kind == literalSegment {
-			written = append(written, part.text)
+			parts = append(parts, part.text)
 			continue
 		}
 		value, given := captures[part.text]
@@ -112,9 +112,9 @@ func fillPattern(segments []segment, captures map[string]string) (string, error)
 			return "", errors.New("the path captures " + part.text +
 				" and nothing was given for it")
 		}
-		written = append(written, value)
+		parts = append(parts, value)
 	}
-	return "/" + strings.Join(written, "/"), nil
+	return "/" + strings.Join(parts, "/"), nil
 }
 
 var errUnpatternedEndpoint = errors.New("the endpoint has no path")

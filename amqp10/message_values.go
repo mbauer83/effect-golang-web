@@ -19,19 +19,19 @@ func brokerMessage(message Message) (*broker.Message, error) {
 		return nil, err
 	}
 
-	sent := broker.NewMessage(message.Body)
-	sent.ApplicationProperties = properties
-	sent.Header = &broker.MessageHeader{Durable: message.Durability == Durable}
+	native := broker.NewMessage(message.Body)
+	native.ApplicationProperties = properties
+	native.Header = &broker.MessageHeader{Durable: message.Durability == Durable}
 	if message.ContentType != "" || message.Subject != "" {
-		sent.Properties = &broker.MessageProperties{}
+		native.Properties = &broker.MessageProperties{}
 		if message.ContentType != "" {
-			sent.Properties.ContentType = &message.ContentType
+			native.Properties.ContentType = &message.ContentType
 		}
 		if message.Subject != "" {
-			sent.Properties.Subject = &message.Subject
+			native.Properties.Subject = &message.Subject
 		}
 	}
-	return sent, nil
+	return native, nil
 }
 
 // deliveryOf is what arrived, in the universal representation.

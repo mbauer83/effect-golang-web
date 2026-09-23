@@ -161,5 +161,5 @@ the schema layer and skip everything the transport does. Instead:
   a caller that does not hold the description, and which the typed client's own
   refusal was hiding.
 
-[`examples/quoting`](../../examples/quoting/quoting.go) is the service. Nothing
+[`examples/quote`](../../examples/quote/quote.go) is the service. Nothing
 in it imports Connect.

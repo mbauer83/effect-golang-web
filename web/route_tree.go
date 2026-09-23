@@ -36,7 +36,7 @@ type resolution[R, E any] struct {
 	handler  Handler[R, E]
 	found    bool
 	captures []binding
-	allowed  []string
+	methods  []string
 }
 
 func newTreeNode[R, E any]() *treeNode[R, E] {
@@ -57,8 +57,8 @@ func (node *treeNode[R, E]) insert(
 	pattern string,
 ) error {
 	if len(segments) == 0 {
-		if existing, taken := node.patterns[method]; taken {
-			return errors.New(method + " " + existing + " and " + method + " " + pattern +
+		if prior, taken := node.patterns[method]; taken {
+			return errors.New(method + " " + prior + " and " + method + " " + pattern +
 				" could match the same request")
 		}
 		node.handlers[method] = handler
@@ -84,13 +84,13 @@ func (node *treeNode[R, E]) childFor(part segment, pattern string) (*treeNode[R,
 		}
 		return node.literals[part.text], nil
 	case captureSegment:
-		return namedChild(&node.capture, part.text, pattern)
+		return claimSlot(&node.capture, part.text, pattern)
 	default:
-		return namedChild(&node.wildcard, part.text, pattern)
+		return claimSlot(&node.wildcard, part.text, pattern)
 	}
 }
 
-func namedChild[R, E any](slot **treeNode[R, E], name string, pattern string) (*treeNode[R, E], error) {
+func claimSlot[R, E any](slot **treeNode[R, E], name string, pattern string) (*treeNode[R, E], error) {
 	if *slot == nil {
 		*slot = newTreeNode[R, E]()
 		(*slot).name = name
@@ -106,46 +106,46 @@ func namedChild[R, E any](slot **treeNode[R, E], name string, pattern string) (*
 // resolve walks the remaining path. It tries the branches in order of
 // specificity and keeps looking after a branch that matched the path but not
 // the method, because a less specific branch may serve the method.
-func (node *treeNode[R, E]) resolve(path []string, method string, bound []binding) resolution[R, E] {
+func (node *treeNode[R, E]) resolve(path []string, method string, bindings []binding) resolution[R, E] {
 	if len(path) == 0 {
-		return node.here(method, bound)
+		return node.here(method, bindings)
 	}
 
-	allowed := []string{}
+	methods := []string{}
 	if literal, present := node.literals[path[0]]; present {
-		found := literal.resolve(path[1:], method, bound)
-		if found.found {
-			return found
+		match := literal.resolve(path[1:], method, bindings)
+		if match.found {
+			return match
 		}
-		allowed = append(allowed, found.allowed...)
+		methods = append(methods, match.methods...)
 	}
 	if node.capture != nil {
-		found := node.capture.resolve(path[1:], method, bind(bound, node.capture.name, path[0]))
-		if found.found {
-			return found
+		match := node.capture.resolve(path[1:], method, bind(bindings, node.capture.name, path[0]))
+		if match.found {
+			return match
 		}
-		allowed = append(allowed, found.allowed...)
+		methods = append(methods, match.methods...)
 	}
 	if node.wildcard != nil {
-		found := node.wildcard.here(method, bind(bound, node.wildcard.name, strings.Join(path, "/")))
-		if found.found {
-			return found
+		match := node.wildcard.here(method, bind(bindings, node.wildcard.name, strings.Join(path, "/")))
+		if match.found {
+			return match
 		}
-		allowed = append(allowed, found.allowed...)
+		methods = append(methods, match.methods...)
 	}
-	return resolution[R, E]{allowed: allowed}
+	return resolution[R, E]{methods: methods}
 }
 
 // here answers for a path that ends at this node.
-func (node *treeNode[R, E]) here(method string, bound []binding) resolution[R, E] {
+func (node *treeNode[R, E]) here(method string, bindings []binding) resolution[R, E] {
 	if handler, served := node.handlers[method]; served {
-		return resolution[R, E]{handler: handler, found: true, captures: bound}
+		return resolution[R, E]{handler: handler, found: true, captures: bindings}
 	}
-	allowed := make([]string, 0, len(node.handlers))
-	for known := range node.handlers {
-		allowed = append(allowed, known)
+	methods := make([]string, 0, len(node.handlers))
+	for key := range node.handlers {
+		methods = append(methods, key)
 	}
-	return resolution[R, E]{allowed: allowed}
+	return resolution[R, E]{methods: methods}
 }
 
 // bind appends a capture.
@@ -155,12 +155,12 @@ func (node *treeNode[R, E]) here(method string, bound []binding) resolution[R, E
 // every branch appends at its own level's length, and the walk returns the
 // moment one branch succeeds. Copying here would be defensive against something
 // that cannot happen, so it does not.
-func bind(bound []binding, name string, value string) []binding {
-	return append(bound, binding{name: name, value: value})
+func bind(bindings []binding, name string, value string) []binding {
+	return append(bindings, binding{name: name, value: value})
 }
 
-// boundParameters turns the bindings into what a request carries.
-func boundParameters(bindings []binding) map[string]string {
+// captureValues turns the bindings into what a request carries.
+func captureValues(bindings []binding) map[string]string {
 	if len(bindings) == 0 {
 		return nil
 	}

@@ -15,30 +15,30 @@ import (
 
 // Accept says the message is done.
 func (link *receiver) Accept(_ context.Context, tag string) error {
-	return link.settle(tag, func(settled *settlements, _ amqp10.Delivery) {
-		settled.accepted = append(settled.accepted, tag)
+	return link.settle(tag, func(outcomes *settlements, _ amqp10.Delivery) {
+		outcomes.accepted = append(outcomes.accepted, tag)
 	})
 }
 
 // Reject says the message will never be processed, and keeps the reason.
 func (link *receiver) Reject(_ context.Context, tag string, reason string) error {
-	return link.settle(tag, func(settled *settlements, _ amqp10.Delivery) {
-		settled.rejected = append(settled.rejected, Rejection{Tag: tag, Reason: reason})
+	return link.settle(tag, func(outcomes *settlements, _ amqp10.Delivery) {
+		outcomes.rejected = append(outcomes.rejected, Rejection{Tag: tag, Reason: reason})
 	})
 }
 
 // Release gives the message back unchanged.
 func (link *receiver) Release(_ context.Context, tag string) error {
-	return link.settle(tag, func(settled *settlements, delivery amqp10.Delivery) {
-		settled.released = append(settled.released, tag)
+	return link.settle(tag, func(outcomes *settlements, delivery amqp10.Delivery) {
+		outcomes.released = append(outcomes.released, tag)
 		link.redeliver(delivery)
 	})
 }
 
 // Modify gives the message back with something said about it, and records what.
 func (link *receiver) Modify(_ context.Context, tag string, change amqp10.Change) error {
-	return link.settle(tag, func(settled *settlements, delivery amqp10.Delivery) {
-		settled.modified = append(settled.modified, Modification{Tag: tag, Change: change})
+	return link.settle(tag, func(outcomes *settlements, delivery amqp10.Delivery) {
+		outcomes.modified = append(outcomes.modified, Modification{Tag: tag, Change: change})
 		if change.UndeliverableHere {
 			// Undeliverable here: another receiver may have it, and there is
 			// only one node, so it goes back and this link will see it again.
@@ -84,6 +84,6 @@ func (link *receiver) settle(
 	}
 	link.broker.mutex.Lock()
 	defer link.broker.mutex.Unlock()
-	decide(&link.broker.settled, delivery)
+	decide(&link.broker.outcomes, delivery)
 	return nil
 }

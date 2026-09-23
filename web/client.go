@@ -156,11 +156,11 @@ func exchange(
 	}
 	defer func() { _ = response.Body.Close() }()
 
-	read, err := io.ReadAll(response.Body)
+	body, err := io.ReadAll(response.Body)
 	if err != nil {
 		return ClientResponse{}, err
 	}
-	return ClientResponse{Status: response.StatusCode, Header: response.Header, Entity: read}, nil
+	return ClientResponse{Status: response.StatusCode, Header: response.Header, Entity: body}, nil
 }
 
 // asFault keeps one Fault rather than wrapping a Fault in a Fault, so a caller

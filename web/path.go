@@ -41,18 +41,18 @@ func parsePattern(path string) ([]segment, error) {
 	captured := make(map[string]bool, len(parts))
 
 	for index, part := range parts {
-		parsed, err := parseSegment(part, index == len(parts)-1)
+		element, err := parseSegment(part, index == len(parts)-1)
 		if err != nil {
 			return nil, faultOf("reading the path "+path, err)
 		}
-		if parsed.kind != literalSegment {
-			if captured[parsed.text] {
+		if element.kind != literalSegment {
+			if captured[element.text] {
 				return nil, faultOf("reading the path "+path,
-					errors.New("two segments are captured as "+parsed.text))
+					errors.New("two segments are captured as "+element.text))
 			}
-			captured[parsed.text] = true
+			captured[element.text] = true
 		}
-		segments = append(segments, parsed)
+		segments = append(segments, element)
 	}
 	return segments, nil
 }
@@ -73,12 +73,12 @@ func parseSegment(part string, last bool) (segment, error) {
 		if !last {
 			return segment{}, errors.New("a wildcard captures the rest and so comes last: " + part)
 		}
-		return namedSegment(wildcardSegment, rest)
+		return newCapture(wildcardSegment, rest)
 	}
-	return namedSegment(captureSegment, name)
+	return newCapture(captureSegment, name)
 }
 
-func namedSegment(kind segmentKind, name string) (segment, error) {
+func newCapture(kind segmentKind, name string) (segment, error) {
 	if strings.TrimSpace(name) == "" {
 		return segment{}, errNamelessCapture
 	}
@@ -94,18 +94,18 @@ func pathSegments(path string) []string {
 // renderPattern writes a pattern back out, for the message a construction
 // mistake reports and for a published document.
 func renderPattern(segments []segment) string {
-	rendered := make([]string, 0, len(segments))
+	parts := make([]string, 0, len(segments))
 	for _, part := range segments {
 		switch part.kind {
 		case captureSegment:
-			rendered = append(rendered, "{"+part.text+"}")
+			parts = append(parts, "{"+part.text+"}")
 		case wildcardSegment:
-			rendered = append(rendered, "{"+part.text+"...}")
+			parts = append(parts, "{"+part.text+"...}")
 		default:
-			rendered = append(rendered, part.text)
+			parts = append(parts, part.text)
 		}
 	}
-	return "/" + strings.Join(rendered, "/")
+	return "/" + strings.Join(parts, "/")
 }
 
 var (

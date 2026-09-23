@@ -115,7 +115,7 @@ func propertiesOf(list dynamic.List) ([]any, error) {
 // acted on the properties it could see would be acting on half the message.
 func ReadProperties(raw map[string]any) (dynamic.Object, error) {
 	object := dynamic.Object{Fields: make([]dynamic.Field, 0, len(raw))}
-	for _, name := range sortedNames(raw) {
+	for _, name := range nameOrder(raw) {
 		value, err := propertyValue(raw[name])
 		if err != nil {
 			return dynamic.Object{}, fmt.Errorf("property %q: %w", name, err)
@@ -182,14 +182,14 @@ func elements(raw []any) (dynamic.Value, error) {
 	return list, nil
 }
 
-// sortedNames is the order the properties are read in.
+// nameOrder is the order the properties are read in.
 //
 // A property map has none of its own; the representation's Object has one,
 // because a description declares its members in an order. By name is the only
 // order available here, and a deterministic one matters: a consumer that
 // forwards the properties it received would otherwise send them differently
 // each time.
-func sortedNames(raw map[string]any) []string {
+func nameOrder(raw map[string]any) []string {
 	names := make([]string, 0, len(raw))
 	for name := range raw {
 		names = append(names, name)

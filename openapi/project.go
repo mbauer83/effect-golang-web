@@ -12,13 +12,13 @@ import (
 // becomes one component that all ten refer to -- which is the reason the schema
 // layer exposes its structure at all.
 func Describe(info Info, declarations []web.Declaration, servers ...Server) Document {
-	gathered := gather(declarations)
-	projected, components := jsonschema.ProjectAllWithPointer(ComponentPointer, gathered.nodes...)
-	shapes := &cursor{projected: projected}
+	inventory := gather(declarations)
+	schemas, components := jsonschema.ProjectAllWithPointer(ComponentPointer, inventory.nodes...)
+	shapes := &cursor{schemas: schemas}
 
 	document := Document{Info: info, Servers: servers, Components: components}
-	for _, declared := range gathered.declarations {
-		document.add(templatePath(declared.declaration.Path), operation(declared, shapes))
+	for _, endpoint := range inventory.declarations {
+		document.add(templatePath(endpoint.declaration.Path), operation(endpoint, shapes))
 	}
 	return document
 }
@@ -40,39 +40,39 @@ type entry struct {
 // cursor hands out the projected shapes in the order they were collected. The
 // two walks are kept in step by construction rather than by counting twice.
 type cursor struct {
-	projected []jsonschema.Node
-	at        int
+	schemas []jsonschema.Node
+	at      int
 }
 
 func (shapes *cursor) next() jsonschema.Node {
-	node := shapes.projected[shapes.at]
+	node := shapes.schemas[shapes.at]
 	shapes.at++
 	return node
 }
 
 func gather(declarations []web.Declaration) collection {
-	collected := collection{}
-	for _, declared := range declarations {
+	inventory := collection{}
+	for _, declaration := range declarations {
 		contribution := entry{
-			declaration: declared,
-			parameters:  len(declared.Parameters),
-			hasEntity:   declared.Entity != nil && declared.Entity.Node != nil,
+			declaration: declaration,
+			parameters:  len(declaration.Parameters),
+			hasEntity:   declaration.Entity != nil && declaration.Entity.Node != nil,
 			// A content entry may name a media type and describe no shape, for
 			// an entity this program did not build from a value.
-			hasContent: declared.Content != nil && declared.Content.Node != nil,
+			hasContent: declaration.Content != nil && declaration.Content.Node != nil,
 		}
-		for _, parameter := range declared.Parameters {
-			collected.nodes = append(collected.nodes, parameter.Node)
+		for _, parameter := range declaration.Parameters {
+			inventory.nodes = append(inventory.nodes, parameter.Node)
 		}
 		if contribution.hasEntity {
-			collected.nodes = append(collected.nodes, declared.Entity.Node)
+			inventory.nodes = append(inventory.nodes, declaration.Entity.Node)
 		}
 		if contribution.hasContent {
-			collected.nodes = append(collected.nodes, declared.Content.Node)
+			inventory.nodes = append(inventory.nodes, declaration.Content.Node)
 		}
-		collected.declarations = append(collected.declarations, contribution)
+		inventory.declarations = append(inventory.declarations, contribution)
 	}
-	return collected
+	return inventory
 }
 
 // add puts an operation under its path, merging with a path already present,

@@ -169,8 +169,8 @@ func CallUpstream[R, In, Out any](
 		return effect.Fail[R, Out](asFault("building the path", err))
 	}
 	return FetchUpstream[R](upstream, endpoint.method, path, request).
-		FlatMap(func(received ClientResponse) effect.Effect[R, Fault, Out] {
-			return decodeResponse[R](endpoint.output, received, endpoint.method+" "+path)
+		FlatMap(func(response ClientResponse) effect.Effect[R, Fault, Out] {
+			return decodeResponse[R](endpoint.output, response, endpoint.method+" "+path)
 		})
 }
 

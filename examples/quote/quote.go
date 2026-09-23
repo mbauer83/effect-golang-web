@@ -1,4 +1,4 @@
-// Package quoting prices a shipment, over gRPC.
+// Package quote prices a shipment, over gRPC.
 //
 // One description does three jobs here: it decodes the request, it encodes the
 // response, and it becomes the .proto file another language generates its
@@ -7,7 +7,7 @@
 //
 // The service depends on the port and never on Connect. Nothing in this package
 // imports it.
-package quoting
+package quote
 
 import (
 	"errors"
@@ -94,7 +94,7 @@ const (
 )
 
 func (refusal Refusal) Error() string {
-	return "quoting: " + refusal.Details
+	return "quote: " + refusal.Details
 }
 
 // FailureFor is what each refusal answers with.
@@ -153,7 +153,7 @@ func Answer(
 	rates map[string]Rate,
 ) error {
 	if boundary == nil {
-		return errors.New("quoting: a service needs a boundary")
+		return errors.New("quote: a service needs a boundary")
 	}
 	return grpc.Answer(boundary, Quote, Price(rates))
 }

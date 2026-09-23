@@ -22,19 +22,19 @@ func (source textSource) Text() (string, error) {
 }
 
 func (source textSource) Integer() (int64, error) {
-	parsed, err := strconv.ParseInt(source.value, 10, 64)
+	value, err := strconv.ParseInt(source.value, 10, 64)
 	if err != nil {
 		return 0, errors.New("expected a whole number, found " + strconv.Quote(source.value))
 	}
-	return parsed, nil
+	return value, nil
 }
 
 func (source textSource) Number() (float64, error) {
-	parsed, err := strconv.ParseFloat(source.value, 64)
+	value, err := strconv.ParseFloat(source.value, 64)
 	if err != nil {
 		return 0, errors.New("expected a number, found " + strconv.Quote(source.value))
 	}
-	return parsed, nil
+	return value, nil
 }
 
 // Boolean accepts what a query string conventionally carries, which is more
@@ -44,27 +44,27 @@ func (source textSource) Boolean() (bool, error) {
 	if source.value == "" {
 		return true, nil
 	}
-	parsed, err := strconv.ParseBool(source.value)
+	value, err := strconv.ParseBool(source.value)
 	if err != nil {
 		return false, errors.New("expected true or false, found " + strconv.Quote(source.value))
 	}
-	return parsed, nil
+	return value, nil
 }
 
 func (source textSource) Bytes() ([]byte, error) {
-	decoded, err := base64.StdEncoding.DecodeString(source.value)
+	value, err := base64.StdEncoding.DecodeString(source.value)
 	if err != nil {
 		return nil, errors.New("expected base64, found " + strconv.Quote(source.value))
 	}
-	return decoded, nil
+	return value, nil
 }
 
 func (source textSource) Timestamp() (time.Time, error) {
-	parsed, err := time.Parse(time.RFC3339, source.value)
+	value, err := time.Parse(time.RFC3339, source.value)
 	if err != nil {
 		return time.Time{}, errors.New("expected an RFC 3339 timestamp, found " + strconv.Quote(source.value))
 	}
-	return parsed, nil
+	return value, nil
 }
 
 // Null is always false. A parameter that is present carries a value; one that

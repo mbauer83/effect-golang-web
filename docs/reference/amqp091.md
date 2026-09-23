@@ -163,8 +163,8 @@ package acquires the dependency by calling them.
 broker := inprocess.NewBroker()
 // ... a producer and a consumer written against the port
 broker.Accepted()   // []uint64
-broker.Discarded()
-broker.Requeued()
+broker.Discards()
+broker.Requeues()
 broker.Depth("shipping")
 ```
 

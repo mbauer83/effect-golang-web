@@ -70,19 +70,19 @@ func (envelope Envelope[A]) Read() (A, error) {
 }
 
 // Accept says the message is done and the broker may forget it.
-func Accept[R, A any](received Envelope[A]) effect.Effect[R, Fault, effect.Unit] {
-	return settleDelivery[R](received, "accepting a message",
-		func(ctx context.Context, tag string) error { return received.from.Accept(ctx, tag) })
+func Accept[R, A any](envelope Envelope[A]) effect.Effect[R, Fault, effect.Unit] {
+	return settleDelivery[R](envelope, "accepting a message",
+		func(ctx context.Context, tag string) error { return envelope.from.Accept(ctx, tag) })
 }
 
 // Reject says the message will never be processed, and why.
 //
 // The reason travels with it: the broker records it, and whoever reads the
 // dead-letter node afterwards has the only explanation there is going to be.
-func Reject[R, A any](received Envelope[A], reason string) effect.Effect[R, Fault, effect.Unit] {
-	return settleDelivery[R](received, "rejecting a message",
+func Reject[R, A any](envelope Envelope[A], reason string) effect.Effect[R, Fault, effect.Unit] {
+	return settleDelivery[R](envelope, "rejecting a message",
 		func(ctx context.Context, tag string) error {
-			return received.from.Reject(ctx, tag, reason)
+			return envelope.from.Reject(ctx, tag, reason)
 		})
 }
 
@@ -92,9 +92,9 @@ func Reject[R, A any](received Envelope[A], reason string) effect.Effect[R, Faul
 // Nothing is recorded, so the broker's count of failed deliveries does not
 // move -- which is right when this receiver is shutting down or was never the
 // right one, and wrong when it tried and failed. Modify is that case.
-func Release[R, A any](received Envelope[A]) effect.Effect[R, Fault, effect.Unit] {
-	return settleDelivery[R](received, "releasing a message",
-		func(ctx context.Context, tag string) error { return received.from.Release(ctx, tag) })
+func Release[R, A any](envelope Envelope[A]) effect.Effect[R, Fault, effect.Unit] {
+	return settleDelivery[R](envelope, "releasing a message",
+		func(ctx context.Context, tag string) error { return envelope.from.Release(ctx, tag) })
 }
 
 // Modify gives the message back with something said about it.
@@ -105,23 +105,23 @@ func Release[R, A any](received Envelope[A]) effect.Effect[R, Fault, effect.Unit
 // go on. Here the receiver can say that it tried, that the message should go
 // elsewhere, and what it found out -- which is what makes a dead-letter policy
 // something the consumer participates in rather than something done to it.
-func Modify[R, A any](received Envelope[A], change Change) effect.Effect[R, Fault, effect.Unit] {
-	return settleDelivery[R](received, "modifying a message",
+func Modify[R, A any](envelope Envelope[A], change Change) effect.Effect[R, Fault, effect.Unit] {
+	return settleDelivery[R](envelope, "modifying a message",
 		func(ctx context.Context, tag string) error {
-			return received.from.Modify(ctx, tag, change)
+			return envelope.from.Modify(ctx, tag, change)
 		})
 }
 
 func settleDelivery[R, A any](
-	received Envelope[A],
+	envelope Envelope[A],
 	op string,
 	settle func(context.Context, string) error,
 ) effect.Effect[R, Fault, effect.Unit] {
 	return effect.Try(
 		func(ctx context.Context, _ R) (effect.Unit, error) {
-			return effect.Unit{}, settle(ctx, received.Delivery.Tag)
+			return effect.Unit{}, settle(ctx, envelope.Delivery.Tag)
 		},
-		func(err error) Fault { return faultOf(op, received.Delivery.Subject, err) },
+		func(err error) Fault { return faultOf(op, envelope.Delivery.Subject, err) },
 	).WithName("settle")
 }
 

@@ -20,13 +20,13 @@ func (response ClientResponse) IsSuccessful() bool {
 // Only so that a schedule has something to retry. Every status is an answer to
 // whoever asked, and recovered below hands it back as one.
 func failUnsuccessful[R any](target string) func(ClientResponse) effect.Effect[R, Fault, ClientResponse] {
-	return func(received ClientResponse) effect.Effect[R, Fault, ClientResponse] {
-		if received.IsSuccessful() {
-			return effect.Succeed[R, Fault](received)
+	return func(response ClientResponse) effect.Effect[R, Fault, ClientResponse] {
+		if response.IsSuccessful() {
+			return effect.Succeed[R, Fault](response)
 		}
 		return effect.Fail[R, ClientResponse](Fault{
 			Op:  "calling " + target,
-			Err: Refusal{Status: received.Status, Entity: received.Entity, header: received.Header},
+			Err: Refusal{Status: response.Status, Entity: response.Entity, header: response.Header},
 		})
 	}
 }

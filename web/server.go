@@ -63,8 +63,8 @@ func ServeWith[R any](scope effect.Scope, settings Settings, handler http.Handle
 	operations := effect.For[R, Fault]()
 	return effect.Gen(func(do *effect.Do[R, Fault]) Server {
 		listener := do.Await(listen[R](scope, settings))
-		abandoned := do.Await(reportAbandoned[R](scope))
-		loop := serveLoop[R](httpServer(settings, handler), listener, settings.Grace, abandoned)
+		abandonment := do.Await(reportAbandonment[R](scope))
+		loop := serveLoop[R](httpServer(settings, handler), listener, settings.Grace, abandonment)
 		fiber := do.Await(operations.ForkIn(scope, loop))
 		return Server{address: listener.Addr(), fiber: fiber}
 	}).WithName("serve")

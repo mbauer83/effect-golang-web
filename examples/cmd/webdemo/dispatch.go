@@ -60,14 +60,14 @@ func runDispatch(runtime *effect.Runtime) {
 	})
 
 	exit := runtime.Run(context.Background(), effect.Unit{}, program)
-	shipped, succeeded := exit.Value()
+	orders, succeeded := exit.Value()
 	if !succeeded {
 		fail(fmt.Errorf("dispatch: %v", exit))
 	}
 
 	fmt.Printf("dispatch: shipped %d, accepted %d, discarded %d, sent back %d\n",
-		len(shipped), len(broker.Accepted()), len(broker.Discarded()), len(broker.Requeued()))
-	for _, order := range shipped {
+		len(orders), len(broker.Acks()), len(broker.Discards()), len(broker.Requeues()))
+	for _, order := range orders {
 		fmt.Printf("  %s x%d (%s)\n", order.Item, order.Quantity, order.Reference)
 	}
 }

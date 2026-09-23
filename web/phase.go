@@ -55,24 +55,24 @@ type PhaseSampler func(phase string) func()
 // "an operation nobody declared", which is how the largest thing in an
 // aggregate came to be a bucket with no name on it.
 const (
-	PhaseDecoding = "decoding"
-	PhaseHandling = "handling"
-	PhaseEncoding = "encoding"
+	PhaseDecode = "decoding"
+	PhaseHandle = "handling"
+	PhaseEncode = "encoding"
 )
 
 // PhaseNames are the three, for a caller assembling a vocabulary.
 //
 //	metrics.NewVocabulary(append(inspect.Names(surface.Declarations()), web.PhaseNames()...)...)
 func PhaseNames() []string {
-	return []string{PhaseDecoding, PhaseHandling, PhaseEncoding}
+	return []string{PhaseDecode, PhaseHandle, PhaseEncode}
 }
 
 // phaseNames is the naming a surface uses when it details its phases.
 func phaseNames() phases {
 	return phases{
-		decodeSpan: PhaseDecoding,
-		handleSpan: PhaseHandling,
-		encodeSpan: PhaseEncoding,
+		decodeSpan: PhaseDecode,
+		handleSpan: PhaseHandle,
+		encodeSpan: PhaseEncode,
 	}
 }
 
@@ -115,12 +115,12 @@ func measurePhase[R, E, A any](
 	}
 	operations := effect.For[R, E]()
 	return operations.Suspend(func() effect.Effect[R, E, A] {
-		ended := sampler(name)
-		if ended == nil {
+		end := sampler(name)
+		if end == nil {
 			return fx
 		}
 		return fx.Ensuring(effect.AddFinalizer[R](func(context.Context) error {
-			ended()
+			end()
 			return nil
 		}))
 	})

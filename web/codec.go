@@ -80,8 +80,8 @@ func ValidateCodec[A any](codec Codec[A]) error {
 // Decode reads the part of the request the codec describes.
 func Decode[A any](codec Codec[A], request Request) (A, error) {
 	if err := ValidateCodec(codec); err != nil {
-		var missing A
-		return missing, err
+		var zero A
+		return zero, err
 	}
 	return codec.decode(request)
 }
@@ -99,16 +99,16 @@ func Nothing() Codec[effect.Unit] {
 // type-level record to widen; it is a package function because a method cannot
 // grow the type parameters its own result needs.
 func Both[A, B any](first Codec[A], second Codec[B]) Codec[effect.Product[A, B]] {
-	combined := Codec[effect.Product[A, B]]{
+	codec := Codec[effect.Product[A, B]]{
 		parameters: append(append([]Parameter{}, first.parameters...), second.parameters...),
 		entity:     firstEntity(first.entity, second.entity),
 		fault:      firstCodecFault(first, second),
 	}
-	if combined.fault != nil {
-		return combined
+	if codec.fault != nil {
+		return codec
 	}
-	combined.decode = func(request Request) (effect.Product[A, B], error) {
-		read, err := first.decode(request)
+	codec.decode = func(request Request) (effect.Product[A, B], error) {
+		value, err := first.decode(request)
 		if err != nil {
 			return effect.Product[A, B]{}, err
 		}
@@ -116,9 +116,9 @@ func Both[A, B any](first Codec[A], second Codec[B]) Codec[effect.Product[A, B]]
 		if err != nil {
 			return effect.Product[A, B]{}, err
 		}
-		return effect.ProductOf(read, also), nil
+		return effect.ProductOf(value, also), nil
 	}
-	return combined
+	return codec
 }
 
 // Convert derives a codec for B from one for A, which is how a Product of
@@ -131,12 +131,12 @@ func Convert[A, B any](inner Codec[A], to func(A) (B, error)) Codec[B] {
 		parameters: inner.parameters,
 		entity:     inner.entity,
 		decode: func(request Request) (B, error) {
-			read, err := inner.decode(request)
+			value, err := inner.decode(request)
 			if err != nil {
-				var missing B
-				return missing, err
+				var zero B
+				return zero, err
 			}
-			return to(read)
+			return to(value)
 		},
 	}
 }
@@ -160,12 +160,12 @@ func firstCodecFault[A, B any](first Codec[A], second Codec[B]) error {
 	if first.entity != nil && second.entity != nil {
 		return faultOf("combining codecs", errTwoEntities)
 	}
-	return repeatedParameter(append(append([]Parameter{}, first.parameters...), second.parameters...))
+	return duplicateParameterFault(append(append([]Parameter{}, first.parameters...), second.parameters...))
 }
 
-// repeatedParameter reports two codecs reading the same parameter, which would
+// duplicateParameterFault reports two codecs reading the same parameter, which would
 // describe it twice and leave a reader of the document guessing which applies.
-func repeatedParameter(parameters []Parameter) error {
+func duplicateParameterFault(parameters []Parameter) error {
 	// The key is a string rather than the Parameter itself: a Parameter carries
 	// a structure node, and a node is not always comparable.
 	seen := make(map[string]bool, len(parameters))

@@ -16,12 +16,12 @@ import (
 	"github.com/bufbuild/protocompile"
 	"google.golang.org/protobuf/reflect/protoreflect"
 
-	"github.com/mbauer83/effect-golang-web/examples/quoting"
+	"github.com/mbauer83/effect-golang-web/examples/quote"
 	"github.com/mbauer83/effect-golang-web/grpc"
 )
 
 func TestTheContractCompilesAndDeclaresTheService(t *testing.T) {
-	document, err := grpc.Contract("logistics.v1", quoting.Quote)
+	document, err := grpc.Contract("logistics.v1", quote.Quote)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,8 +65,8 @@ func TestTheContractCompilesAndDeclaresTheService(t *testing.T) {
 
 	// The path the descriptor implies is the path the transport answers at, so
 	// a client generated from this file reaches the handler.
-	if path := "/" + string(service.FullName()) + "/" + string(method.Name()); path != quoting.Quote.Path() {
-		t.Errorf("the contract says %s and the transport answers %s", path, quoting.Quote.Path())
+	if path := "/" + string(service.FullName()) + "/" + string(method.Name()); path != quote.Quote.Path() {
+		t.Errorf("the contract says %s and the transport answers %s", path, quote.Quote.Path())
 	}
 
 	assertShapes(t, files[0].Messages())
@@ -93,7 +93,7 @@ func assertShapes(t *testing.T, messages protoreflect.MessageDescriptors) {
 }
 
 func TestTheContractCarriesTheProseAndTheConstraints(t *testing.T) {
-	document, err := grpc.Contract("logistics.v1", quoting.Quote)
+	document, err := grpc.Contract("logistics.v1", quote.Quote)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -121,11 +121,11 @@ func TestTheContractCarriesTheProseAndTheConstraints(t *testing.T) {
 func TestAShapeTwoProceduresShareIsDeclaredOnce(t *testing.T) {
 	// The claim the projection makes: a type used by ten procedures appears
 	// once. With one procedure it is untestable, so this is where it is tested.
-	revised := grpc.Unary(quoting.Service, "Revise",
-		quoting.EnquirySchema, quoting.RateSchema).
+	revised := grpc.Unary(quote.Service, "Revise",
+		quote.EnquirySchema, quote.RateSchema).
 		WithDescription("Revise prices a shipment again.")
 
-	document, err := grpc.Contract("logistics.v1", quoting.Quote, revised)
+	document, err := grpc.Contract("logistics.v1", quote.Quote, revised)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -164,7 +164,7 @@ func TestAContractNamingAServiceOutsideItsPackageIsRefused(t *testing.T) {
 	// The file would compile and declare a service at an address nobody calls,
 	// because the path a client builds is the package and the name together.
 	elsewhere := grpc.Unary("shipping.v2.Rates", "Quote",
-		quoting.EnquirySchema, quoting.RateSchema)
+		quote.EnquirySchema, quote.RateSchema)
 
 	_, err := grpc.Contract("logistics.v1", elsewhere)
 	if err == nil {

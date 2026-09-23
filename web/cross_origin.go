@@ -125,14 +125,14 @@ func (crossOrigin CrossOrigin) headersFor(request *http.Request) string {
 // would hand a page at one origin the answer that named another, and the
 // browser would refuse it.
 func (crossOrigin CrossOrigin) share(response Response, origin string) Response {
-	shared := response.
+	result := response.
 		WithHeader("Access-Control-Allow-Origin", origin).
 		WithHeader("Vary", varyByOrigin(response))
 	if len(crossOrigin.ExposedHeaders) > 0 {
-		shared = shared.WithHeader("Access-Control-Expose-Headers",
+		result = result.WithHeader("Access-Control-Expose-Headers",
 			strings.Join(crossOrigin.ExposedHeaders, ", "))
 	}
-	return shared
+	return result
 }
 
 // varyByOrigin is the response's own Vary with Origin among it.
@@ -143,8 +143,8 @@ func (crossOrigin CrossOrigin) share(response Response, origin string) Response 
 // would serve a compressed body to a client that cannot read one.
 func varyByOrigin(response Response) string {
 	already := response.Header().Values("Vary")
-	for _, stated := range already {
-		for _, name := range strings.Split(stated, ",") {
+	for _, value := range already {
+		for _, name := range strings.Split(value, ",") {
 			if strings.EqualFold(strings.TrimSpace(name), "Origin") {
 				return strings.Join(already, ", ")
 			}

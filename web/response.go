@@ -117,10 +117,10 @@ func (response Response) WithStatus(status int) Response {
 // alone -- which is what lets middleware add a header to a response it does not
 // own.
 func (response Response) WithHeader(name string, value string) Response {
-	replaced := http.Header{}
-	maps.Copy(replaced, response.header)
-	replaced.Set(name, value)
-	response.header = replaced
+	header := http.Header{}
+	maps.Copy(header, response.header)
+	header.Set(name, value)
+	response.header = header
 	return response
 }
 

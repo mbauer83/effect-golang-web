@@ -78,7 +78,7 @@ func temporary(name string) amqp091.Topology {
 	exchange := queue + "-exchange"
 	return amqp091.Topology{
 		Exchanges: []amqp091.Exchange{
-			{Name: exchange, Routing: amqp091.Direct, Durability: amqp091.Transient},
+			{Name: exchange, Kind: amqp091.Direct, Durability: amqp091.Transient},
 		},
 		Queues: []amqp091.Queue{
 			{Name: queue, Durability: amqp091.Transient, Access: amqp091.Exclusive},

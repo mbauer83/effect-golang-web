@@ -121,27 +121,27 @@ func Collect(
 ) effect.Stream[effect.Unit, amqp10.Fault, Shipment] {
 	return effect.CollectStreamEffect(
 		amqp10.Values[effect.Unit](link, ShipmentSchema),
-		func(received amqp10.Envelope[Shipment]) consignEffect[effect.Chunk[Shipment]] {
-			return collectConsignment(received, carrier)
+		func(envelope amqp10.Envelope[Shipment]) consignEffect[effect.Chunk[Shipment]] {
+			return collectConsignment(envelope, carrier)
 		})
 }
 
 // collectConsignment is what happens to one delivery.
 func collectConsignment(
-	received amqp10.Envelope[Shipment],
+	envelope amqp10.Envelope[Shipment],
 	carrier func(Shipment) consignEffect[Outcome],
 ) consignEffect[effect.Chunk[Shipment]] {
 	// Direct style: offer it, then settle it according to what came back. As a
 	// FlatMap the settling was nested inside the offering, which is the wrong
 	// way round for something that happens after it.
 	return effect.Gen(func(do *consignDo) effect.Chunk[Shipment] {
-		shipment, err := received.Read()
+		shipment, err := envelope.Read()
 		if err != nil {
-			return do.Await(amqp10.Reject[effect.Unit](received,
+			return do.Await(amqp10.Reject[effect.Unit](envelope,
 				"the shipment cannot be read: "+err.Error()).As(effect.ChunkOf[Shipment]()))
 		}
 		outcome := do.Await(carrier(shipment))
-		return do.Await(settleConsignment(received, shipment, outcome))
+		return do.Await(settleConsignment(envelope, shipment, outcome))
 	})
 }
 
@@ -151,23 +151,23 @@ type consignDo = effect.Do[effect.Unit, amqp10.Fault]
 
 // settleConsignment turns the carrier's answer into the disposition that says it.
 func settleConsignment(
-	received amqp10.Envelope[Shipment],
+	envelope amqp10.Envelope[Shipment],
 	shipment Shipment,
 	outcome Outcome,
 ) consignEffect[effect.Chunk[Shipment]] {
-	refused, declined := outcome.(Refusal)
+	refusal, declined := outcome.(Refusal)
 	if !declined {
-		return amqp10.Accept[effect.Unit](received).As(effect.ChunkOf(shipment))
+		return amqp10.Accept[effect.Unit](envelope).As(effect.ChunkOf(shipment))
 	}
-	if refused.Finality == Never {
-		return amqp10.Reject[effect.Unit](received, refused.Reason).
+	if refusal.Finality == Never {
+		return amqp10.Reject[effect.Unit](envelope, refusal.Reason).
 			As(effect.ChunkOf[Shipment]())
 	}
-	return amqp10.Modify[effect.Unit](received, amqp10.Change{
-		DeliveryFailed:    refused.Finality == NotNow,
-		UndeliverableHere: refused.Finality == NotMe,
-		Annotations: annotations("refused-because", refused.Reason,
-			"attempts", strconv.FormatUint(uint64(received.Delivery.Attempts+1), 10)),
+	return amqp10.Modify[effect.Unit](envelope, amqp10.Change{
+		DeliveryFailed:    refusal.Finality == NotNow,
+		UndeliverableHere: refusal.Finality == NotMe,
+		Annotations: annotations("refused-because", refusal.Reason,
+			"attempts", strconv.FormatUint(uint64(envelope.Delivery.Attempts+1), 10)),
 	}).As(effect.ChunkOf[Shipment]())
 }
 

@@ -12,10 +12,10 @@ import (
 // Broker holds nodes in memory. One per test: a shared one shares its nodes,
 // and then two tests fail in an order-dependent way.
 type Broker struct {
-	mutex   sync.Mutex
-	nodes   map[string]*node
-	tag     uint64
-	settled settlements
+	mutex    sync.Mutex
+	nodes    map[string]*node
+	tag      uint64
+	outcomes settlements
 }
 
 // node is one address messages wait at.
@@ -64,28 +64,28 @@ func (broker *Broker) Declare(address string) {
 func (broker *Broker) Accepted() []string {
 	broker.mutex.Lock()
 	defer broker.mutex.Unlock()
-	return append([]string(nil), broker.settled.accepted...)
+	return append([]string(nil), broker.outcomes.accepted...)
 }
 
 // Rejected is the messages a receiver said would never be processed, and why.
 func (broker *Broker) Rejected() []Rejection {
 	broker.mutex.Lock()
 	defer broker.mutex.Unlock()
-	return append([]Rejection(nil), broker.settled.rejected...)
+	return append([]Rejection(nil), broker.outcomes.rejected...)
 }
 
 // Released is the tags of the messages a receiver gave back unchanged.
 func (broker *Broker) Released() []string {
 	broker.mutex.Lock()
 	defer broker.mutex.Unlock()
-	return append([]string(nil), broker.settled.released...)
+	return append([]string(nil), broker.outcomes.released...)
 }
 
 // Modified is the messages a receiver gave back with something said about them.
 func (broker *Broker) Modified() []Modification {
 	broker.mutex.Lock()
 	defer broker.mutex.Unlock()
-	return append([]Modification(nil), broker.settled.modified...)
+	return append([]Modification(nil), broker.outcomes.modified...)
 }
 
 // Depth is how many messages a node holds that nobody has taken.
