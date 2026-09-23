@@ -39,7 +39,7 @@ func Connect[R any](scope effect.Scope, address string) effect.Effect[R, Fault, 
 			}
 			return &Connection{connection: connection}, nil
 		},
-		func(err error) Fault { return faultOf("connecting", "", err) },
+		func(err error) Fault { return faultOf("connect", "", err) },
 	).WithName("connect")
 
 	return scope.AcquireRelease(acquire, disconnect[R])

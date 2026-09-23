@@ -141,7 +141,7 @@ func loopExit(err error) effect.Exit[Fault, effect.Unit] {
 	if err == nil || errors.Is(err, http.ErrServerClosed) {
 		return effect.ExitSuccess[Fault](effect.Unit{})
 	}
-	return effect.ExitFailure[Fault, effect.Unit](Fault{Op: "serving", Err: err})
+	return effect.ExitFailure[Fault, effect.Unit](Fault{Op: "serve", Err: err})
 }
 
 func httpServer(settings Settings, handler http.Handler) *http.Server {

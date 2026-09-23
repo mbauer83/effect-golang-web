@@ -55,9 +55,9 @@ type PhaseSampler func(phase string) func()
 // "an operation nobody declared", which is how the largest thing in an
 // aggregate came to be a bucket with no name on it.
 const (
-	PhaseDecode = "decoding"
-	PhaseHandle = "handling"
-	PhaseEncode = "encoding"
+	PhaseDecode = "decode"
+	PhaseHandle = "handle"
+	PhaseEncode = "encode"
 )
 
 // PhaseNames are the three, for a caller assembling a vocabulary.

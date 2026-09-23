@@ -99,7 +99,7 @@ func TestARefusalThatMightSucceedLaterIsGivenBackSayingWhy(t *testing.T) {
 		}
 		// And what the receiver recorded, which is the other half of what
 		// modifying says: whoever gets it next knows why it came back.
-		held, present := modified[0].Change.Annotations.Member("refused-because")
+		held, present := modified[0].Change.Annotations.Member("refusal-reason")
 		if !present {
 			t.Errorf("%s: expected the reason recorded, got %#v", named, modified[0].Change)
 		} else if held != dynamic.OfText("no room") {

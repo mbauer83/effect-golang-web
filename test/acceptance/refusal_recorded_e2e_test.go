@@ -105,7 +105,7 @@ func TestARefusalThatBecameAStatusIsRecorded(t *testing.T) {
 	if !strings.Contains(said[0], "refusal_recorded_e2e_test.go:") {
 		t.Errorf("expected the line that raised it, got %q", said[0])
 	}
-	if !strings.Contains(said[0], "handling") {
+	if !strings.Contains(said[0], "handle") {
 		t.Errorf("expected the phase it was raised inside, got %q", said[0])
 	}
 }

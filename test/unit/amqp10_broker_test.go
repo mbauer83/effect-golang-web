@@ -117,7 +117,7 @@ func settledTried(link amqp10.ReceiverLink, delivery amqp10.Delivery, why string
 			return effect.Unit{}, link.Modify(ctx, delivery.Tag, amqp10.Change{
 				DeliveryFailed: true,
 				Annotations: dynamic.Object{Fields: []dynamic.Field{
-					{Name: "refused-because", Value: dynamic.OfText(why)},
+					{Name: "refusal-reason", Value: dynamic.OfText(why)},
 				}},
 			})
 		},

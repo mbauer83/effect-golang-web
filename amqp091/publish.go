@@ -24,7 +24,7 @@ func Publish[R any](
 		func(ctx context.Context, _ R) (effect.Unit, error) {
 			return effect.Unit{}, channel.Publish(ctx, target, message)
 		},
-		func(err error) Fault { return faultOf("publishing", target.Key, err) },
+		func(err error) Fault { return faultOf("publish", target.Key, err) },
 	).WithName("publish")
 }
 

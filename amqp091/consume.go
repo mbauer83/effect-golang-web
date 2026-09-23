@@ -140,7 +140,7 @@ func subscribe[R any](
 		func(ctx context.Context, _ R) (Deliveries, error) {
 			return channel.Consume(ctx, queue)
 		},
-		func(err error) Fault { return faultOf("consuming", queue, err) },
+		func(err error) Fault { return faultOf("consume", queue, err) },
 	).WithName("consume")
 
 	return scope.AcquireRelease(acquire, unsubscribe[R])

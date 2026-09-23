@@ -33,7 +33,7 @@ func runDispatch(runtime *effect.Runtime) {
 				attempts++
 				if attempts == 1 {
 					return effect.For[effect.Unit, amqp091.Fault]().
-						Fail[effect.Unit](amqp091.Fault{Op: "packing", Err: errWarehouseBusy})
+						Fail[effect.Unit](amqp091.Fault{Op: "pack", Err: errWarehouseBusy})
 				}
 				return effect.For[effect.Unit, amqp091.Fault]().Succeed(effect.Unit{})
 			})

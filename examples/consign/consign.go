@@ -166,7 +166,7 @@ func settleConsignment(
 	return amqp10.Modify[effect.Unit](envelope, amqp10.Change{
 		DeliveryFailed:    refusal.Finality == NotNow,
 		UndeliverableHere: refusal.Finality == NotMe,
-		Annotations: annotations("refused-because", refusal.Reason,
+		Annotations: annotations("refusal-reason", refusal.Reason,
 			"attempts", strconv.FormatUint(uint64(envelope.Delivery.Attempts+1), 10)),
 	}).As(effect.ChunkOf[Shipment]())
 }

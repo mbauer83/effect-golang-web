@@ -41,7 +41,7 @@ func Connect[R any](scope effect.Scope, address string, options *broker.ConnOpti
 			}
 			return &Connection{connection: connection}, nil
 		},
-		func(err error) Fault { return faultOf("connecting", address, err) },
+		func(err error) Fault { return faultOf("connect", address, err) },
 	).WithName("connect")
 
 	return scope.AcquireRelease(acquire, disconnect[R])

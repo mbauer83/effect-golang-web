@@ -44,7 +44,7 @@ func (upstream *UpstreamClient) cacheKey(method string, path string, request Cli
 // visible before that happens.
 func lookupCache[R any](upstream *UpstreamClient, key string) effect.Effect[R, Fault, cache.Lookup] {
 	return effect.Fold(
-		cache.Read[R](upstream.store, key).CatchAll(logCacheFault[R, cache.Lookup]("reading", key)),
+		cache.Read[R](upstream.store, key).CatchAll(logCacheFault[R, cache.Lookup]("read", key)),
 		func(effect.Cause[cache.Fault]) cache.Lookup { return cache.Lookup{} },
 		func(lookup cache.Lookup) cache.Lookup { return lookup },
 	).MapError(func(effect.Never) Fault { return Fault{} })
@@ -70,7 +70,7 @@ func writeCache[R any](
 		}
 		writeEntry := cache.Write[R](upstream.store, cache.Entry{
 			Key: key, About: about, Entity: entity, Fresh: upstream.terms.TimeToLive,
-		}).CatchAll(logCacheFault[R, effect.Unit]("keeping", key))
+		}).CatchAll(logCacheFault[R, effect.Unit]("write", key))
 		return effect.Fold(writeEntry,
 			func(effect.Cause[cache.Fault]) ClientResponse { return response },
 			func(effect.Unit) ClientResponse { return response },
@@ -82,7 +82,7 @@ func logCacheFault[R, A any](op string, key string) func(cache.Fault) effect.Eff
 	return func(why cache.Fault) effect.Effect[R, cache.Fault, A] {
 		return effect.LogWarn[R, cache.Fault](
 			"the answer store could not be used; asking the service instead",
-			slog.String("doing", op),
+			slog.String("op", op),
 			slog.String("key", key),
 			slog.String("fault", why.Error()),
 		).FlatMap(func(effect.Unit) effect.Effect[R, cache.Fault, A] {

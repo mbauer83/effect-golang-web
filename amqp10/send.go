@@ -20,7 +20,7 @@ func Send[R any](link SenderLink, message Message) effect.Effect[R, Fault, effec
 		func(ctx context.Context, _ R) (effect.Unit, error) {
 			return effect.Unit{}, link.Send(ctx, message)
 		},
-		func(err error) Fault { return faultOf("sending", link.Address(), err) },
+		func(err error) Fault { return faultOf("send", link.Address(), err) },
 	).WithName("send")
 }
 
