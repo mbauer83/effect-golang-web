@@ -55,7 +55,7 @@ func (codec Codec[A]) WithDescription(doc string) Codec[A] {
 		return codec
 	}
 	parameters := append([]Parameter{}, codec.parameters...)
-	parameters[0].Doc = doc
+	parameters[0].Description = doc
 	codec.parameters = parameters
 	return codec
 }

@@ -27,11 +27,11 @@ const (
 // document should say about it. Reading and describing come from one
 // declaration, so they cannot disagree.
 type Parameter struct {
-	Name     string
-	In       Location
-	Doc      string
-	Required bool
-	Node     structure.Node
+	Name        string
+	In          Location
+	Description string
+	Required    bool
+	Node        structure.Node
 }
 
 // Content describes an entity: the media type it arrives as and the shape it

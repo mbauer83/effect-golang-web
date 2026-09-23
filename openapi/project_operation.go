@@ -16,7 +16,7 @@ func operation(endpoint entry, shapes *cursor) Operation {
 		Method:      endpoint.declaration.Method,
 		ID:          identify(endpoint.declaration),
 		Summary:     endpoint.declaration.Summary,
-		Description: endpoint.declaration.Doc,
+		Description: endpoint.declaration.Description,
 		Parameters:  withPathTemplate(endpoint.declaration, parameters(endpoint, shapes)),
 		RequestBody: requestBody(endpoint, shapes),
 		Responses:   responses(endpoint, shapes),
@@ -84,7 +84,7 @@ func parameters(endpoint entry, shapes *cursor) []Parameter {
 			Name:        parameter.Name,
 			In:          string(parameter.In),
 			Required:    parameter.Required,
-			Description: parameter.Doc,
+			Description: parameter.Description,
 			Schema:      shapes.next(),
 		})
 	}
@@ -111,7 +111,7 @@ func responses(endpoint entry, shapes *cursor) []Response {
 	for _, failure := range endpoint.declaration.Failures {
 		list = append(list, Response{
 			Status:      failure.Status,
-			Description: responseDescription(failure.Status, failure.Doc),
+			Description: responseDescription(failure.Status, failure.Description),
 		})
 	}
 	slices.SortStableFunc(list, func(first Response, second Response) int {

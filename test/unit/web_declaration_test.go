@@ -98,7 +98,7 @@ func TestADocumentedFailureIsCarriedWithoutBeingPerformed(t *testing.T) {
 		t.Fatalf("expected both failures documented, got %#v", failures)
 	}
 	var first web.FailureResponse = failures[0]
-	if first.Status != http.StatusNotFound || first.Doc == "" {
+	if first.Status != http.StatusNotFound || first.Description == "" {
 		t.Fatalf("unexpected failure: %#v", first)
 	}
 	if failures[1].Status != http.StatusGone {
@@ -111,7 +111,7 @@ func TestDocumentingAnEndpointLeavesTheOriginalAlone(t *testing.T) {
 	_ = original.WithSummary("List").WithDescription("Everything").WithFailure(http.StatusGone, "gone")
 
 	if declared := original.Declaration(); declared.Summary != "" ||
-		declared.Doc != "" || len(declared.Failures) != 0 {
+		declared.Description != "" || len(declared.Failures) != 0 {
 		t.Fatalf("the original endpoint was changed: %#v", declared)
 	}
 }

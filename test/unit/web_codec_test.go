@@ -154,7 +154,7 @@ func TestProseOnAParameterReachesItsDeclaration(t *testing.T) {
 	if err := web.ValidateCodec(codec); err != nil {
 		t.Fatal(err)
 	}
-	if doc := codec.Parameters()[0].Doc; doc != "which shelf to list" {
+	if doc := codec.Parameters()[0].Description; doc != "which shelf to list" {
 		t.Fatalf("expected the prose carried, got %q", doc)
 	}
 }

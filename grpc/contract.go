@@ -47,11 +47,11 @@ func Contract(packageName string, procedures ...Declaration) (protobuf.Document,
 		}
 		request, response := procedure.Shapes()
 		protoProcedures = append(protoProcedures, protobuf.Procedure{
-			Service:  bare,
-			Method:   procedure.Method(),
-			Doc:      procedure.Doc(),
-			Request:  request,
-			Response: response,
+			Service:     bare,
+			Method:      procedure.Method(),
+			Description: procedure.Doc(),
+			Request:     request,
+			Response:    response,
 		})
 	}
 	return protobuf.ProjectServices(packageName, protoProcedures...)

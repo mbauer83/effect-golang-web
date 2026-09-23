@@ -36,7 +36,7 @@ func TestTheSurfaceDescribesItselfForAPublishedContract(t *testing.T) {
 	}
 	found := declarations[2]
 	if found.Path != "/books/{title}" || len(found.Parameters) != 1 ||
-		found.Parameters[0].Doc == "" {
+		found.Parameters[0].Description == "" {
 		t.Fatalf("expected the path parameter described, got %#v", found)
 	}
 }

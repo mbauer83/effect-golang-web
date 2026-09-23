@@ -71,8 +71,8 @@ func ReturnsNothing(status int) Output[effect.Unit] {
 // boundary, once, and this is how a published document says what that mapping
 // will produce.
 type FailureResponse struct {
-	Status int
-	Doc    string
+	Status      int
+	Description string
 }
 
 // Declaration is everything about a route except how it is handled: what it
@@ -83,15 +83,15 @@ type FailureResponse struct {
 // eventually a typed client -- where a route carrying only a function could
 // give none of them.
 type Declaration struct {
-	Method     string
-	Path       string
-	Summary    string
-	Doc        string
-	Parameters []Parameter
-	Entity     *Content
-	Status     int
-	Content    *Content
-	Failures   []FailureResponse
+	Method      string
+	Path        string
+	Summary     string
+	Description string
+	Parameters  []Parameter
+	Entity      *Content
+	Status      int
+	Content     *Content
+	Failures    []FailureResponse
 }
 
 // Endpoint declares what a route accepts and returns. Its handler is separate.
@@ -164,21 +164,21 @@ func (endpoint Endpoint[In, Out]) WithDescription(doc string) Endpoint[In, Out] 
 // refuses, for the published document.
 func (endpoint Endpoint[In, Out]) WithFailure(status int, doc string) Endpoint[In, Out] {
 	endpoint.failures = append(append([]FailureResponse{}, endpoint.failures...),
-		FailureResponse{Status: status, Doc: doc})
+		FailureResponse{Status: status, Description: doc})
 	return endpoint
 }
 
 // Declaration is what the endpoint says about itself.
 func (endpoint Endpoint[In, Out]) Declaration() Declaration {
 	return Declaration{
-		Method:     endpoint.method,
-		Path:       renderPattern(endpoint.segments),
-		Summary:    endpoint.summary,
-		Doc:        endpoint.doc,
-		Parameters: endpoint.input.parameters,
-		Entity:     endpoint.input.entity,
-		Status:     endpoint.output.status,
-		Content:    endpoint.output.content,
-		Failures:   endpoint.failures,
+		Method:      endpoint.method,
+		Path:        renderPattern(endpoint.segments),
+		Summary:     endpoint.summary,
+		Description: endpoint.doc,
+		Parameters:  endpoint.input.parameters,
+		Entity:      endpoint.input.entity,
+		Status:      endpoint.output.status,
+		Content:     endpoint.output.content,
+		Failures:    endpoint.failures,
 	}
 }
