@@ -30,7 +30,7 @@ func runConsign(runtime *effect.Runtime) {
 		fail(err)
 	}
 
-	// Refuses once and then takes it, because a shipment given back is attempts
+	// Refuses once and then takes it, because a shipment given back is offered
 	// again: a carrier that always refused would loop, which is what the
 	// disposition means.
 	attempts := 0
