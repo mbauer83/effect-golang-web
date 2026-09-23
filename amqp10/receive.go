@@ -71,7 +71,7 @@ func (envelope Envelope[A]) Read() (A, error) {
 
 // Accept says the message is done and the broker may forget it.
 func Accept[R, A any](envelope Envelope[A]) effect.Effect[R, Fault, effect.Unit] {
-	return settleDelivery[R](envelope, "accepting a message",
+	return settleDelivery[R](envelope, "accept a message",
 		func(ctx context.Context, tag string) error { return envelope.from.Accept(ctx, tag) })
 }
 
@@ -80,7 +80,7 @@ func Accept[R, A any](envelope Envelope[A]) effect.Effect[R, Fault, effect.Unit]
 // The reason travels with it: the broker records it, and whoever reads the
 // dead-letter node afterwards has the only explanation there is going to be.
 func Reject[R, A any](envelope Envelope[A], reason string) effect.Effect[R, Fault, effect.Unit] {
-	return settleDelivery[R](envelope, "rejecting a message",
+	return settleDelivery[R](envelope, "reject a message",
 		func(ctx context.Context, tag string) error {
 			return envelope.from.Reject(ctx, tag, reason)
 		})
@@ -93,7 +93,7 @@ func Reject[R, A any](envelope Envelope[A], reason string) effect.Effect[R, Faul
 // move -- which is right when this receiver is shutting down or was never the
 // right one, and wrong when it tried and failed. Modify is that case.
 func Release[R, A any](envelope Envelope[A]) effect.Effect[R, Fault, effect.Unit] {
-	return settleDelivery[R](envelope, "releasing a message",
+	return settleDelivery[R](envelope, "release a message",
 		func(ctx context.Context, tag string) error { return envelope.from.Release(ctx, tag) })
 }
 
@@ -106,7 +106,7 @@ func Release[R, A any](envelope Envelope[A]) effect.Effect[R, Fault, effect.Unit
 // elsewhere, and what it found out -- which is what makes a dead-letter policy
 // something the consumer participates in rather than something done to it.
 func Modify[R, A any](envelope Envelope[A], change Change) effect.Effect[R, Fault, effect.Unit] {
-	return settleDelivery[R](envelope, "modifying a message",
+	return settleDelivery[R](envelope, "modify a message",
 		func(ctx context.Context, tag string) error {
 			return envelope.from.Modify(ctx, tag, change)
 		})

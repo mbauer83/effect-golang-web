@@ -76,8 +76,8 @@ func (procedure Procedure[In, Out]) Method() string {
 	return procedure.method
 }
 
-// Doc is the prose attached to it.
-func (procedure Procedure[In, Out]) Doc() string {
+// Description is the prose attached to it.
+func (procedure Procedure[In, Out]) Description() string {
 	return procedure.doc
 }
 

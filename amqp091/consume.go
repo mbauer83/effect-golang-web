@@ -83,14 +83,14 @@ func (envelope Envelope[A]) Read() (A, error) {
 
 // Ack accepts a delivery, so the broker may forget it.
 func Ack[R, A any](envelope Envelope[A]) effect.Effect[R, Fault, effect.Unit] {
-	return settle[R](envelope, "accepting a delivery", envelope.deliveries.Ack)
+	return settle[R](envelope, "accept a delivery", envelope.deliveries.Ack)
 }
 
 // Discard rejects a delivery without return. The broker drops it, or routes it
 // wherever the queue's dead-letter configuration says -- which is where a
 // message nobody can read belongs.
 func Discard[R, A any](envelope Envelope[A]) effect.Effect[R, Fault, effect.Unit] {
-	return settle[R](envelope, "discarding a delivery", envelope.deliveries.Discard)
+	return settle[R](envelope, "discard a delivery", envelope.deliveries.Discard)
 }
 
 // Requeue rejects a delivery and asks for it back, for a consumer that cannot
@@ -101,7 +101,7 @@ func Discard[R, A any](envelope Envelope[A]) effect.Effect[R, Fault, effect.Unit
 // caller's decision to make, which is the whole reason acknowledgement is
 // explicit.
 func Requeue[R, A any](envelope Envelope[A]) effect.Effect[R, Fault, effect.Unit] {
-	return settle[R](envelope, "requeueing a delivery", envelope.deliveries.Requeue)
+	return settle[R](envelope, "requeue a delivery", envelope.deliveries.Requeue)
 }
 
 func settle[R, A any](

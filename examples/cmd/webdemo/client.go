@@ -43,9 +43,9 @@ func runClient(runtime *effect.Runtime, base string) {
 
 	book, ok := runtime.Run(context.Background(), effect.Unit{}, program).Value()
 	if !ok {
-		fail(fmt.Errorf("calling: the round trip failed"))
+		fail(fmt.Errorf("client: the round trip failed"))
 	}
-	fmt.Printf("calling: added and read back %q by %v, %d pages\n",
+	fmt.Printf("client: added and read back %q by %v, %d pages\n",
 		book.Title, book.Authors, book.Pages)
 
 	// A status the endpoint did not declare arrives as a Refusal, which

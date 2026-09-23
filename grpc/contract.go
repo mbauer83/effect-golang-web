@@ -25,7 +25,7 @@ import (
 type Declaration interface {
 	Service() string
 	Method() string
-	Doc() string
+	Description() string
 	Shapes() (request, response structure.Node)
 	Fault() error
 }
@@ -49,7 +49,7 @@ func Contract(packageName string, procedures ...Declaration) (protobuf.Document,
 		protoProcedures = append(protoProcedures, protobuf.Procedure{
 			Service:     bare,
 			Method:      procedure.Method(),
-			Description: procedure.Doc(),
+			Description: procedure.Description(),
 			Request:     request,
 			Response:    response,
 		})
