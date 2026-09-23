@@ -13,10 +13,10 @@ require (
 	github.com/bufbuild/protocompile v0.14.1
 	github.com/coder/websocket v1.8.15
 	github.com/getkin/kin-openapi v0.149.0
-	github.com/mbauer83/effect-golang v0.2.0
-	github.com/mbauer83/effect-golang-schema v0.2.0
+	github.com/mbauer83/effect-golang v0.3.0
+	github.com/mbauer83/effect-golang-schema v0.3.0
 	github.com/rabbitmq/amqp091-go v1.14.0
-	golang.org/x/net v0.58.0
+	golang.org/x/net v0.59.0
 	google.golang.org/protobuf v1.36.12
 )
 
@@ -24,11 +24,14 @@ require (
 	github.com/go-openapi/jsonpointer v0.22.5 // indirect
 	github.com/go-openapi/swag/jsonname v0.25.5 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
+	github.com/mbauer83/effect-golang/tools/effectgo v0.3.0 // indirect
 	github.com/oasdiff/yaml v0.1.1 // indirect
 	github.com/oasdiff/yaml3 v0.0.14 // indirect
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3 // indirect
-	golang.org/x/sync v0.22.0 // indirect
-	golang.org/x/text v0.41.0 // indirect
+	golang.org/x/mod v0.41.0 // indirect
+	golang.org/x/sync v0.23.0 // indirect
+	golang.org/x/text v0.42.0 // indirect
+	golang.org/x/tools v0.50.0 // indirect
 )
 
 // Every module of effect-golang is versioned together and released in
@@ -38,3 +41,5 @@ require (
 // and what a `replace` was being misused for before: a replace is ignored by
 // anything that depends on the module carrying it, so it said nothing to a
 // consumer and only ever described one person's layout.
+
+tool github.com/mbauer83/effect-golang/tools/effectgo
