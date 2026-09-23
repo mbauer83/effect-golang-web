@@ -55,7 +55,7 @@ func listen[R any](scope effect.Scope, settings Settings) effect.Effect[R, Fault
 			return net.Listen("tcp", settings.Address)
 		},
 		func(err error) Fault { return Fault{Doing: "opening the listener", Err: err} },
-	).Named("listen")
+	).WithName("listen")
 
 	return scope.AcquireRelease(acquire, closingListener[R])
 }
@@ -111,7 +111,7 @@ func serveLoop[R any](
 			// scope, not by this fiber.
 			return effect.ExitSuccess[Fault](effect.Unit{})
 		}
-	}).Named("serve-loop")
+	}).WithName("serve-loop")
 }
 
 // shutDown stops accepting, waits for the requests already in flight, and then

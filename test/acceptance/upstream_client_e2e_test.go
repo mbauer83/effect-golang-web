@@ -47,7 +47,7 @@ func answers(t *testing.T, status int, entity string) *asked {
 // process.
 func readingUnderTerms(t *testing.T, service *asked, patience web.Patience) (*web.UpstreamClient, cache.Store) {
 	t.Helper()
-	keeping := cache.NewHeld(64, time.Now)
+	keeping := cache.NewMemoryStore(64, time.Now)
 	upstream, err := web.NewUpstreamClient(
 		web.Dial(http.DefaultClient, service.server.URL),
 		web.UpstreamTerms{
@@ -57,7 +57,7 @@ func readingUnderTerms(t *testing.T, service *asked, patience web.Patience) (*we
 			Patience: patience,
 		},
 		keeping,
-		rate.NewHeld(time.Now),
+		rate.NewMemoryLimiter(time.Now),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -202,8 +202,8 @@ func TestATurnIsWaitedForBeforeAsking(t *testing.T) {
 			Allowed: rate.Allowance{Name: "a slow service", Most: 3, Every: 300 * time.Millisecond},
 			Fresh:   time.Minute,
 		},
-		cache.NewHeld(64, time.Now),
-		rate.NewHeld(time.Now),
+		cache.NewMemoryStore(64, time.Now),
+		rate.NewMemoryLimiter(time.Now),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -234,7 +234,7 @@ func TestTermsThatSayNothingAreRefusedWhereTheyAreWritten(t *testing.T) {
 		{Allowed: rate.Allowance{Name: "a service", Most: 1, Every: time.Second}, Fresh: time.Minute},
 		{Named: "a service", Allowed: rate.Allowance{Name: "a service", Most: 1, Every: time.Second}},
 	} {
-		if _, err := web.NewUpstreamClient(client, terms, cache.NewHeld(8, time.Now), rate.NewHeld(time.Now)); err == nil {
+		if _, err := web.NewUpstreamClient(client, terms, cache.NewMemoryStore(8, time.Now), rate.NewMemoryLimiter(time.Now)); err == nil {
 			t.Fatalf("expected %+v to be refused", terms)
 		}
 	}

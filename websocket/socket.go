@@ -47,7 +47,7 @@ func Send[R any](socket Socket, message Message) effect.Effect[R, Fault, effect.
 			return effect.Unit{}, socket.connection.Write(ctx, messageType(message.Kind), message.Data)
 		},
 		func(err error) Fault { return faultOf("sending a message", err) },
-	).Named("send")
+	).WithName("send")
 }
 
 // Receive reads the next message, whole.
@@ -65,7 +65,7 @@ func Receive[R any](socket Socket) effect.Effect[R, Fault, Message] {
 			return Message{Kind: messageKind(kind), Data: data}, nil
 		},
 		func(err error) Fault { return faultOf("reading a message", err) },
-	).Named("receive")
+	).WithName("receive")
 }
 
 // SendText writes one text message, which is the common case.
@@ -84,7 +84,7 @@ func Close[R any](socket Socket, reason string) effect.Effect[R, Fault, effect.U
 			return effect.Unit{}, socket.connection.Close(ws.StatusNormalClosure, reason)
 		},
 		func(err error) Fault { return faultOf("closing the connection", err) },
-	).Named("close")
+	).WithName("close")
 }
 
 // closeSocket releases the socket when its scope ends.

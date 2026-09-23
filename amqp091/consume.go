@@ -114,7 +114,7 @@ func handleDelivery[R, A any](
 			return effect.Unit{}, answer(received.Delivery.Tag)
 		},
 		func(err error) Fault { return faultOf(doing, received.Delivery.Key, err) },
-	).Named("acknowledge")
+	).WithName("acknowledge")
 }
 
 // read decodes one delivery, keeping the refusal rather than raising it.
@@ -141,7 +141,7 @@ func subscribe[R any](
 			return channel.Consume(ctx, queue)
 		},
 		func(err error) Fault { return faultOf("consuming", queue, err) },
-	).Named("consume")
+	).WithName("consume")
 
 	return scope.AcquireRelease(acquire, unsubscribe[R])
 }

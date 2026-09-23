@@ -22,7 +22,7 @@ func Serve(
 		settings := web.Settings{Listener: listener}
 		return web.ServeWith[effect.Unit](scope, settings, boundary.Handler(surface.Handler())).
 			FlatMap(web.Await[effect.Unit]).
-			Named("bookstore")
+			WithName("bookstore")
 	})
 }
 

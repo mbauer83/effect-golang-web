@@ -21,7 +21,7 @@ func Send[R any](link Sending, message Message) effect.Effect[R, Fault, effect.U
 			return effect.Unit{}, link.Send(ctx, message)
 		},
 		func(err error) Fault { return faultOf("sending", link.Address(), err) },
-	).Named("send")
+	).WithName("send")
 }
 
 // SendValue encodes a value through its schema and sends it.
@@ -41,7 +41,7 @@ func SendValue[R, A any](
 		FlatMap(func(message Message) effect.Effect[R, Fault, effect.Unit] {
 			return Send[R](link, message)
 		}).
-		Named("send-value")
+		WithName("send-value")
 }
 
 // Encoded is the message a value makes.

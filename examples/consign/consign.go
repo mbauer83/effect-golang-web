@@ -135,20 +135,20 @@ func collectConsignment(
 	// Direct style: offer it, then settle it according to what came back. As a
 	// FlatMap the settling was nested inside the offering, which is the wrong
 	// way round for something that happens after it.
-	return direct.Run(func(bind *settling) effect.Chunk[Shipment] {
+	return direct.Run(func(do *settling) effect.Chunk[Shipment] {
 		shipment, err := received.Read()
 		if err != nil {
-			return direct.Bind(bind, amqp10.Reject[effect.Unit](received,
+			return do.Await(amqp10.Reject[effect.Unit](received,
 				"the shipment cannot be read: "+err.Error()).As(effect.ChunkOf[Shipment]()))
 		}
-		outcome := direct.Bind(bind, carrier(shipment))
-		return direct.Bind(bind, validateConsignment(received, shipment, outcome))
+		outcome := do.Await(carrier(shipment))
+		return do.Await(validateConsignment(received, shipment, outcome))
 	})
 }
 
 // settling is the binder this program binds in. No defer in the body, which is
 // the condition for direct style.
-type settling = direct.Binder[effect.Unit, amqp10.Fault]
+type settling = direct.Do[effect.Unit, amqp10.Fault]
 
 // validateConsignment turns the carrier's answer into the disposition that says it.
 func validateConsignment(

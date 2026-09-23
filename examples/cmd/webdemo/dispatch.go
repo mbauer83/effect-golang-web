@@ -45,19 +45,19 @@ func runDispatch(runtime *effect.Runtime) {
 	// only to say "then". The body holds no defer, which is the condition --
 	// in direct style a defer runs on an ordinary domain failure and not only
 	// on a panic.
-	program := direct.Run(func(bind *dispatching) []dispatch.Order {
-		direct.Bind(bind, dispatch.Prepare(broker))
+	program := direct.Run(func(do *dispatching) []dispatch.Order {
+		do.Await(dispatch.Prepare(broker))
 		// A body nothing can read, so the discard is shown rather than
 		// described.
-		direct.Bind(bind, amqp091.Publish[effect.Unit](broker,
+		do.Await(amqp091.Publish[effect.Unit](broker,
 			amqp091.Target{Exchange: dispatch.Orders, Key: dispatch.Placed},
 			amqp091.Message{Body: []byte(`{"reference":"not a uuid"}`)}))
-		direct.Bind(bind, dispatch.Place(broker, dispatch.Order{
+		do.Await(dispatch.Place(broker, dispatch.Order{
 			Reference: "8f14e45f-ceea-467a-a4fb-1a9c73d0f2b1",
 			Item:      "lamp",
 			Quantity:  2,
 		}))
-		return direct.Bind(bind, effect.RunCollect(dispatch.Ship(broker, packing).TakeStream(1)))
+		return do.Await(effect.RunCollect(dispatch.Ship(broker, packing).TakeStream(1)))
 	})
 
 	exit := runtime.Run(context.Background(), effect.Unit{}, program)
@@ -76,4 +76,4 @@ func runDispatch(runtime *effect.Runtime) {
 // The channel this scenario works in, and the binder it binds with, named so a
 // signature says what it is rather than repeating itself.
 type shipping[A any] = effect.Effect[effect.Unit, amqp091.Fault, A]
-type dispatching = direct.Binder[effect.Unit, amqp091.Fault]
+type dispatching = direct.Do[effect.Unit, amqp091.Fault]

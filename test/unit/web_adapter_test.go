@@ -106,7 +106,7 @@ func TestADefectReachesTheBoundarysReportBecauseNothingElseSeesIt(t *testing.T) 
 	// interprets directly -- which is what every request is -- reaches an
 	// observer nowhere. An observer installed on the runtime records nothing
 	// for this request.
-	observer := &effecttest.RecordingObserver{}
+	observer := &effecttest.EventRecorder{}
 	runtime, err := effect.NewRuntime(effect.WithObserver(observer))
 	if err != nil {
 		t.Fatal(err)

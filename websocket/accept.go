@@ -62,7 +62,7 @@ func runConversation[R, E any](
 		return scope.AcquireRelease(
 			effect.For[R, E]().Succeed(socket),
 			closeSocket[R],
-		).FlatMap(converse).Named("conversation")
+		).FlatMap(converse).WithName("conversation")
 	})
 }
 

@@ -110,7 +110,7 @@ func (adapter Adapter[R, E]) Sharing(across CrossOrigin) Adapter[R, E] {
 func (adapter Adapter[R, E]) Interpret(ctx context.Context, fx effect.Effect[R, E, effect.Unit]) {
 	exit := adapter.runtime.Run(ctx, adapter.environment, fx)
 	cause, failed := exit.Cause()
-	if !failed || cause.IsInterruptedOnly() {
+	if !failed || cause.HasInterruptsOnly() {
 		return
 	}
 	adapter.report(ctx, errors.New("web: the exchange ended badly: "+cause.String()))
@@ -205,7 +205,7 @@ func (adapter Adapter[R, E]) Quietly() Adapter[R, E] {
 // defectResponse is the default answer to something the application did not
 // account for.
 func defectResponse[E any](cause effect.Cause[E]) Response {
-	if cause.IsInterruptedOnly() {
+	if cause.HasInterruptsOnly() {
 		return Empty(http.StatusServiceUnavailable)
 	}
 	return Empty(http.StatusInternalServerError)

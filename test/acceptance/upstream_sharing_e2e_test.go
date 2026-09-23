@@ -62,7 +62,7 @@ func (service *heldOpen) timesAsked() int {
 // pacing is not what this test is measuring.
 func readingFrom(t *testing.T, service *heldOpen) (*web.UpstreamClient, cache.Store) {
 	t.Helper()
-	keeping := cache.NewHeld(64, time.Now)
+	keeping := cache.NewMemoryStore(64, time.Now)
 	upstream, err := web.NewUpstreamClient(
 		web.Dial(http.DefaultClient, service.server.URL),
 		web.UpstreamTerms{
@@ -71,7 +71,7 @@ func readingFrom(t *testing.T, service *heldOpen) (*web.UpstreamClient, cache.St
 			Fresh:   time.Minute,
 		},
 		keeping,
-		rate.NewHeld(time.Now),
+		rate.NewMemoryLimiter(time.Now),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -157,7 +157,7 @@ func keptWithin(t *testing.T, keeping cache.Store, within time.Duration) {
 			cache.Read[effect.Unit](keeping, "a service:film:603:GET /film/603").
 				MapError(func(cache.Fault) web.Fault { return web.Fault{} }),
 			func(effect.Cause[web.Fault]) bool { return false },
-			func(cached cache.Cached) bool { return cached.Found },
+			func(cached cache.Lookup) bool { return cached.Found },
 		).MapError(func(effect.Never) web.Fault { return web.Fault{} }))
 		if found, ok := exit.Value(); ok && found {
 			return

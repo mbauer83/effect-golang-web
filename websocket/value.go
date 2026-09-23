@@ -27,7 +27,7 @@ func SendValue[R, A any](socket Socket, shape schema.Schema[A], value A) effect.
 			}
 			return Send[R](socket, Message{Kind: Text, Data: document})
 		}).
-		Named("send-value")
+		WithName("send-value")
 }
 
 // ReceiveValue reads the next message, decoded through its schema.
@@ -44,7 +44,7 @@ func ReceiveValue[R, A any](socket Socket, shape schema.Schema[A]) effect.Effect
 				func(err error) Fault { return faultOf("reading a message", err) },
 			)
 		}).
-		Named("receive-value")
+		WithName("receive-value")
 }
 
 // Values is the inbound side decoded through a schema.

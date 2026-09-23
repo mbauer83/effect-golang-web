@@ -122,7 +122,7 @@ func settleDelivery[R, A any](
 			return effect.Unit{}, settle(ctx, received.Delivery.Tag)
 		},
 		func(err error) Fault { return faultOf(doing, received.Delivery.Subject, err) },
-	).Named("settle")
+	).WithName("settle")
 }
 
 // read decodes one delivery, keeping the refusal rather than raising it.

@@ -25,7 +25,7 @@ func Publish[R any](
 			return effect.Unit{}, channel.Publish(ctx, target, message)
 		},
 		func(err error) Fault { return faultOf("publishing", target.Key, err) },
-	).Named("publish")
+	).WithName("publish")
 }
 
 // PublishValue encodes a value through its schema and sends it.
@@ -46,7 +46,7 @@ func PublishValue[R, A any](
 		FlatMap(func(message Message) effect.Effect[R, Fault, effect.Unit] {
 			return Publish[R](channel, target, message)
 		}).
-		Named("publish-value")
+		WithName("publish-value")
 }
 
 // Encoded is the message a value makes.

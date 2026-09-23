@@ -117,7 +117,7 @@ func Fetch[R any](
 			return exchange(ctx, client, method, path, requesting)
 		},
 		func(err error) Fault { return asFault("calling "+method+" "+path, err) },
-	).Named("fetch")
+	).WithName("fetch")
 }
 
 func exchange(

@@ -69,13 +69,13 @@ func runConversation(running effect.Ref[int64]) func(websocket.Socket) tallyEffe
 			func(change Change) tallyEffect[effect.Unit] {
 				// Direct style: apply the change, then say what the total is.
 				// As a FlatMap the answering was nested inside the applying.
-				return direct.Run(func(bind *tallying) effect.Unit {
-					now := direct.Bind(bind, applyTally(running, change))
-					return direct.Bind(bind, websocket.SendValue[effect.Unit](
+				return direct.Run(func(do *tallying) effect.Unit {
+					now := do.Await(applyTally(running, change))
+					return do.Await(websocket.SendValue[effect.Unit](
 						socket, TotalSchema, Total{Total: now}))
 				})
 			},
-		).Named("tally")
+		).WithName("tally")
 	}
 }
 
@@ -90,10 +90,10 @@ func applyTally(running effect.Ref[int64], change Change) tallyEffect[int64] {
 
 // Ask sends one change and reads the answer, which is what a client does.
 func Ask[R any](socket websocket.Socket, add int32) effect.Effect[R, websocket.Fault, Total] {
-	return direct.Run(func(bind *direct.Binder[R, websocket.Fault]) Total {
-		direct.Bind(bind, websocket.SendValue[R](socket, ChangeSchema, Change{Add: add}))
-		return direct.Bind(bind, websocket.ReceiveValue[R](socket, TotalSchema))
-	}).Named("ask")
+	return direct.Run(func(do *direct.Do[R, websocket.Fault]) Total {
+		do.Await(websocket.SendValue[R](socket, ChangeSchema, Change{Add: add}))
+		return do.Await(websocket.ReceiveValue[R](socket, TotalSchema))
+	}).WithName("ask")
 }
 
 // tallying is the binder the server side binds in.
@@ -101,4 +101,4 @@ func Ask[R any](socket websocket.Socket, add int32) effect.Effect[R, websocket.F
 // Direct style because a change is applied and then answered, in that order,
 // and a FlatMap put the answering inside the applying. No defer in either
 // body, which is the condition.
-type tallying = direct.Binder[effect.Unit, websocket.Fault]
+type tallying = direct.Do[effect.Unit, websocket.Fault]

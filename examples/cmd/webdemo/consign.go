@@ -54,16 +54,16 @@ func runConsign(runtime *effect.Runtime) {
 	// Direct style: three things in order, which as FlatMaps read inside-out
 	// with the last nested deepest. No defer in the body, which is the
 	// condition for using it.
-	program := direct.Run(func(bind *consigning) []consign.Shipment {
-		direct.Bind(bind, amqp10.Send[effect.Unit](sender, amqp10.Message{
+	program := direct.Run(func(do *consigning) []consign.Shipment {
+		do.Await(amqp10.Send[effect.Unit](sender, amqp10.Message{
 			Body: []byte(`{"reference":"not a uuid","carrier":"","weight":0}`),
 		}))
-		direct.Bind(bind, consign.Hand(sender, consign.Shipment{
+		do.Await(consign.Hand(sender, consign.Shipment{
 			Reference: "8f14e45f-ceea-467a-a4fb-1a9c73d0f2b1",
 			Carrier:   "overland",
 			Weight:    12.5,
 		}))
-		return direct.Bind(bind, effect.RunCollect(consign.Collect(receiver, carrier).TakeStream(1)))
+		return do.Await(effect.RunCollect(consign.Collect(receiver, carrier).TakeStream(1)))
 	})
 
 	exit := runtime.Run(context.Background(), effect.Unit{}, program)
@@ -85,4 +85,4 @@ func runConsign(runtime *effect.Runtime) {
 
 // The channel this scenario works in, and the binder it binds with.
 type collecting[A any] = effect.Effect[effect.Unit, amqp10.Fault, A]
-type consigning = direct.Binder[effect.Unit, amqp10.Fault]
+type consigning = direct.Do[effect.Unit, amqp10.Fault]

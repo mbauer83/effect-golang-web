@@ -42,11 +42,11 @@ func (upstream *UpstreamClient) cacheKey(method string, path string, requesting 
 // asking the service. It is logged with the key, because a cache that has been
 // unreachable for an hour is a rate limit about to be spent and has to be
 // visible before that happens.
-func getCached[R any](upstream *UpstreamClient, filed string) effect.Effect[R, Fault, cache.Cached] {
+func getCached[R any](upstream *UpstreamClient, filed string) effect.Effect[R, Fault, cache.Lookup] {
 	return effect.Fold(
-		cache.Read[R](upstream.keeping, filed).CatchAll(cacheFault[R, cache.Cached]("reading", filed)),
-		func(effect.Cause[cache.Fault]) cache.Cached { return cache.Cached{} },
-		func(cached cache.Cached) cache.Cached { return cached },
+		cache.Read[R](upstream.keeping, filed).CatchAll(cacheFault[R, cache.Lookup]("reading", filed)),
+		func(effect.Cause[cache.Fault]) cache.Lookup { return cache.Lookup{} },
+		func(cached cache.Lookup) cache.Lookup { return cached },
 	).MapError(func(effect.Never) Fault { return Fault{} })
 }
 
@@ -120,7 +120,7 @@ func written(received Received) ([]byte, error) {
 // A kept answer that cannot be read back is treated as no answer: it is this
 // program's own writing, so a failure here is a bug rather than a thing to
 // report to a caller, and the service can still be asked.
-func responseFrom(cached cache.Cached) (Received, bool) {
+func responseFrom(cached cache.Lookup) (Received, bool) {
 	if !cached.Found {
 		return Received{}, false
 	}

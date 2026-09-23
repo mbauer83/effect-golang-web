@@ -40,7 +40,7 @@ func Connect[R any](scope effect.Scope, address string) effect.Effect[R, Fault, 
 			return &Connection{connection: connection}, nil
 		},
 		func(err error) Fault { return faultOf("connecting", "", err) },
-	).Named("connect")
+	).WithName("connect")
 
 	return scope.AcquireRelease(acquire, disconnect[R])
 }
@@ -56,7 +56,7 @@ func Open[R any](scope effect.Scope, connection *Connection) effect.Effect[R, Fa
 			return &Channel{channel: channel}, nil
 		},
 		func(err error) Fault { return faultOf("opening a channel", "", err) },
-	).Named("open-channel")
+	).WithName("open-channel")
 
 	return scope.AcquireRelease(acquire, closeConnection[R])
 }
@@ -74,7 +74,7 @@ func Prefetch[R any](channel *Channel, count int) effect.Effect[R, Fault, effect
 			return effect.Unit{}, channel.channel.Qos(count, 0, false)
 		},
 		func(err error) Fault { return faultOf("setting the prefetch", "", err) },
-	).Named("prefetch")
+	).WithName("prefetch")
 }
 
 func disconnect[R any](connection *Connection) effect.Effect[R, effect.Never, effect.Unit] {

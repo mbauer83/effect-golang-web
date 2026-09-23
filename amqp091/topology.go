@@ -38,7 +38,7 @@ func Declare[R any](channel Declaring, topology Topology) effect.Effect[R, Fault
 			return BindQueue[R](channel, binding)
 		})).
 		As(effect.Unit{}).
-		Named("declare")
+		WithName("declare")
 }
 
 // DeclareExchange states one exchange.
@@ -48,7 +48,7 @@ func DeclareExchange[R any](channel Declaring, exchange Exchange) effect.Effect[
 			return effect.Unit{}, channel.DeclareExchange(ctx, exchange)
 		},
 		func(err error) Fault { return faultOf("declaring an exchange", exchange.Name, err) },
-	).Named("declare-exchange")
+	).WithName("declare-exchange")
 }
 
 // DeclareQueue states one queue.
@@ -58,7 +58,7 @@ func DeclareQueue[R any](channel Declaring, queue Queue) effect.Effect[R, Fault,
 			return effect.Unit{}, channel.DeclareQueue(ctx, queue)
 		},
 		func(err error) Fault { return faultOf("declaring a queue", queue.Name, err) },
-	).Named("declare-queue")
+	).WithName("declare-queue")
 }
 
 // BindQueue sends a queue the messages an exchange routes by a key.
@@ -68,5 +68,5 @@ func BindQueue[R any](channel Declaring, binding Binding) effect.Effect[R, Fault
 			return effect.Unit{}, channel.Bind(ctx, binding)
 		},
 		func(err error) Fault { return faultOf("binding a queue", binding.Queue, err) },
-	).Named("bind-queue")
+	).WithName("bind-queue")
 }

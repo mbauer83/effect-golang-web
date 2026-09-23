@@ -103,7 +103,7 @@ func Ask[R, In, Out any](
 			}
 			return sendRequest[R](transport, procedure, written)
 		}).
-		Named("ask")
+		WithName("ask")
 }
 
 func sendRequest[R, In, Out any](
@@ -126,7 +126,7 @@ func sendRequest[R, In, Out any](
 			})
 		}
 		return effect.ExitSuccess[Failure](read)
-	}).Named("call")
+	}).WithName("call")
 }
 
 func callFault[R, Out any](code Code, message string) effect.Effect[R, Failure, Out] {

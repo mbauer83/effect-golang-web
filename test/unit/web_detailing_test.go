@@ -56,7 +56,7 @@ func TestDetailingComposesWithWrappingSoThePhasesSitUnderTheRoute(t *testing.T) 
 	}
 	both := surface.Detailing().Wrapping(spanning)
 
-	observer := &effecttest.RecordingObserver{}
+	observer := &effecttest.EventRecorder{}
 	runtime, err := effect.NewRuntime(effect.WithObserver(observer))
 	if err != nil {
 		t.Fatal(err)
@@ -108,7 +108,7 @@ func spanning(
 // spansOf sends one request through a surface and counts the spans by name.
 func spansOf(t *testing.T, surface web.Routes[effect.Unit, Refusal], path string) map[string]int {
 	t.Helper()
-	observer := &effecttest.RecordingObserver{}
+	observer := &effecttest.EventRecorder{}
 	runtime, err := effect.NewRuntime(effect.WithObserver(observer))
 	if err != nil {
 		t.Fatal(err)

@@ -94,5 +94,5 @@ func Body[R any](request Request) effect.Effect[R, Fault, []byte] {
 			return io.ReadAll(request.underlying.Body)
 		},
 		func(err error) Fault { return Fault{Doing: "reading the request body", Err: err} },
-	).Named("read-body")
+	).WithName("read-body")
 }

@@ -72,7 +72,7 @@ func ServeWith[R any](scope effect.Scope, settings Settings, handler http.Handle
 						})
 				})
 		}).
-		Named("serve")
+		WithName("serve")
 }
 
 // Await completes when the server stops, and fails if it stopped for a reason

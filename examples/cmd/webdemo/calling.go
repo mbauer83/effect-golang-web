@@ -29,16 +29,16 @@ func runCalling(runtime *effect.Runtime, base string) {
 	client := web.Dial(http.DefaultClient, base)
 	added := bookstore.Book{Title: "Called", Authors: []string{"A Client"}, Pages: 12}
 
-	program := direct.Run(func(bind *direct.Binder[effect.Unit, web.Fault]) bookstore.Book {
+	program := direct.Run(func(do *direct.Do[effect.Unit, web.Fault]) bookstore.Book {
 		sending, err := web.Carrying(web.Requesting{}, bookstore.BookSchema, added)
 		if err != nil {
-			direct.Bind(bind, effect.Fail[effect.Unit, bookstore.Book](
+			do.Await(effect.Fail[effect.Unit, bookstore.Book](
 				web.Fault{Doing: "encoding the book", Err: err}))
 		}
-		direct.Bind(bind, web.Call[effect.Unit](client, bookstore.AddBook, sending))
+		do.Await(web.Call[effect.Unit](client, bookstore.AddBook, sending))
 		// The title fills the endpoint's captured segment by name, so the path
 		// is built from the declaration rather than pasted together here.
-		return direct.Bind(bind, web.Call[effect.Unit](client, bookstore.FindBook,
+		return do.Await(web.Call[effect.Unit](client, bookstore.FindBook,
 			web.Requesting{Path: map[string]string{"title": added.Title}}))
 	})
 

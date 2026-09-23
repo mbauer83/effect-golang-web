@@ -140,7 +140,7 @@ func FetchFromUpstream[R any](
 ) effect.Effect[R, Fault, Received] {
 	filed := upstream.cacheKey(method, path, requesting)
 	return getCached[R](upstream, filed).
-		FlatMap(func(cached cache.Cached) effect.Effect[R, Fault, Received] {
+		FlatMap(func(cached cache.Lookup) effect.Effect[R, Fault, Received] {
 			if received, replayed := responseFrom(cached); replayed {
 				return effect.Succeed[R, Fault](received)
 			}
@@ -148,7 +148,7 @@ func FetchFromUpstream[R any](
 				askUpstream[R](upstream, method, path, requesting).
 					FlatMap(putCached[R](upstream, filed, requesting.About)))
 		}).
-		Named("upstream read")
+		WithName("upstream read")
 }
 
 // CallUpstream reads an endpoint under the same terms, and reads the answer

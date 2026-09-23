@@ -176,7 +176,7 @@ func (boundary *Boundary[R, E]) failureForCause(
 
 // defectFailure is what a defect or an interruption answers with by default.
 func defectFailure[E any](cause effect.Cause[E]) Failure {
-	if cause.IsInterruptedOnly() {
+	if cause.HasInterruptsOnly() {
 		return Failure{Code: Cancelled, Message: "the call was cancelled"}
 	}
 	return Failure{Code: Unknown, Message: "the service failed"}

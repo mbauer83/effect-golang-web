@@ -58,7 +58,7 @@ func NewStore(books ...Book) effect.Effect[effect.Unit, effect.Never, *Store] {
 // It hands back a copy, so a reader cannot change the store through what it was
 // given.
 func (store *Store) All() storeEffect[[]Book] {
-	return widenFault(store.books.Get[effect.Unit]().Map(slices.Clone)).Named("list-books")
+	return widenFault(store.books.Get[effect.Unit]().Map(slices.Clone)).WithName("list-books")
 }
 
 // Add appends a book, or refuses because the store already holds that title.
@@ -80,29 +80,29 @@ func (store *Store) Add(book Book) storeEffect[effect.Unit] {
 	// something that happens after it -- and a refusal is bound like anything
 	// else, because binding one abandons the body, which is what a refusal
 	// means.
-	return direct.Run(func(bind *storing) effect.Unit {
-		if direct.Bind(bind, widenFault(added)) {
+	return direct.Run(func(do *storing) effect.Unit {
+		if do.Await(widenFault(added)) {
 			return effect.Unit{}
 		}
-		direct.Bind(bind, effect.For[effect.Unit, Fault]().Fail[effect.Unit](Fault{
+		do.Await(effect.For[effect.Unit, Fault]().Fail[effect.Unit](Fault{
 			Kind: AlreadyHeld,
 			Err:  errors.New(book.Title + " is already held"),
 		}))
 		return effect.Unit{}
-	}).Named("add-book")
+	}).WithName("add-book")
 }
 
 // Find returns the book with the given title, or refuses because there is none.
 func (store *Store) Find(title string) storeEffect[Book] {
-	return direct.Run(func(bind *storing) Book {
-		getEntry := direct.Bind(bind, widenFault(store.books.Get[effect.Unit]()))
+	return direct.Run(func(do *storing) Book {
+		getEntry := do.Await(widenFault(store.books.Get[effect.Unit]()))
 		index := slices.IndexFunc(getEntry, sameTitle(title))
 		if index < 0 {
-			direct.Bind(bind, effect.For[effect.Unit, Fault]().
+			do.Await(effect.For[effect.Unit, Fault]().
 				Fail[Book](Fault{Kind: NotFound}))
 		}
 		return getEntry[index]
-	}).Named("find-book")
+	}).WithName("find-book")
 }
 
 // storing is the binder the store's operations bind in.
@@ -111,7 +111,7 @@ func (store *Store) Find(title string) storeEffect[Book] {
 // decides -- and as FlatMaps the deciding was nested inside the reading. None
 // of these bodies holds a defer, which is the condition: in direct style a
 // defer runs on an ordinary domain failure and not only on a panic.
-type storing = direct.Binder[effect.Unit, Fault]
+type storing = direct.Do[effect.Unit, Fault]
 
 func sameTitle(title string) func(Book) bool {
 	return func(book Book) bool { return book.Title == title }
