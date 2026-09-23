@@ -14,7 +14,6 @@ import (
 	"github.com/mbauer83/effect-golang-web/web"
 	"github.com/mbauer83/effect-golang-web/websocket"
 	"github.com/mbauer83/effect-golang/effect"
-	"github.com/mbauer83/effect-golang/experimental/direct"
 )
 
 // Change is what a client asks for.
@@ -69,7 +68,7 @@ func runConversation(running effect.Ref[int64]) func(websocket.Socket) tallyEffe
 			func(change Change) tallyEffect[effect.Unit] {
 				// Direct style: apply the change, then say what the total is.
 				// As a FlatMap the answering was nested inside the applying.
-				return direct.Run(func(do *tallying) effect.Unit {
+				return effect.Gen(func(do *tallying) effect.Unit {
 					now := do.Await(applyTally(running, change))
 					return do.Await(websocket.SendValue[effect.Unit](
 						socket, TotalSchema, Total{Total: now}))
@@ -90,7 +89,7 @@ func applyTally(running effect.Ref[int64], change Change) tallyEffect[int64] {
 
 // Ask sends one change and reads the answer, which is what a client does.
 func Ask[R any](socket websocket.Socket, add int32) effect.Effect[R, websocket.Fault, Total] {
-	return direct.Run(func(do *direct.Do[R, websocket.Fault]) Total {
+	return effect.Gen(func(do *effect.Do[R, websocket.Fault]) Total {
 		do.Await(websocket.SendValue[R](socket, ChangeSchema, Change{Add: add}))
 		return do.Await(websocket.ReceiveValue[R](socket, TotalSchema))
 	}).WithName("ask")
@@ -101,4 +100,4 @@ func Ask[R any](socket websocket.Socket, add int32) effect.Effect[R, websocket.F
 // Direct style because a change is applied and then answered, in that order,
 // and a FlatMap put the answering inside the applying. No defer in either
 // body, which is the condition.
-type tallying = direct.Do[effect.Unit, websocket.Fault]
+type tallying = effect.Do[effect.Unit, websocket.Fault]

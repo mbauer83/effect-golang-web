@@ -15,7 +15,6 @@ import (
 	"github.com/mbauer83/effect-golang-web/amqp10/inprocess"
 	"github.com/mbauer83/effect-golang-web/examples/consign"
 	"github.com/mbauer83/effect-golang/effect"
-	"github.com/mbauer83/effect-golang/experimental/direct"
 )
 
 func runConsign(runtime *effect.Runtime) {
@@ -54,7 +53,7 @@ func runConsign(runtime *effect.Runtime) {
 	// Direct style: three things in order, which as FlatMaps read inside-out
 	// with the last nested deepest. No defer in the body, which is the
 	// condition for using it.
-	program := direct.Run(func(do *consigning) []consign.Shipment {
+	program := effect.Gen(func(do *consigning) []consign.Shipment {
 		do.Await(amqp10.Send[effect.Unit](sender, amqp10.Message{
 			Body: []byte(`{"reference":"not a uuid","carrier":"","weight":0}`),
 		}))
@@ -85,4 +84,4 @@ func runConsign(runtime *effect.Runtime) {
 
 // The channel this scenario works in, and the binder it binds with.
 type collecting[A any] = effect.Effect[effect.Unit, amqp10.Fault, A]
-type consigning = direct.Do[effect.Unit, amqp10.Fault]
+type consigning = effect.Do[effect.Unit, amqp10.Fault]

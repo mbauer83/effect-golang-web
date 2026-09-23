@@ -15,7 +15,6 @@ import (
 	"slices"
 
 	"github.com/mbauer83/effect-golang/effect"
-	"github.com/mbauer83/effect-golang/experimental/direct"
 )
 
 // Book is one entry.
@@ -80,7 +79,7 @@ func (store *Store) Add(book Book) storeEffect[effect.Unit] {
 	// something that happens after it -- and a refusal is bound like anything
 	// else, because binding one abandons the body, which is what a refusal
 	// means.
-	return direct.Run(func(do *storing) effect.Unit {
+	return effect.Gen(func(do *storing) effect.Unit {
 		if do.Await(widenFault(added)) {
 			return effect.Unit{}
 		}
@@ -94,7 +93,7 @@ func (store *Store) Add(book Book) storeEffect[effect.Unit] {
 
 // Find returns the book with the given title, or refuses because there is none.
 func (store *Store) Find(title string) storeEffect[Book] {
-	return direct.Run(func(do *storing) Book {
+	return effect.Gen(func(do *storing) Book {
 		getEntry := do.Await(widenFault(store.books.Get[effect.Unit]()))
 		index := slices.IndexFunc(getEntry, sameTitle(title))
 		if index < 0 {
@@ -111,7 +110,7 @@ func (store *Store) Find(title string) storeEffect[Book] {
 // decides -- and as FlatMaps the deciding was nested inside the reading. None
 // of these bodies holds a defer, which is the condition: in direct style a
 // defer runs on an ordinary domain failure and not only on a panic.
-type storing = direct.Do[effect.Unit, Fault]
+type storing = effect.Do[effect.Unit, Fault]
 
 func sameTitle(title string) func(Book) bool {
 	return func(book Book) bool { return book.Title == title }

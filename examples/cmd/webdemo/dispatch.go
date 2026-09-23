@@ -17,7 +17,6 @@ import (
 	"github.com/mbauer83/effect-golang-web/amqp091/inprocess"
 	"github.com/mbauer83/effect-golang-web/examples/dispatch"
 	"github.com/mbauer83/effect-golang/effect"
-	"github.com/mbauer83/effect-golang/experimental/direct"
 )
 
 var errWarehouseBusy = errors.New("the warehouse is busy")
@@ -45,7 +44,7 @@ func runDispatch(runtime *effect.Runtime) {
 	// only to say "then". The body holds no defer, which is the condition --
 	// in direct style a defer runs on an ordinary domain failure and not only
 	// on a panic.
-	program := direct.Run(func(do *dispatching) []dispatch.Order {
+	program := effect.Gen(func(do *dispatching) []dispatch.Order {
 		do.Await(dispatch.Prepare(broker))
 		// A body nothing can read, so the discard is shown rather than
 		// described.
@@ -76,4 +75,4 @@ func runDispatch(runtime *effect.Runtime) {
 // The channel this scenario works in, and the binder it binds with, named so a
 // signature says what it is rather than repeating itself.
 type shipping[A any] = effect.Effect[effect.Unit, amqp091.Fault, A]
-type dispatching = direct.Do[effect.Unit, amqp091.Fault]
+type dispatching = effect.Do[effect.Unit, amqp091.Fault]

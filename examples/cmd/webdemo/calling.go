@@ -16,7 +16,6 @@ import (
 	"github.com/mbauer83/effect-golang-web/examples/bookstore"
 	"github.com/mbauer83/effect-golang-web/web"
 	"github.com/mbauer83/effect-golang/effect"
-	"github.com/mbauer83/effect-golang/experimental/direct"
 )
 
 // calling is the client's channel: the transport's own faults, which is what a
@@ -29,7 +28,7 @@ func runCalling(runtime *effect.Runtime, base string) {
 	client := web.Dial(http.DefaultClient, base)
 	added := bookstore.Book{Title: "Called", Authors: []string{"A Client"}, Pages: 12}
 
-	program := direct.Run(func(do *direct.Do[effect.Unit, web.Fault]) bookstore.Book {
+	program := effect.Gen(func(do *effect.Do[effect.Unit, web.Fault]) bookstore.Book {
 		sending, err := web.Carrying(web.Requesting{}, bookstore.BookSchema, added)
 		if err != nil {
 			do.Await(effect.Fail[effect.Unit, bookstore.Book](

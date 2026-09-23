@@ -18,7 +18,6 @@ import (
 	"github.com/mbauer83/effect-golang-schema/schema/dynamic"
 	"github.com/mbauer83/effect-golang-web/amqp10"
 	"github.com/mbauer83/effect-golang/effect"
-	"github.com/mbauer83/effect-golang/experimental/direct"
 )
 
 // Shipment is one consignment.
@@ -135,7 +134,7 @@ func collectConsignment(
 	// Direct style: offer it, then settle it according to what came back. As a
 	// FlatMap the settling was nested inside the offering, which is the wrong
 	// way round for something that happens after it.
-	return direct.Run(func(do *settling) effect.Chunk[Shipment] {
+	return effect.Gen(func(do *settling) effect.Chunk[Shipment] {
 		shipment, err := received.Read()
 		if err != nil {
 			return do.Await(amqp10.Reject[effect.Unit](received,
@@ -148,7 +147,7 @@ func collectConsignment(
 
 // settling is the binder this program binds in. No defer in the body, which is
 // the condition for direct style.
-type settling = direct.Do[effect.Unit, amqp10.Fault]
+type settling = effect.Do[effect.Unit, amqp10.Fault]
 
 // validateConsignment turns the carrier's answer into the disposition that says it.
 func validateConsignment(
