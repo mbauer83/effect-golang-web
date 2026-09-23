@@ -151,7 +151,7 @@ func TestASurfaceThatDidNotAskIsHandedNothing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Detailing names the phases and measures nothing: the two are separate
+	// WithPhaseSpans names the phases and measures nothing: the two are separate
 	// settings because they cost differently.
 	answer(t, surface.WithPhaseSpans(), "/books/Zionomicon")
 	answer(t, surface, "/books/Zionomicon")
@@ -159,7 +159,7 @@ func TestASurfaceThatDidNotAskIsHandedNothing(t *testing.T) {
 	if len(record.opened) != 0 {
 		t.Fatalf("expected no sampling, got %v", record.opened)
 	}
-	// A nil sampler is Detailing, rather than a surface that panics per
+	// A nil sampler is WithPhaseSpans, rather than a surface that panics per
 	// request: a caller may pass what a flag gave it.
 	if named := spansOf(t, surface.WithPhaseSampler(nil), "/books/Zionomicon"); len(named) != 3 {
 		t.Fatalf("expected a nil sampler to name the phases anyway, got %v", named)

@@ -5,7 +5,7 @@ package amqp091
 // Three interfaces rather than one, because most programs use one of them: a
 // producer publishes, a consumer consumes, and whoever owns the topology
 // declares it -- usually at start-up and usually once. A consumer that depended
-// on Declaring would be claiming a right it does not exercise.
+// on Declarer would be claiming a right it does not exercise.
 
 import (
 	"context"
@@ -138,7 +138,7 @@ const (
 	// instance's own subscription.
 	//
 	// It is also how a queue says it needs no keeping: a broker may refuse one
-	// that is neither Lasting nor Exclusive, because a queue nothing persists and
+	// that is neither Durable nor Exclusive, because a queue nothing persists and
 	// nobody owns is one it cannot account for. RabbitMQ 4 does.
 	Exclusive
 )

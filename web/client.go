@@ -56,14 +56,14 @@ type ClientRequest struct {
 	// the entity and the type that describes it cannot disagree.
 	Header http.Header
 	// Entity is the request body, already encoded, and MediaType says what it
-	// is. Carrying fills both from a value and its schema.
+	// is. WithEntity fills both from a value and its schema.
 	Entity    []byte
 	MediaType string
 	// About is what this request is about -- a film, an order, a customer --
-	// so that everything a careful client has kept about one thing can be
+	// so that everything an upstream client has kept about one thing can be
 	// dropped together when somebody asks for it to be looked up again.
 	//
-	// Read only by FetchCarefully and CallCarefully. Fetch and Call keep
+	// Read only by FetchUpstream and CallUpstream. Fetch and Call keep
 	// nothing and so have nothing to file it under, in the same way that
 	// Fetch takes the path whole and reads nothing from Path.
 	About string
@@ -164,7 +164,7 @@ func exchange(
 }
 
 // asFault keeps one Fault rather than wrapping a Fault in a Fault, so a caller
-// reading Doing sees what actually failed and not the outermost stage.
+// reading Op sees what actually failed and not the outermost stage.
 func asFault(op string, err error) Fault {
 	var already Fault
 	if errors.As(err, &already) {

@@ -76,9 +76,9 @@ func (store *Store) Add(book Book) storeEffect[effect.Unit] {
 	})
 	// Direct style: read the answer, then decide. As a FlatMap the deciding
 	// was nested inside the reading, which is the wrong way round for
-	// something that happens after it -- and a refusal is bound like anything
-	// else, because binding one abandons the body, which is what a refusal
-	// means.
+	// something that happens after it -- and a refusal is awaited like
+	// anything else, because awaiting one abandons the body, which is what a
+	// refusal means.
 	return effect.Gen(func(do *storeDo) effect.Unit {
 		if do.Await(widenFault(added)) {
 			return effect.Unit{}
@@ -104,7 +104,7 @@ func (store *Store) Find(title string) storeEffect[Book] {
 	}).WithName("find-book")
 }
 
-// storeDo is the binder the store's operations bind in.
+// storeDo is the Do the store's operations await through.
 //
 // Direct style throughout, because every one of them reads the cell and then
 // decides -- and as FlatMaps the deciding was nested inside the reading. None

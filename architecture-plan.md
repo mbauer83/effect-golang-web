@@ -1286,3 +1286,12 @@ document was invalid and no amount of reading it would have said so.
 10. **The emitted OpenAPI document is valid**, checked by a parser.
 11. **No third-party dependency is needed to use the HTTP core.**
 12. **A transport's dependency stays in that transport's package.**
+
+CORRECTED: the names this plan was written with have since been replaced by
+the vocabulary ZIO-HTTP and Effect already use, so reading it against the code
+needs this map. `Documented` is `WithDescription` and `Named` is `WithName`;
+`Wrapping`, `Detailing` and `Measuring` are `WithMiddleware`,
+`WithPhaseSpans` and `WithPhaseSampler`, and `Matched` is `RouteMiddleware`;
+`Upgrading` is `Upgrade`; the AMQP ports `Publishing`, `Consuming` and
+`Declaring` are `Publisher`, `Consumer` and `Declarer`; and gRPC's `Answering`
+is `UnaryHandler`. The decisions recorded above are unchanged.

@@ -62,7 +62,7 @@ const (
 
 // PhaseNames are the three, for a caller assembling a vocabulary.
 //
-//	metrics.Naming(append(inspect.Names(surface.Declarations()), web.PhaseNames()...)...)
+//	metrics.NewVocabulary(append(inspect.Names(surface.Declarations()), web.PhaseNames()...)...)
 func PhaseNames() []string {
 	return []string{PhaseDecoding, PhaseHandling, PhaseEncoding}
 }

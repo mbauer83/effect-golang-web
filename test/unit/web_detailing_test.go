@@ -4,7 +4,7 @@ package unit
 //
 // Decoding and encoding are the route's work as much as the handler is, and a
 // trace that showed one bar for all three could not say which of them a slow
-// request spent its time in. A separate setting from Wrapping, because they
+// request spent its time in. A separate setting from WithMiddleware, because they
 // cost differently.
 
 import (

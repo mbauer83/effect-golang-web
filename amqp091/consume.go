@@ -14,7 +14,7 @@ import (
 
 // Consume subscribes to a queue and streams what arrives, undecoded.
 //
-// The element is a Received[[]byte] and not a Delivery, because a delivery
+// The element is an Envelope[[]byte] and not a Delivery, because a delivery
 // parted from its subscription cannot be acknowledged -- and a consumer that
 // never acknowledges is one the broker stops sending to. With a prefetch of
 // one it receives one message and then waits forever, which is a stall no
@@ -42,7 +42,7 @@ func Consume[R any](channel Consumer, queue string) effect.Stream[R, Fault, Enve
 // of a websocket conversation, and deliberately: a conversation is stateful, so
 // a peer that said something unreadable has said something about the whole
 // exchange, but a queue is a sequence of separate messages and one that cannot
-// be read is one message. It arrives as a Received whose Read refuses, so the
+// be read is one message. It arrives as an Envelope whose Read refuses, so the
 // consumer decides what to do with it -- which is the same decision it makes
 // about a message it understood and could not act on.
 func Values[R, A any](
@@ -77,8 +77,8 @@ type Envelope[A any] struct {
 // It is a method rather than a field because a zero value that looked valid
 // would be a trap: a consumer that forgot to ask would act on a message that
 // was never there.
-func (received Envelope[A]) Read() (A, error) {
-	return received.value, received.refusal
+func (envelope Envelope[A]) Read() (A, error) {
+	return envelope.value, envelope.refusal
 }
 
 // Ack accepts a delivery, so the broker may forget it.

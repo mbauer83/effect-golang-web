@@ -72,7 +72,7 @@ func runDispatch(runtime *effect.Runtime) {
 	}
 }
 
-// The channel this scenario works in, and the binder it binds with, named so a
+// The channel this scenario works in, and the Do it awaits through, named so a
 // signature says what it is rather than repeating itself.
 type dispatchEffect[A any] = effect.Effect[effect.Unit, amqp091.Fault, A]
 type dispatchDo = effect.Do[effect.Unit, amqp091.Fault]

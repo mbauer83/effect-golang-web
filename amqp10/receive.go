@@ -39,7 +39,7 @@ func Receive[R any](link ReceiverLink) effect.Stream[R, Fault, Delivery] {
 // A message the schema refuses does not fail the stream, for the reason it does
 // not in AMQP 0-9-1: a link carries separate messages rather than one stateful
 // conversation, so one that cannot be read says something about one message. It
-// arrives as a Received whose Read refuses, and the consumer decides -- and here
+// arrives as an Envelope whose Read refuses, and the consumer decides -- and here
 // there are four things it can decide rather than three.
 func Values[R, A any](
 	link ReceiverLink,
@@ -65,8 +65,8 @@ type Envelope[A any] struct {
 // A method rather than a field because a zero value that looked valid would be
 // a trap: a consumer that forgot to ask would act on a message that was never
 // there.
-func (received Envelope[A]) Read() (A, error) {
-	return received.value, received.refusal
+func (envelope Envelope[A]) Read() (A, error) {
+	return envelope.value, envelope.refusal
 }
 
 // Accept says the message is done and the broker may forget it.

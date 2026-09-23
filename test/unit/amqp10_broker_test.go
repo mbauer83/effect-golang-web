@@ -110,7 +110,7 @@ func TestSettlingTheSameDeliveryTwiceIsRefused(t *testing.T) {
 }
 
 // The three settlements this file needs, each built the way a program builds
-// one: a Received carries the link, so it is made by reading through Values.
+// one: an Envelope carries the link, so it is made by reading through Values.
 func settledTried(link amqp10.ReceiverLink, delivery amqp10.Delivery, why string) consigning[effect.Unit] {
 	return effect.Try(
 		func(ctx context.Context, _ effect.Unit) (effect.Unit, error) {

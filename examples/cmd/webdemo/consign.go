@@ -77,11 +77,11 @@ func runConsign(runtime *effect.Runtime) {
 		fmt.Printf("  rejected: %s\n", rejection.Reason)
 	}
 	for _, modification := range broker.Modified() {
-		fmt.Printf("  given back: tried=%v elsewhere=%v\n",
+		fmt.Printf("  given back: delivery failed=%v undeliverable here=%v\n",
 			modification.Change.DeliveryFailed, modification.Change.UndeliverableHere)
 	}
 }
 
-// The channel this scenario works in, and the binder it binds with.
+// The channel this scenario works in, and the Do it awaits through.
 type consignEffect[A any] = effect.Effect[effect.Unit, amqp10.Fault, A]
 type consignDo = effect.Do[effect.Unit, amqp10.Fault]

@@ -153,7 +153,7 @@ func (route Route[R, E]) withPhases(sampler PhaseSampler) Route[R, E] {
 // encodeOutput turns the handler's output value into the response the endpoint
 // declared.
 //
-// An encodeOutput failure is a defect rather than a typed failure: the value came
+// An encoding failure is a defect rather than a typed failure: the value came
 // from this program, so a schema that cannot describe it is a mistake here and
 // not something a client can be told about or act on.
 func encodeOutput[R, E, Out any](output Output[Out]) func(Out) effect.Effect[R, E, Response] {

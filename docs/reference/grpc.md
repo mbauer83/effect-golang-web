@@ -8,11 +8,11 @@ generates its client from.
 
 ```go
 var Quote = grpc.Unary("logistics.v1.Rates", "Quote", EnquirySchema, RateSchema).
-    Documented("Quote prices one shipment, or says why it cannot be priced.")
+    WithDescription("Quote prices one shipment, or says why it cannot be priced.")
 
-transport := grpc.NewConnected()
-boundary, err := grpc.NewBoundary(runtime, environment, transport, Coded)
-err = grpc.Answer(boundary, Quote, Priced(rates))
+transport := grpc.NewConnectServer()
+boundary, err := grpc.NewBoundary(runtime, environment, transport, FailureFor)
+err = grpc.Answer(boundary, Quote, Price(rates))
 handler, err := boundary.Handler()   // mount it like any http.Handler
 ```
 
@@ -39,17 +39,17 @@ grpc-go disagree about almost everything except that a unary call is bytes in,
 and bytes or a code out.
 
 ```go
-type Serving interface {
-    Answer(path string, answer Answering) error
+type ServerTransport interface {
+    Answer(path string, answer UnaryHandler) error
     Handler() (http.Handler, error)
 }
-type Calling interface {
+type ClientTransport interface {
     Call(ctx context.Context, path string, request []byte) ([]byte, *Failure)
 }
-type Answering func(ctx context.Context, request []byte) ([]byte, *Failure)
+type UnaryHandler func(ctx context.Context, request []byte) ([]byte, *Failure)
 ```
 
-`Answering` returns a `Failure` rather than an `error` so a transport has the
+`UnaryHandler` returns a `Failure` rather than an `error` so a transport has the
 code without having to guess one. A transport inventing a code from an error
 string would be inventing the one thing the caller branches on.
 
@@ -65,7 +65,7 @@ would mean translating twice and losing in both directions.
 An application maps its own refusals in one place:
 
 ```go
-func Coded(refusal Refusal) grpc.Failure {
+func FailureFor(refusal Refusal) grpc.Failure {
     switch refusal.Reason {
     case TooHeavy:   return grpc.Failure{Code: grpc.FailedPrecondition, Message: refusal.Details}
     case NoCapacity: return grpc.Failure{Code: grpc.Unavailable, Message: refusal.Details}

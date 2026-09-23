@@ -18,7 +18,7 @@
 // There is a port here, and unlike the one in sql it is not because there are
 // two implementations worth having: amqp091-go is the only serious one. It is
 // because a program that publishes and consumes should be testable without a
-// broker, and because Publishing and Consuming are what an application actually
+// broker, and because Publisher and Consumer are what an application actually
 // depends on -- three operations, one of which most programs never call. The
 // adapter over amqp091-go is in this package and nothing above it sees that
 // library.

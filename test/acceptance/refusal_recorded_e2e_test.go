@@ -72,9 +72,9 @@ func surfaceThatRefuses(t *testing.T, quiet bool) (string, *recorded) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Detailing so each phase of a request is a named span, which is what
+	// WithPhaseSpans, so each phase of a request is a named span, which is what
 	// puts something other than a line in the record. A surface that also
-	// names its requests -- inspect.Observing -- puts the route there
+	// names its requests -- inspect.Tracer -- puts the route there
 	// instead, which is better still and is a deployment's choice.
 	front := httptest.NewServer(boundary.Handler(surface.WithPhaseSpans().Handler()))
 	t.Cleanup(front.Close)

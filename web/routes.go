@@ -109,7 +109,7 @@ type RouteMiddleware[R, E any] func(Declaration, Handler[R, E]) Handler[R, E]
 // and nothing would say so.
 //
 //	surface, err := web.NewRoutes(routes...)
-//	surface = surface.WithMiddleware(inspect.Observing(costs))
+//	surface = surface.WithMiddleware(inspect.Tracer[Env, Refusal](costs))
 //
 // It cannot fail. The patterns are the ones that already assembled, and a
 // wrapper does not change them, so there is nothing left to refuse. A zero
@@ -135,7 +135,7 @@ func (routes Routes[R, E]) WithMiddleware(each RouteMiddleware[R, E]) Routes[R, 
 // WithPhaseSpans makes every route name the parts of its own work -- decoding,
 // handling, encoding -- so a trace shows them separately.
 //
-// A second setting rather than part of Wrapping, because they answer different
+// A second setting rather than part of WithMiddleware, because they answer different
 // questions and cost differently: a route span says which request was slow, and
 // these say which part of it was.
 //
@@ -151,7 +151,7 @@ func (routes Routes[R, E]) WithMiddleware(each RouteMiddleware[R, E]) Routes[R, 
 // microseconds, which will otherwise tell you about WithSpan rather than about
 // itself.
 //
-//	surface = surface.WithPhaseSpans().Wrapping(inspect.Observing(costs))
+//	surface = surface.WithPhaseSpans().WithMiddleware(inspect.Tracer[Env, Refusal](costs))
 //
 // Decoding and encoding are the route's work as much as the handler is. A
 // large document to unmarshal is real time, and a trace that showed one bar
@@ -160,7 +160,7 @@ func (routes Routes[R, E]) WithPhaseSpans() Routes[R, E] {
 	return routes.withPhases(nil)
 }
 
-// WithPhaseSampler is Detailing that also hands each phase to a sampler, so a caller
+// WithPhaseSampler is WithPhaseSpans that also hands each phase to a sampler, so a caller
 // who can measure the process -- which this module cannot; it reads no
 // counters and depends on nothing that does -- accounts for the phases as well
 // as naming them.
@@ -174,8 +174,8 @@ func (routes Routes[R, E]) WithPhaseSpans() Routes[R, E] {
 // all. What the sampler itself costs is the sampler's business. The measurement
 // is in test/unit/web_cost_test.go.
 //
-//	surface = surface.WithPhaseSampler(inspect.Sampling(watched.Costs)).
-//	    Wrapping(inspect.Observing[Env, Refusal](watched.Costs))
+//	surface = surface.WithPhaseSampler(inspect.Sampler(watched.Costs)).
+//	    WithMiddleware(inspect.Tracer[Env, Refusal](watched.Costs))
 func (routes Routes[R, E]) WithPhaseSampler(sampler PhaseSampler) Routes[R, E] {
 	return routes.withPhases(sampler)
 }

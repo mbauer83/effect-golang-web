@@ -22,8 +22,8 @@ runtime's rather than either protocol's.
 ```go
 amqp10.Connect[R](scope, "amqps://host:5671", nil)
 amqp10.Open[R](scope, connection)                        // a session
-amqp10.Sender[R](scope, session, "consignments")         // Sending
-amqp10.Receiver[R](scope, session, "consignments", 32)   // Receiving
+amqp10.Sender[R](scope, session, "consignments")         // SenderLink
+amqp10.Receiver[R](scope, session, "consignments", 32)   // ReceiverLink
 ```
 
 A connection multiplexes sessions; a session multiplexes links; a link is
@@ -42,7 +42,7 @@ filling memory below it.
 ```go
 amqp10.Send[R](link, message)
 amqp10.SendValue[R](link, ShipmentSchema, shipment)
-amqp10.Encoded(ShipmentSchema, shipment) // (Message, error)
+amqp10.Encode(ShipmentSchema, shipment) // (Message, error)
 ```
 
 Unlike a 0-9-1 publish, `Send` waits for the broker to settle the transfer, so
@@ -59,9 +59,9 @@ in another language would read a quoted document.
 
 ```go
 amqp10.Receive[R](link)                     // Stream[R, Fault, Delivery]
-amqp10.Values[R](link, ShipmentSchema)      // Stream[R, Fault, Received[A]]
+amqp10.Values[R](link, ShipmentSchema)      // Stream[R, Fault, Envelope[A]]
 
-func (received Received[A]) Read() (A, error)
+func (received Envelope[A]) Read() (A, error)
 amqp10.Accept[R](received)                  // done; the broker may forget it
 amqp10.Reject[R](received, reason)          // never; dead-lettered, with the reason
 amqp10.Release[R](received)                 // back, unchanged, saying nothing
@@ -74,8 +74,8 @@ point of this package:
 | | what the broker learns |
 |---|---|
 | `Release` | the message is back |
-| `Modify{Tried: true}` | a receiver attempted it and failed — the delivery count moves |
-| `Modify{Elsewhere: true}` | this receiver cannot take it; stop offering it here |
+| `Modify{DeliveryFailed: true}` | a receiver attempted it and failed — the delivery count moves |
+| `Modify{UndeliverableHere: true}` | this receiver cannot take it; stop offering it here |
 | `Modify{Annotations: …}` | whatever the receiver found out, recorded on the message |
 
 A 0-9-1 requeue is a release. So a broker there deciding whether a message has
@@ -104,7 +104,7 @@ each mapping to exactly one disposition.
 
 ## The port, and the third untyped file
 
-`Sending` and `Receiving` are the whole port — two interfaces because a link
+`SenderLink` and `ReceiverLink` are the whole port — two interfaces because a link
 goes one way, and a program that only sends should not depend on four
 dispositions it never makes. The dispositions are on the link rather than on a
 `Delivery` because it is the link that owes the broker an answer, and a delivery
@@ -112,7 +112,7 @@ outliving its link can no longer be settled at all. A delivery is named by its
 tag, which is what the protocol names it by; a message with no tag is refused on
 arrival rather than arriving as something the consumer will fail to settle.
 
-`Properties`, `Annotations` and `Named` are the boundary. Application properties
+`Properties`, `Annotations` and `ReadProperties` are the boundary. Application properties
 and annotations are AMQP maps, which the protocol defines as sets of named
 values and the library represents as `map[string]any`; this is the third place
 in the module holding a value it cannot name, and the architecture test names

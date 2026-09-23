@@ -31,7 +31,7 @@ into an older dialect that says almost the same thing with different keywords.
   codec that read an optional body would be describing two shapes and would say
   so itself.
 - **Responses**, ordered by status: the success the endpoint declared, and every
-  status `Failing` documented. A description is required of each, so one is
+  status `WithFailure` documented. A description is required of each, so one is
   supplied from the status text when the endpoint said nothing.
 - **An operation id**, derived from the method and the path — `GET /books/{title}`
   is `getBooksByTitle` — so that one exists at all and is stable whoever

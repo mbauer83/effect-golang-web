@@ -86,7 +86,7 @@ func TestEachHelperDeclaresItsOwnMethod(t *testing.T) {
 }
 
 func TestADocumentedFailureIsCarriedWithoutBeingPerformed(t *testing.T) {
-	// Failing says what the boundary's mapping will produce. It does not do the
+	// WithFailure says what the boundary's mapping will produce. It does not do the
 	// mapping, and nothing about the route changes because it was written.
 	endpoint := web.GET("/books/{title}", web.PathParam("title", schema.Text()),
 		web.Returns(http.StatusOK, bookSchema)).

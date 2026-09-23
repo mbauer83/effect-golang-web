@@ -35,7 +35,7 @@ a time would still be holding all of them.
 ```go
 amqp091.Publish[R](channel, amqp091.Target{Exchange: "orders", Key: "placed"}, message)
 amqp091.PublishValue[R](channel, target, OrderSchema, order)
-amqp091.Encoded(OrderSchema, order) // (Message, error)
+amqp091.Encode(OrderSchema, order) // (Message, error)
 ```
 
 `Target` is an exchange and the key it routes by. An empty exchange is the
@@ -45,7 +45,7 @@ topology of its own wants.
 
 The value is encoded before anything is sent, so a value the schema refuses is
 reported rather than published as a body the consumer would have to make sense
-of. `Encoded` is public because `Message` has more to say than a value does — a
+of. `Encode` is public because `Message` has more to say than a value does — a
 durability, headers — and a caller that wants to set those should not have to
 choose between them and the schema.
 
@@ -57,10 +57,10 @@ when a caller asks.
 ## Consuming, and acknowledgement
 
 ```go
-amqp091.Consume[R](channel, "shipping")                // Stream[R, Fault, Received[[]byte]]
-amqp091.Values[R](channel, "shipping", OrderSchema)    // Stream[R, Fault, Received[A]]
+amqp091.Consume[R](channel, "shipping")                // Stream[R, Fault, Envelope[[]byte]]
+amqp091.Values[R](channel, "shipping", OrderSchema)    // Stream[R, Fault, Envelope[A]]
 
-func (received Received[A]) Read() (A, error)
+func (received Envelope[A]) Read() (A, error)
 amqp091.Ack[R](received)      // the broker may forget it
 amqp091.Discard[R](received)  // dropped, or dead-lettered
 amqp091.Requeue[R](received)  // back to the queue
@@ -69,8 +69,8 @@ amqp091.Requeue[R](received)  // back to the queue
 Three named operations rather than `Reject(requeue bool)`, because "true" does
 not say which way round the question was asked.
 
-**Both entry points yield a `Received`, so both can acknowledge.** `Consume`
-undecoded is `Received[[]byte]` whose `Read` is the body as it arrived — the
+**Both entry points yield an `Envelope`, so both can acknowledge.** `Consume`
+undecoded is `Envelope[[]byte]` whose `Read` is the body as it arrived — the
 identity decoding, which cannot refuse. A bare `Delivery` would have been the
 obvious element and is the wrong one: acknowledgement belongs to the
 subscription, so a delivery parted from its own cannot be acknowledged at all,
@@ -82,7 +82,7 @@ and then waits for a second that will never come.
 of a [websocket](websocket.md) and deliberately so: a conversation is stateful,
 so a peer that said something unreadable has said something about the whole
 exchange — but a queue is a sequence of separate messages, and one that cannot be
-read is one message. It arrives as a `Received` whose `Read` refuses, so the
+read is one message. It arrives as an `Envelope` whose `Read` refuses, so the
 consumer decides. `Read` is a method and not a field because a zero value that
 looked valid would be a trap: a consumer that forgot to ask would act on a
 message that was never there.
@@ -102,8 +102,8 @@ not close the channel: the program may still be publishing on it.
 
 ```go
 var Topology = amqp091.Topology{
-    Exchanges: []amqp091.Exchange{{Name: "orders", Routing: amqp091.Direct, Durability: amqp091.Lasting}},
-    Queues:    []amqp091.Queue{{Name: "shipping", Durability: amqp091.Lasting}},
+    Exchanges: []amqp091.Exchange{{Name: "orders", Routing: amqp091.Direct, Durability: amqp091.Durable}},
+    Queues:    []amqp091.Queue{{Name: "shipping", Durability: amqp091.Durable}},
     Bindings:  []amqp091.Binding{{Exchange: "orders", Queue: "shipping", Key: "placed"}},
 }
 amqp091.Declare[R](channel, Topology)
@@ -127,16 +127,16 @@ something it did not do. A `Key` keeps the routing key it arrived with when
 empty, which is what a single dead-letter exchange usually wants.
 
 A queue's `Access` is `Shared` unless it says otherwise — any connection may
-consume from it, which is what a queue named in a topology is for. `Owned`
+consume from it, which is what a queue named in a topology is for. `Exclusive`
 restricts it to the connection that declared it and has the broker delete it
 when that connection closes: a reply queue, or one instance's own subscription.
 It is also the way to ask for a queue that needs no keeping, because a broker
-may refuse one that is neither `Lasting` nor `Owned` — RabbitMQ 4 does, having
+may refuse one that is neither `Durable` nor `Exclusive` — RabbitMQ 4 does, having
 deprecated transient non-exclusive queues.
 
 ## The port, and the two untyped functions
 
-`Publishing`, `Consuming`, `Declaring` and `Deliveries` are the whole port.
+`Publisher`, `Consumer`, `Declarer` and `Deliveries` are the whole port.
 Three interfaces rather than one because most programs use one of them: a
 producer publishes, a consumer consumes, and whoever owns the topology declares
 it, usually once at start-up.
@@ -165,7 +165,7 @@ broker := inprocess.NewBroker()
 broker.Accepted()   // []uint64
 broker.Discarded()
 broker.Requeued()
-broker.Waiting("shipping")
+broker.Depth("shipping")
 ```
 
 `amqp091/inprocess` satisfies the port, so a producer and consumer run against

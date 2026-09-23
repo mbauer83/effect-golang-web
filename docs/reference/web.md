@@ -56,12 +56,12 @@ the request's. The body is read once, as `net/http`'s is.
 | `Text(status, body)` | plain text, length declared |
 | `Bytes(status, contentType, body)` | bytes in hand, length declared |
 | `JSON(status, schema, value)` | encoded through the schema, length declared |
-| `Streaming(status, contentType, write)` | produced as it is written, no length |
+| `Stream(status, contentType, write)` | produced as it is written, no length |
 | `Delegate(handler)` | whatever an existing `http.Handler` writes |
 
 `JSON` encodes before anything is written and returns an error if it cannot,
 because a status cannot be taken back once it has gone out — the alternative is
-a 200 with a truncated body. `Streaming` accepts that trade deliberately for the
+a 200 with a truncated body. `Stream` accepts that trade deliberately for the
 case where materialising the entity first is the wrong one; a failure part-way
 through is reported to the boundary, which records it.
 
@@ -170,7 +170,7 @@ need no description of their own:
 | `Entity(schema)` | the JSON body, decoded straight from its reader |
 | `Nothing()` | nothing |
 
-`codec.Documented(doc)` attaches prose for the published document, to a codec
+`codec.WithDescription(doc)` attaches prose for the published document, to a codec
 that reads exactly one parameter.
 
 Absent and empty are different: `?shelf=` carries an empty value and no `shelf`
@@ -205,10 +205,10 @@ of them.
 ```go
 web.Handle(
     web.GET("/books/{title}",
-        web.PathParam("title", schema.Text()).Documented("the title to look for"),
+        web.PathParam("title", schema.Text()).WithDescription("the title to look for"),
         web.Returns(http.StatusOK, BookSchema)).
-        Summary("Find a book by title").
-        Failing(http.StatusNotFound, "no book with that title is held"),
+        WithSummary("Find a book by title").
+        WithFailure(http.StatusNotFound, "no book with that title is held"),
     func(title string) storeEffect[Book] { ... },
 )
 ```
@@ -216,7 +216,7 @@ web.Handle(
 The handler takes the decoded input and returns the **output value**, not a
 response: the endpoint already says how that value is encoded and with what
 status. `Returns(status, schema)` encodes through a schema; `ReturnsNothing(status)`
-sends none. `Failing` documents a status the boundary's mapping will produce —
+sends none. `WithFailure` documents a status the boundary's mapping will produce —
 it does not perform the mapping.
 
 A request the codecs refuse never reaches the handler and never becomes the
@@ -234,11 +234,11 @@ needs a variable segment the handler has no use for.
 ```go
 client := web.Dial(http.DefaultClient, "http://host:8080")
 
-web.Fetch[R](client, "GET", "/books", web.Requesting{})        // Effect[R, Fault, Received]
-web.Call[R](client, FindBook, web.Requesting{                  // Effect[R, Fault, Book]
+web.Fetch[R](client, "GET", "/books", web.ClientRequest{})     // Effect[R, Fault, ClientResponse]
+web.Call[R](client, FindBook, web.ClientRequest{               // Effect[R, Fault, Book]
     Path: map[string]string{"title": "Zionomicon"},
 })
-sending, err := web.Carrying(web.Requesting{}, BookSchema, book)
+request, err := web.WithEntity(web.ClientRequest{}, BookSchema, book)
 ```
 
 `Dial` takes the `http.Client` rather than replacing it. TLS, proxies, pooling,
@@ -254,13 +254,13 @@ so `Retry` and a `Schedule` compose over a call as they do over anything.
 **`Call` takes the endpoint and needs nothing the declaration already says.**
 The method, the path pattern, the status and the response shape all come from
 the same value the server dispatches with, and the response is decoded through
-the very schema it was encoded through. `Requesting.Path` fills the captured
+the very schema it was encoded through. `ClientRequest.Path` fills the captured
 segments by name; a capture with nothing to fill it is refused *before anything
 is sent*, because the alternative is sending the literal `{title}`, getting a
 404, and looking at the wrong end of your own mistake.
 
 A status the endpoint did not declare becomes a `Fault` carrying a `Refusal`
-with the status and the entity, reachable with `errors.As`. `Failing` documents
+with the status and the entity, reachable with `errors.As`. `WithFailure` documents
 a status on the serving side; on this side it is the answer that arrived instead
 of the one promised, and the body usually says why.
 
@@ -275,16 +275,16 @@ inverse on every `Convert` — worth doing when a caller wants it, not before.
 ## Asking carefully
 
 ```go
-careful, err := web.Carefully(client, web.Terms{
-    Named:    "tmdb",
-    Allowed:  rate.Allowance{Name: "tmdb", Most: 40, Every: 10 * time.Second},
-    Fresh:    time.Hour,
-    Patience: web.Patience{First: 200 * time.Millisecond, Longest: time.Second, Retries: 2},
-}, keeping, pacing)                                    // cache.Store, rate.Limiter
+upstream, err := web.NewUpstreamClient(client, web.UpstreamTerms{
+    Name:       "tmdb",
+    Allowance:  rate.Allowance{Name: "tmdb", Most: 40, Every: 10 * time.Second},
+    TimeToLive: time.Hour,
+    Retry:      web.RetryPolicy{Base: 200 * time.Millisecond, Max: time.Second, Retries: 2},
+}, store, limiter)                                     // cache.Store, rate.Limiter
 
-web.FetchCarefully[R](careful, "GET", "/3/movie/603",  // Effect[R, Fault, Received]
-    web.Requesting{About: "film:603"})
-web.CallCarefully[R](careful, FindFilm, requesting)    // Effect[R, Fault, Film]
+web.FetchUpstream[R](upstream, "GET", "/3/movie/603",  // Effect[R, Fault, ClientResponse]
+    web.ClientRequest{About: "film:603"})
+web.CallUpstream[R](upstream, FindFilm, request)       // Effect[R, Fault, Film]
 ```
 
 Reading a service this program does not own has three concerns that have
@@ -301,7 +301,7 @@ to. In one process the runtime's own adapters are the right answer; between
 processes [`effect-golang-cache`](https://github.com/mbauer83/effect-golang-cache)
 is, and neither this module nor a caller's code changes to say so.
 
-**The status is still data.** A refused request is a `Received` carrying that
+**The status is still data.** A refused request is a `ClientResponse` carrying that
 status, exactly as with `Fetch`, so a caller decides what a 404 means about what
 it asked for — an absence to one caller and a failure to another. Only a
 successful answer is kept: a path that was briefly a 500 must not be a 500 for
@@ -315,7 +315,7 @@ body and is read back by the library that wrote it. Keeping only the entity
 would lose the content type; inventing a format for all three would be
 inventing one that exists.
 
-**`Requesting.About` is what the request is about** — a film, an order, a
+**`ClientRequest.About` is what the request is about** — a film, an order, a
 customer — and it is what everything kept about one thing is dropped by. A
 person pressing "refresh" means "find out about this thing again", not "drop
 these four keys". `Fetch` and `Call` keep nothing and read nothing from it, in
@@ -329,7 +329,7 @@ spent. An unenforced rate limit costs a service's goodwill and this program its
 access, so a pace this program cannot consult is a request this program does
 not make.
 
-Terms that say nothing are refused by `Carefully` rather than at the first
+Terms that say nothing are refused by `NewUpstreamClient` rather than at the first
 request: a service asked at an unstated rate is one that eventually blocks the
 program asking, and that is a mistake worth catching where it is made.
 
@@ -365,7 +365,7 @@ tree, so one of the two names would silently never be bound.
 surface, err := web.NewRoutes(listBooks, addBook, findBook)
 ```
 
-`NewRoutesRejecting` supplies the surface's own answer to a request the codecs
+`NewRoutesWithRejection` supplies the surface's own answer to a request the codecs
 refused, because a client meets one API and not a collection of separately
 worded ones. `Declarations()` returns what the routes say about themselves, in
 declared order, which is what a published document is projected from.
@@ -373,10 +373,10 @@ declared order, which is what a published document is projected from.
 ## Wrapping every route
 
 ```go
-type Matched[R, E any] func(Declaration, Handler[R, E]) Handler[R, E]
+type RouteMiddleware[R, E any] func(Declaration, Handler[R, E]) Handler[R, E]
 
 surface, err := web.NewRoutes(routes...)
-surface = surface.Wrapping(observing)     // one setting, whole surface
+surface = surface.WithMiddleware(observing) // one setting, whole surface
 ```
 
 `Middleware` wraps the surface's handler, and by then the only thing left of
@@ -385,16 +385,16 @@ or a rate limit and **not** enough for anything that has to *name* the route: a
 concrete path is an unbounded value, so a span name or a metric label made from
 one becomes a series per request.
 
-`Matched` is the wrapper that is told which route it is wrapping. `Wrapping`
-applies one to every route, giving each its own `Declaration`, and returns the
-surface rebuilt — the same declarations, the same precedence, the same
-rejections.
+`RouteMiddleware` is the wrapper that is told which route it is wrapping.
+`WithMiddleware` applies one to every route, giving each its own `Declaration`,
+and returns the surface rebuilt — the same declarations, the same precedence,
+the same rejections.
 
 **It is a setting and not a convention.** A concern applied at every call site
 is one that can be forgotten at one call site, and nothing would say so; a
 concern applied to the assembled surface covers the route somebody added this
 morning. Turning it off is not applying it, which a caller can decide from a
-flag at start-up. `Wrapping(nil)` and a zero `Routes` are both the surface
+flag at start-up. `WithMiddleware(nil)` and a zero `Routes` are both the surface
 itself.
 
 A wrapper sees the route's whole work — the codecs as well as the handler,
@@ -413,15 +413,15 @@ vocabulary has its traffic lumped in with everything undeclared.
 ## Naming a route's own parts
 
 ```go
-surface = surface.Detailing().Wrapping(observing)
+surface = surface.WithPhaseSpans().WithMiddleware(observing)
 ```
 
-`Detailing` makes every route span its own phases: `web.PhaseDecoding`,
+`WithPhaseSpans` makes every route span its own phases: `web.PhaseDecoding`,
 `web.PhaseHandling`, `web.PhaseEncoding`. Decoding and encoding are the route's
 work as much as the handler is — a large document to unmarshal is real time —
 and one bar for all three cannot say which of them a slow request spent it in.
 
-A second setting rather than part of `Wrapping`, because they answer different
+A second setting rather than part of `WithMiddleware`, because they answer different
 questions and cost differently: a route span says which request was slow, and
 these say which part of it was. Three spans per request instead of one is not a
 price to charge a surface that did not ask.
@@ -436,12 +436,12 @@ codecs to name, because the exchange after the upgrade is not described here.
 ### Measuring them, without measuring them here
 
 ```go
-type Sampling func(phase string) func()
+type PhaseSampler func(phase string) func()
 
-surface = surface.Measuring(sampler).Wrapping(observing)
+surface = surface.WithPhaseSampler(sampler).WithMiddleware(observing)
 ```
 
-`Measuring` is `Detailing` that also hands each phase to a sampler: it is
+`WithPhaseSampler` is `WithPhaseSpans` that also hands each phase to a sampler: it is
 called when the phase begins and the function it returns when the phase ends,
 however it ended — a failure and an interruption included.
 
@@ -450,7 +450,7 @@ three phases carry three different value types, so a single value that wrapped
 "an effect of any type" would need a method with type parameters of its own.
 A pair of callbacks also keeps the direction right — reading a counter is not
 this module's business, so the naming is here and the measuring is whoever is
-watching. `inspect.Sampling` in `effect-golang-observe-web` is one.
+watching. `inspect.Sampler` in `effect-golang-observe-web` is one.
 
 It names the phases as well, because a phase measured and not named is one
 nobody can find: an account is keyed by the phase's name, and a timeline is

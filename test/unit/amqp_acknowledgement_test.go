@@ -16,7 +16,7 @@ import (
 )
 
 func TestAnUndecodedDeliveryCanStillBeAcknowledged(t *testing.T) {
-	// Which is the whole reason Consume yields a Received rather than a
+	// Which is the whole reason Consume yields an Envelope rather than a
 	// Delivery. Acknowledgement belongs to the subscription, so an element
 	// parted from its own could not be settled at all -- and a consumer that
 	// never settles is one a real broker stops sending to.

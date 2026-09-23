@@ -1,7 +1,7 @@
 // Package inprocess is a broker that runs inside the test that uses it.
 //
-// It satisfies the port, so a sender and a receiver written against Sending and
-// Receiving run against this exactly as they run against Service Bus or
+// It satisfies the port, so a sender and a receiver written against SenderLink
+// and ReceiverLink run against this exactly as they run against Service Bus or
 // ActiveMQ. What it gives a test that a real broker cannot is the four
 // dispositions as questions: which deliveries were accepted, which were
 // rejected and why, which were released unchanged, and which were modified and

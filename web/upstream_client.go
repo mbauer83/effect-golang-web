@@ -77,12 +77,12 @@ func (terms UpstreamTerms) IsStated() bool {
 // while somebody waits for the answer.
 type RetryPolicy struct {
 	Base    time.Duration
-	MaxWait time.Duration
+	Max     time.Duration
 	Retries uint64
 }
 
-// IsPatient reports whether this policy would try again at all.
-func (policy RetryPolicy) IsPatient() bool {
+// IsEnabled reports whether this policy would try again at all.
+func (policy RetryPolicy) IsEnabled() bool {
 	return policy.Retries > 0 && policy.Base > 0
 }
 
@@ -122,8 +122,8 @@ func (upstream *UpstreamClient) Name() string { return upstream.terms.Name }
 // worth keeping, and the service's otherwise.
 //
 // Fetch with the three concerns applied, and it answers the same way. The
-// status is data, and a service that refused after every attempt is a Received
-// carrying that refusal rather than a failure -- so a caller decides what a
+// status is data, and a service that refused after every attempt is a
+// ClientResponse carrying that refusal rather than a failure -- so a caller decides what a
 // status means about what it asked for, exactly as it does with Fetch.
 //
 // Only a successful answer is kept. A path that was briefly a 500 must not be
@@ -174,16 +174,17 @@ func CallUpstream[R, In, Out any](
 		})
 }
 
-// askUpstream takes a turn and asks, again on the terms' patience.
+// askUpstream takes a turn and asks, and asks again under the terms' retry
+// policy.
 //
 // The turn is inside the retry rather than around it, so a second attempt
-// waits for its own turn: askUpstream again past the rate a service agreed to is
+// waits for its own turn: asking again past the rate a service agreed to is
 // how a program that meant to stay within the terms gets itself blocked.
 //
-// A status worth askUpstream again about is carried as a failure while the retry is
-// running and handed back as the Received it came from once the patience is
-// spent, because a schedule retries a failure and this function answers with a
-// status. Both are true of the same response.
+// A status worth asking again about is carried as a failure while the retry is
+// running and handed back as the ClientResponse it came from once the retries
+// are spent, because a schedule retries a failure and this function answers
+// with a status. Both are true of the same response.
 func askUpstream[R any](
 	upstream *UpstreamClient,
 	method string,
@@ -213,13 +214,13 @@ func awaitTurn[R any](upstream *UpstreamClient) effect.Effect[R, Fault, effect.U
 		})
 }
 
-// retrySchedule is the terms' patience as a schedule over what went wrong.
+// retrySchedule is the terms' retry policy as a schedule over what went wrong.
 func retrySchedule(policy RetryPolicy) effect.Schedule[Fault, effect.Unit] {
-	if !policy.IsPatient() {
+	if !policy.IsEnabled() {
 		return effect.Stop[Fault]()
 	}
 	return effect.IntersectSchedules(
-		effect.Exponential[Fault](policy.Base, policy.MaxWait),
+		effect.Exponential[Fault](policy.Base, policy.Max),
 		effect.Recurs[Fault](policy.Retries),
 	).
 		MapOutput(func(effect.Product[time.Duration, uint64]) effect.Unit { return effect.Unit{} }).

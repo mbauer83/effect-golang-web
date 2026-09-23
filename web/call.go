@@ -32,7 +32,7 @@ type Refusal struct {
 	Status int
 	Entity []byte
 	// header is what came with it, kept unexported because a refusal is about
-	// the status and the body. FetchCarefully needs it to hand back the whole
+	// the status and the body. FetchUpstream needs it to hand back the whole
 	// response it made a refusal of, and nothing else has asked for it.
 	header http.Header
 }

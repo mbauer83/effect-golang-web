@@ -69,7 +69,7 @@ func Prepare(channel amqp091.Declarer) dispatchEffect[effect.Unit] {
 
 // Place publishes one order.
 //
-// Lasting, because an order the broker forgot in a restart is an order the
+// Durable, because an order the broker forgot in a restart is an order the
 // customer placed and nobody will ship.
 func Place(channel amqp091.Publisher, order Order) dispatchEffect[effect.Unit] {
 	return effect.For[effect.Unit, amqp091.Fault]().

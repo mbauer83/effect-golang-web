@@ -49,7 +49,7 @@ const Consignments = "consignments"
 
 // Hand sends one shipment.
 //
-// Lasting, because a shipment the broker forgot in a restart is a shipment the
+// Durable, because a shipment the broker forgot in a restart is a shipment the
 // customer paid for and no carrier will collect. The reference is the subject,
 // which is the field a broker's own rules are usually written against.
 func Hand(link amqp10.SenderLink, shipment Shipment) consignEffect[effect.Unit] {
@@ -145,8 +145,8 @@ func collectConsignment(
 	})
 }
 
-// consignDo is the binder this program binds in. No defer in the body, which is
-// the condition for direct style.
+// consignDo is the Do this program awaits through. No defer in the body, which
+// is the condition for direct style.
 type consignDo = effect.Do[effect.Unit, amqp10.Fault]
 
 // settleConsignment turns the carrier's answer into the disposition that says it.

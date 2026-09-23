@@ -18,7 +18,7 @@ acquires it.
 ## Accepting
 
 ```go
-web.Upgrading("/tally", "Keep a running tally",
+web.Upgrade("/tally", "Keep a running tally",
     websocket.Accept(boundary, converse, websocket.Settings{}))
 ```
 
@@ -29,7 +29,7 @@ environment and the reporting a handler needs are the boundary's. That is what
 `Adapter.Interpret` is for, and a transport that takes over the connection is
 the only thing that needs it.
 
-`web.Upgrading` mounts it as a route, so a websocket endpoint is dispatched and
+`web.Upgrade` mounts it as a route, so a websocket endpoint is dispatched and
 documented by the same tree as everything else. Its declaration says what is
 true of the HTTP part — a `GET` that answers 101 and carries no entity — and
 stops there, because what happens after the upgrade is a different protocol and

@@ -95,7 +95,7 @@ func Ask[R any](socket websocket.Socket, add int32) effect.Effect[R, websocket.F
 	}).WithName("ask")
 }
 
-// tallyDo is the binder the server side binds in.
+// tallyDo is the Do the server side awaits through.
 //
 // Direct style because a change is applied and then answered, in that order,
 // and a FlatMap put the answering inside the applying. No defer in either

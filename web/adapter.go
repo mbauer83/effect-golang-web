@@ -83,9 +83,9 @@ func (adapter Adapter[R, E]) WithReport(report func(context.Context, error)) Ada
 // because no route is being asked for.
 //
 //	boundary = boundary.WithCrossOrigin(web.CrossOrigin{
-//	    Origins:  []string{"https://films.example"},
-//	    Headers:  []string{"Authorization", "Content-Type"},
-//	    Remember: 10 * time.Minute,
+//	    AllowedOrigins: []string{"https://films.example"},
+//	    AllowedHeaders: []string{"Authorization", "Content-Type"},
+//	    MaxAge:         10 * time.Minute,
 //	})
 //
 // Declaring nothing shares nothing, which is what a surface only its own

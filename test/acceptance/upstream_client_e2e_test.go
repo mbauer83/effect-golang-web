@@ -161,7 +161,7 @@ func TestARefusalIsAnAnswerAndIsNotKept(t *testing.T) {
 func TestAServiceThatCouldNotAnswerIsAskedAgain(t *testing.T) {
 	service := answers(t, http.StatusInternalServerError, `{}`)
 	upstream, _ := readingUnderTerms(t, service, web.RetryPolicy{
-		Base: time.Millisecond, MaxWait: 5 * time.Millisecond, Retries: 2,
+		Base: time.Millisecond, Max: 5 * time.Millisecond, Retries: 2,
 	})
 
 	received := fetched(t, upstream, aboutOne())
@@ -181,7 +181,7 @@ func TestAnAnswerIsNotAskedForTwice(t *testing.T) {
 	// and asking again would spend an allowance to be told it twice.
 	service := answers(t, http.StatusTooManyRequests, `{}`)
 	upstream, _ := readingUnderTerms(t, service, web.RetryPolicy{
-		Base: time.Millisecond, MaxWait: 5 * time.Millisecond, Retries: 2,
+		Base: time.Millisecond, Max: 5 * time.Millisecond, Retries: 2,
 	})
 
 	_ = fetched(t, upstream, aboutOne())
