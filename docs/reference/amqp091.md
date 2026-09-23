@@ -102,7 +102,7 @@ not close the channel: the program may still be publishing on it.
 
 ```go
 var Topology = amqp091.Topology{
-    Exchanges: []amqp091.Exchange{{Name: "orders", Routing: amqp091.Direct, Durability: amqp091.Durable}},
+    Exchanges: []amqp091.Exchange{{Name: "orders", Kind: amqp091.Direct, Durability: amqp091.Durable}},
     Queues:    []amqp091.Queue{{Name: "shipping", Durability: amqp091.Durable}},
     Bindings:  []amqp091.Binding{{Exchange: "orders", Queue: "shipping", Key: "placed"}},
 }

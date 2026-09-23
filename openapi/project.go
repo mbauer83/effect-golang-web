@@ -23,7 +23,7 @@ func Describe(info Info, declarations []web.Declaration, servers ...Server) Docu
 	return document
 }
 
-// gathered holds every declaration together with the shapes it contributes, in
+// collection holds every declaration together with the shapes it contributes, in
 // the one order both the projection and the assembly walk them in.
 type collection struct {
 	declarations []entry
