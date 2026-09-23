@@ -19,7 +19,7 @@ import (
 func refusing(how consign.Finality, why string) func(consign.Shipment) consigning[consign.Outcome] {
 	return func(consign.Shipment) consigning[consign.Outcome] {
 		return effect.For[effect.Unit, amqp10.Fault]().
-			Succeed[consign.Outcome](consign.Refused{Finality: how, Reason: why})
+			Succeed[consign.Outcome](consign.Refusal{Finality: how, Reason: why})
 	}
 }
 
@@ -28,8 +28,8 @@ func TestARefusalThatWillNeverSucceedIsRejectedRatherThanGivenBack(t *testing.T)
 	// the node empties -- which is why this stream ends on its own where the
 	// other two would not.
 	broker, exit := consigned(t, func(
-		sender amqp10.Sending,
-		receiver amqp10.Receiving,
+		sender amqp10.SenderLink,
+		receiver amqp10.ReceiverLink,
 	) consigning[[]consign.Shipment] {
 		return consign.Hand(sender, consignment).
 			FlatMap(func(effect.Unit) consigning[[]consign.Shipment] {
@@ -68,8 +68,8 @@ func TestARefusalThatMightSucceedLaterIsGivenBackSayingWhy(t *testing.T) {
 		"not now": {how: consign.NotNow, tried: true},
 	} {
 		broker, exit := consigned(t, func(
-			sender amqp10.Sending,
-			receiver amqp10.Receiving,
+			sender amqp10.SenderLink,
+			receiver amqp10.ReceiverLink,
 		) consigning[[]consign.Shipment] {
 			return consign.Hand(sender, consignment).
 				FlatMap(func(effect.Unit) consigning[[]consign.Shipment] {
@@ -93,8 +93,8 @@ func TestARefusalThatMightSucceedLaterIsGivenBackSayingWhy(t *testing.T) {
 			t.Errorf("%s: expected one modification, got %d", named, len(modified))
 			continue
 		}
-		if modified[0].Change.Tried != expected.tried ||
-			modified[0].Change.Elsewhere != expected.elsewhere {
+		if modified[0].Change.DeliveryFailed != expected.tried ||
+			modified[0].Change.UndeliverableHere != expected.elsewhere {
 			t.Errorf("%s: unexpected change: %#v", named, modified[0].Change)
 		}
 		// And what the receiver recorded, which is the other half of what
@@ -129,10 +129,10 @@ func refusingOnce(
 				offered++
 				if offered > 1 {
 					return effect.For[effect.Unit, amqp10.Fault]().
-						Succeed[consign.Outcome](consign.Collected{})
+						Succeed[consign.Outcome](consign.Collection{})
 				}
 				return effect.For[effect.Unit, amqp10.Fault]().
-					Succeed[consign.Outcome](consign.Refused{Finality: how, Reason: why})
+					Succeed[consign.Outcome](consign.Refusal{Finality: how, Reason: why})
 			})
 	}
 }

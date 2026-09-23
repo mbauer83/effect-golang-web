@@ -22,8 +22,8 @@ type FaultKind string
 const (
 	// NotFound is a request for something the store does not hold.
 	NotFound FaultKind = "not-found"
-	// AlreadyHeld is an attempt to add a title the store already has.
-	AlreadyHeld FaultKind = "already-held"
+	// AlreadyExists is an attempt to add a title the store already has.
+	AlreadyExists FaultKind = "already-held"
 )
 
 func (fault Fault) Error() string {
@@ -46,7 +46,7 @@ func StatusFor(fault Fault) web.Response {
 	switch fault.Kind {
 	case NotFound:
 		return web.Empty(http.StatusNotFound)
-	case AlreadyHeld:
+	case AlreadyExists:
 		return web.Text(http.StatusConflict, fault.Error())
 	default:
 		return web.Empty(http.StatusInternalServerError)

@@ -77,7 +77,7 @@ func BenchmarkDetailedRoute(b *testing.B) {
 	handler := benchSurface(b, func(
 		surface web.Routes[effect.Unit, Refusal],
 	) web.Routes[effect.Unit, Refusal] {
-		return surface.Detailing()
+		return surface.WithPhaseSpans()
 	})
 	request := httptest.NewRequest(http.MethodGet, "/books/Zionomicon", nil)
 	b.ReportAllocs()
@@ -90,7 +90,7 @@ func BenchmarkMeasuredRoute(b *testing.B) {
 	handler := benchSurface(b, func(
 		surface web.Routes[effect.Unit, Refusal],
 	) web.Routes[effect.Unit, Refusal] {
-		return surface.Measuring(func(string) func() { return func() {} })
+		return surface.WithPhaseSampler(func(string) func() { return func() {} })
 	})
 	request := httptest.NewRequest(http.MethodGet, "/books/Zionomicon", nil)
 	b.ReportAllocs()

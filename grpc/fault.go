@@ -7,15 +7,15 @@ import "errors"
 // Fault is a fault of this package: a procedure that could not be declared, a
 // message that could not be encoded, a call that did not get through.
 type Fault struct {
-	// Doing names the stage.
-	Doing string
+	// Op names the stage.
+	Op string
 	// Procedure is the one it was about, where the stage had one.
 	Procedure string
 	Err       error
 }
 
 func (fault Fault) Error() string {
-	rendered := "grpc: " + fault.Doing
+	rendered := "grpc: " + fault.Op
 	if fault.Procedure != "" {
 		rendered += " [" + fault.Procedure + "]"
 	}
@@ -30,8 +30,8 @@ func (fault Fault) Unwrap() error {
 	return fault.Err
 }
 
-func faultOf(doing string, procedure string, err error) Fault {
-	return Fault{Doing: doing, Procedure: procedure, Err: err}
+func faultOf(op string, procedure string, err error) Fault {
+	return Fault{Op: op, Procedure: procedure, Err: err}
 }
 
 // Code is what an RPC answers with when it does not answer with a message.

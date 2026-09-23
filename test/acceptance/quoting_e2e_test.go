@@ -33,14 +33,14 @@ type calling[A any] = effect.Effect[effect.Unit, grpc.Failure, A]
 // The listener is closed by the test rather than by a scope, because what is
 // being tested is the transport and not the lifetime -- and a server whose
 // shutdown is part of the assertion is covered where the HTTP core's is.
-func quoted(t *testing.T) *grpc.Dialled {
+func quoted(t *testing.T) *grpc.ConnectClient {
 	t.Helper()
 	runtime, err := effect.NewRuntime(effect.WithDebugTracking())
 	if err != nil {
 		t.Fatal(err)
 	}
-	transport := grpc.NewConnected()
-	boundary, err := grpc.NewBoundary(runtime, effect.Unit{}, transport, quoting.Coded)
+	transport := grpc.NewConnectServer()
+	boundary, err := grpc.NewBoundary(runtime, effect.Unit{}, transport, quoting.FailureFor)
 	if err != nil {
 		t.Fatal(err)
 	}

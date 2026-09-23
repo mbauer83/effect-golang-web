@@ -137,7 +137,7 @@ func TestAnOrderThePackingRefusesComesBackAndIsShippedWhenItCan(t *testing.T) {
 					return effect.For[effect.Unit, amqp091.Fault]().Succeed(effect.Unit{})
 				}
 				return effect.For[effect.Unit, amqp091.Fault]().
-					Fail[effect.Unit](amqp091.Fault{Doing: "packing", Err: errBusy})
+					Fail[effect.Unit](amqp091.Fault{Op: "packing", Err: errBusy})
 			})
 	}
 
@@ -162,7 +162,7 @@ func TestAnOrderThePackingRefusesComesBackAndIsShippedWhenItCan(t *testing.T) {
 		t.Fatalf("expected one acceptance, got %v", accepted)
 	}
 	// Nothing left waiting: the order was taken, sent back twice, and settled.
-	if waiting := broker.Waiting(dispatch.Shipping); waiting != 0 {
+	if waiting := broker.Depth(dispatch.Shipping); waiting != 0 {
 		t.Fatalf("expected the queue empty, got %d waiting", waiting)
 	}
 }

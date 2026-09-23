@@ -28,7 +28,7 @@ type sampled struct {
 	closed []string
 }
 
-func (record *sampled) sampling() web.Sampling {
+func (record *sampled) sampling() web.PhaseSampler {
 	return func(phase string) func() {
 		record.mutex.Lock()
 		record.opened = append(record.opened, phase)
@@ -72,7 +72,7 @@ func TestMeasuringClosesAPhaseThatRefusedTheRequest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	surface := counted.Measuring(record.sampling())
+	surface := counted.WithPhaseSampler(record.sampling())
 
 	// Text where a number was declared, so the codec refuses it and the
 	// handler is never reached.
@@ -105,7 +105,7 @@ func TestMeasuringClosesAPhaseThatFailed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	answer(t, failing.Measuring(record.sampling()), "/books/Zionomicon")
+	answer(t, failing.WithPhaseSampler(record.sampling()), "/books/Zionomicon")
 
 	if !slices.Contains(record.closed, web.PhaseHandling) {
 		t.Fatalf("expected the failed handling closed, got %v", record.closed)
@@ -153,7 +153,7 @@ func TestASurfaceThatDidNotAskIsHandedNothing(t *testing.T) {
 	}
 	// Detailing names the phases and measures nothing: the two are separate
 	// settings because they cost differently.
-	answer(t, surface.Detailing(), "/books/Zionomicon")
+	answer(t, surface.WithPhaseSpans(), "/books/Zionomicon")
 	answer(t, surface, "/books/Zionomicon")
 
 	if len(record.opened) != 0 {
@@ -161,19 +161,19 @@ func TestASurfaceThatDidNotAskIsHandedNothing(t *testing.T) {
 	}
 	// A nil sampler is Detailing, rather than a surface that panics per
 	// request: a caller may pass what a flag gave it.
-	if named := spansOf(t, surface.Measuring(nil), "/books/Zionomicon"); len(named) != 3 {
+	if named := spansOf(t, surface.WithPhaseSampler(nil), "/books/Zionomicon"); len(named) != 3 {
 		t.Fatalf("expected a nil sampler to name the phases anyway, got %v", named)
 	}
 }
 
-func measured(t *testing.T, sampling web.Sampling) web.Routes[effect.Unit, Refusal] {
+func measured(t *testing.T, sampling web.PhaseSampler) web.Routes[effect.Unit, Refusal] {
 	t.Helper()
 	surface, err := web.NewRoutes(
 		echo(http.MethodGet, "/books/{title}", web.PathParam("title", schema.Text())))
 	if err != nil {
 		t.Fatal(err)
 	}
-	return surface.Measuring(sampling)
+	return surface.WithPhaseSampler(sampling)
 }
 
 func answer(t *testing.T, surface web.Routes[effect.Unit, Refusal], path string) {

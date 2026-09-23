@@ -20,7 +20,7 @@ type Broker struct {
 
 // node is one address messages wait at.
 type node struct {
-	waiting []amqp10.Delivery
+	backlog []amqp10.Delivery
 }
 
 // Rejection is one message refused, with the reason the receiver gave. The
@@ -88,15 +88,15 @@ func (broker *Broker) Modified() []Modification {
 	return append([]Modification(nil), broker.settled.modified...)
 }
 
-// Waiting is how many messages a node holds that nobody has taken.
-func (broker *Broker) Waiting(address string) int {
+// Depth is how many messages a node holds that nobody has taken.
+func (broker *Broker) Depth(address string) int {
 	broker.mutex.Lock()
 	defer broker.mutex.Unlock()
-	waiting, known := broker.nodes[address]
+	node, known := broker.nodes[address]
 	if !known {
 		return 0
 	}
-	return len(waiting.waiting)
+	return len(node.backlog)
 }
 
 var (

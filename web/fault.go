@@ -10,16 +10,16 @@ import "errors"
 // for the transport's own troubles, which every application handles the same
 // way.
 type Fault struct {
-	// Doing names what was being attempted, which is what a caller acts on.
-	Doing string
-	Err   error
+	// Op names what was being attempted, which is what a caller acts on.
+	Op  string
+	Err error
 }
 
 func (fault Fault) Error() string {
 	if fault.Err == nil {
-		return "web: " + fault.Doing
+		return "web: " + fault.Op
 	}
-	return "web: " + fault.Doing + ": " + fault.Err.Error()
+	return "web: " + fault.Op + ": " + fault.Err.Error()
 }
 
 // Unwrap keeps errors.Is and errors.As working through the boundary, so a
@@ -30,11 +30,11 @@ func (fault Fault) Unwrap() error {
 
 // faultOf names what failed, and reports nothing when nothing did, so a caller
 // composing stages does not have to check twice.
-func faultOf(doing string, err error) error {
+func faultOf(op string, err error) error {
 	if err == nil {
 		return nil
 	}
-	return Fault{Doing: doing, Err: err}
+	return Fault{Op: op, Err: err}
 }
 
 // errNoListener reports a server asked to serve without anything to serve on.

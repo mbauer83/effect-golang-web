@@ -27,7 +27,7 @@ type Topology struct {
 // Exchanges and queues first, then the bindings, because a binding names both
 // and the broker will not invent either. That ordering is the reason this
 // exists rather than leaving a caller to write three loops in the right order.
-func Declare[R any](channel Declaring, topology Topology) effect.Effect[R, Fault, effect.Unit] {
+func Declare[R any](channel Declarer, topology Topology) effect.Effect[R, Fault, effect.Unit] {
 	return effect.ForEach(topology.Exchanges, func(exchange Exchange) effect.Effect[R, Fault, effect.Unit] {
 		return DeclareExchange[R](channel, exchange)
 	}).
@@ -42,7 +42,7 @@ func Declare[R any](channel Declaring, topology Topology) effect.Effect[R, Fault
 }
 
 // DeclareExchange states one exchange.
-func DeclareExchange[R any](channel Declaring, exchange Exchange) effect.Effect[R, Fault, effect.Unit] {
+func DeclareExchange[R any](channel Declarer, exchange Exchange) effect.Effect[R, Fault, effect.Unit] {
 	return effect.Try(
 		func(ctx context.Context, _ R) (effect.Unit, error) {
 			return effect.Unit{}, channel.DeclareExchange(ctx, exchange)
@@ -52,7 +52,7 @@ func DeclareExchange[R any](channel Declaring, exchange Exchange) effect.Effect[
 }
 
 // DeclareQueue states one queue.
-func DeclareQueue[R any](channel Declaring, queue Queue) effect.Effect[R, Fault, effect.Unit] {
+func DeclareQueue[R any](channel Declarer, queue Queue) effect.Effect[R, Fault, effect.Unit] {
 	return effect.Try(
 		func(ctx context.Context, _ R) (effect.Unit, error) {
 			return effect.Unit{}, channel.DeclareQueue(ctx, queue)
@@ -62,7 +62,7 @@ func DeclareQueue[R any](channel Declaring, queue Queue) effect.Effect[R, Fault,
 }
 
 // BindQueue sends a queue the messages an exchange routes by a key.
-func BindQueue[R any](channel Declaring, binding Binding) effect.Effect[R, Fault, effect.Unit] {
+func BindQueue[R any](channel Declarer, binding Binding) effect.Effect[R, Fault, effect.Unit] {
 	return effect.Try(
 		func(ctx context.Context, _ R) (effect.Unit, error) {
 			return effect.Unit{}, channel.Bind(ctx, binding)

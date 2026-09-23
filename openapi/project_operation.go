@@ -11,7 +11,7 @@ import (
 	"github.com/mbauer83/effect-golang-web/web"
 )
 
-func operation(declared contributed, shapes *cursor) Operation {
+func operation(declared entry, shapes *cursor) Operation {
 	return Operation{
 		Method:      declared.declaration.Method,
 		ID:          identify(declared.declaration),
@@ -76,7 +76,7 @@ func templatePath(path string) string {
 	return strings.Join(parts, "/")
 }
 
-func parameters(declared contributed, shapes *cursor) []Parameter {
+func parameters(declared entry, shapes *cursor) []Parameter {
 	described := make([]Parameter, 0, declared.parameters)
 	for index := 0; index < declared.parameters; index++ {
 		parameter := declared.declaration.Parameters[index]
@@ -91,7 +91,7 @@ func parameters(declared contributed, shapes *cursor) []Parameter {
 	return described
 }
 
-func requestBody(declared contributed, shapes *cursor) *RequestBody {
+func requestBody(declared entry, shapes *cursor) *RequestBody {
 	if !declared.hasEntity {
 		return nil
 	}
@@ -106,12 +106,12 @@ func requestBody(declared contributed, shapes *cursor) *RequestBody {
 
 // responses lists the success the endpoint declared and the failures it
 // documented, ordered by status so the same routes render identically.
-func responses(declared contributed, shapes *cursor) []Response {
+func responses(declared entry, shapes *cursor) []Response {
 	described := []Response{success(declared, shapes)}
 	for _, failure := range declared.declaration.Failures {
 		described = append(described, Response{
 			Status:      failure.Status,
-			Description: describeParameters(failure.Status, failure.Doc),
+			Description: responseDescription(failure.Status, failure.Doc),
 		})
 	}
 	slices.SortStableFunc(described, func(first Response, second Response) int {
@@ -120,24 +120,24 @@ func responses(declared contributed, shapes *cursor) []Response {
 	return described
 }
 
-func success(declared contributed, shapes *cursor) Response {
-	answered := Response{
+func success(declared entry, shapes *cursor) Response {
+	response := Response{
 		Status:      declared.declaration.Status,
-		Description: describeParameters(declared.declaration.Status, ""),
+		Description: responseDescription(declared.declaration.Status, ""),
 	}
 	if declared.declaration.Content != nil {
-		answered.MediaType = declared.declaration.Content.MediaType
+		response.MediaType = declared.declaration.Content.MediaType
 	}
 	if declared.hasContent {
 		shape := shapes.next()
-		answered.Schema = &shape
+		response.Schema = &shape
 	}
-	return answered
+	return response
 }
 
-// describeParameters supplies the description the specification requires, from the
+// responseDescription supplies the description the specification requires, from the
 // status itself when the endpoint said nothing.
-func describeParameters(status int, doc string) string {
+func responseDescription(status int, doc string) string {
 	if doc != "" {
 		return doc
 	}

@@ -31,7 +31,7 @@ func (link *receiver) Reject(_ context.Context, tag string, reason string) error
 func (link *receiver) Release(_ context.Context, tag string) error {
 	return link.settle(tag, func(settled *settlements, delivery amqp10.Delivery) {
 		settled.released = append(settled.released, tag)
-		link.settlementOf(delivery)
+		link.redeliver(delivery)
 	})
 }
 
@@ -39,22 +39,22 @@ func (link *receiver) Release(_ context.Context, tag string) error {
 func (link *receiver) Modify(_ context.Context, tag string, change amqp10.Change) error {
 	return link.settle(tag, func(settled *settlements, delivery amqp10.Delivery) {
 		settled.modified = append(settled.modified, Modification{Tag: tag, Change: change})
-		if change.Elsewhere {
+		if change.UndeliverableHere {
 			// Undeliverable here: another receiver may have it, and there is
 			// only one node, so it goes back and this link will see it again.
 			// A real broker would route it away from this receiver; a fake
 			// that pretended to would be pretending to be a broker.
-			link.settlementOf(delivery)
+			link.redeliver(delivery)
 			return
 		}
 		// Attempted and failed: the broker's count of deliveries moves, which
 		// is the whole difference from a release.
 		delivery.Attempts++
-		link.settlementOf(delivery)
+		link.redeliver(delivery)
 	})
 }
 
-// settlementOf puts a delivery back at the node, at the end.
+// redeliver puts a delivery back at the node, at the end.
 //
 // A real broker puts it back where it can, which for a single receiver means
 // straight back at the front. At the end is the honest simplification: a test
@@ -62,12 +62,12 @@ func (link *receiver) Modify(_ context.Context, tag string, change amqp10.Change
 // not promise.
 //
 // The broker's lock is already held by settle.
-func (link *receiver) settlementOf(delivery amqp10.Delivery) {
+func (link *receiver) redeliver(delivery amqp10.Delivery) {
 	node, known := link.broker.nodes[link.address]
 	if !known {
 		return
 	}
-	node.waiting = append(node.waiting, delivery)
+	node.backlog = append(node.backlog, delivery)
 }
 
 func (link *receiver) settle(

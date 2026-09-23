@@ -26,10 +26,10 @@ func TestAnUndecodedDeliveryCanStillBeAcknowledged(t *testing.T) {
 			return amqp091.Publish[effect.Unit](broker,
 				amqp091.Target{Key: "raw"}, amqp091.Message{Body: []byte("one")})
 		}).
-		FlatMap(func(effect.Unit) queueing[[]amqp091.Received[[]byte]] {
+		FlatMap(func(effect.Unit) queueing[[]amqp091.Envelope[[]byte]] {
 			return effect.RunCollect(effect.MapStreamEffect(
 				amqp091.Consume[effect.Unit](broker, "raw").TakeStream(1),
-				func(received amqp091.Received[[]byte]) queueing[amqp091.Received[[]byte]] {
+				func(received amqp091.Envelope[[]byte]) queueing[amqp091.Envelope[[]byte]] {
 					return amqp091.Ack[effect.Unit](received).As(received)
 				}))
 		})
@@ -48,7 +48,7 @@ func TestAnUndecodedDeliveryCanStillBeAcknowledged(t *testing.T) {
 		accepted[0] != arrived[0].Delivery.Tag {
 		t.Fatalf("expected the delivery accepted, got %v", accepted)
 	}
-	if waiting := broker.Waiting("raw"); waiting != 0 {
+	if waiting := broker.Depth("raw"); waiting != 0 {
 		t.Fatalf("expected nothing left waiting, got %d", waiting)
 	}
 }

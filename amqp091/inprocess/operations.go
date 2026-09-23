@@ -19,21 +19,21 @@ func (broker *Broker) Publish(
 	target amqp091.Target,
 	message amqp091.Message,
 ) error {
-	reached, err := broker.queuesFor(target, message)
+	placements, err := broker.queuesFor(target, message)
 	if err != nil {
 		return err
 	}
 	// Outside the lock, because a full queue must not be a deadlock.
-	for _, offered := range reached {
-		if err := offered.queue.offer(offered.delivery); err != nil {
+	for _, placement := range placements {
+		if err := placement.queue.offer(placement.delivery); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// offered is one message on its way to one queue.
-type offered struct {
+// placement is one message on its way to one queue.
+type placement struct {
 	queue    *queue
 	delivery amqp091.Delivery
 }
@@ -43,7 +43,7 @@ type offered struct {
 func (broker *Broker) queuesFor(
 	target amqp091.Target,
 	message amqp091.Message,
-) ([]offered, error) {
+) ([]placement, error) {
 	broker.mutex.Lock()
 	defer broker.mutex.Unlock()
 
@@ -51,14 +51,14 @@ func (broker *Broker) queuesFor(
 	if err != nil {
 		return nil, err
 	}
-	going := make([]offered, 0, len(names))
+	placements := make([]placement, 0, len(names))
 	for _, name := range names {
-		waiting, err := broker.queueNamed(name)
+		queue, err := broker.queueNamed(name)
 		if err != nil {
 			return nil, err
 		}
 		broker.tag++
-		going = append(going, offered{queue: waiting, delivery: amqp091.Delivery{
+		placements = append(placements, placement{queue: queue, delivery: amqp091.Delivery{
 			Body:        message.Body,
 			ContentType: message.ContentType,
 			Headers:     message.Headers,
@@ -67,7 +67,7 @@ func (broker *Broker) queuesFor(
 			Tag:         broker.tag,
 		}})
 	}
-	return going, nil
+	return placements, nil
 }
 
 // routeTargets is which queues a target reaches.
@@ -86,16 +86,16 @@ func (broker *Broker) routeTargets(target amqp091.Target) ([]string, error) {
 		return nil, errNotRoutable
 	}
 
-	reached := []string{}
+	queues := []string{}
 	for _, binding := range broker.bindings {
 		if binding.Exchange != target.Exchange {
 			continue
 		}
 		if exchange.Routing == amqp091.Fanout || binding.Key == target.Key {
-			reached = append(reached, binding.Queue)
+			queues = append(queues, binding.Queue)
 		}
 	}
-	return reached, nil
+	return queues, nil
 }
 
 // Consume subscribes to a queue.
@@ -103,11 +103,11 @@ func (broker *Broker) Consume(_ context.Context, name string) (amqp091.Deliverie
 	broker.mutex.Lock()
 	defer broker.mutex.Unlock()
 
-	waiting, err := broker.queueNamed(name)
+	queue, err := broker.queueNamed(name)
 	if err != nil {
 		return nil, err
 	}
-	return &subscription{broker: broker, queue: waiting}, nil
+	return &subscription{broker: broker, queue: queue}, nil
 }
 
 // DeclareExchange states one exchange.
@@ -132,7 +132,7 @@ func (broker *Broker) DeclareQueue(_ context.Context, declared amqp091.Queue) er
 	broker.queues[declared.Name] = &queue{
 		// Bounded, because an unbounded one would let a test that published in
 		// a loop grow until the box noticed rather than until the test failed.
-		waiting:   make(chan amqp091.Delivery, 1024),
+		backlog:   make(chan amqp091.Delivery, 1024),
 		unsettled: map[uint64]amqp091.Delivery{},
 	}
 	return nil

@@ -24,7 +24,7 @@ func Inbound[R any](socket Socket) effect.Stream[R, Fault, Message] {
 		return effect.From(func(ctx context.Context, _ R) effect.Exit[Fault, effect.Step[Message]] {
 			kind, data, err := socket.connection.Read(ctx)
 			if err != nil {
-				return readFrame(err)
+				return readExit(err)
 			}
 			return effect.ExitSuccess[Fault](effect.Emit(effect.ChunkOf(
 				Message{Kind: messageKind(kind), Data: data},
@@ -33,8 +33,8 @@ func Inbound[R any](socket Socket) effect.Stream[R, Fault, Message] {
 	})
 }
 
-// readFrame decides what the end of a read means.
-func readFrame(err error) effect.Exit[Fault, effect.Step[Message]] {
+// readExit decides what the end of a read means.
+func readExit(err error) effect.Exit[Fault, effect.Step[Message]] {
 	if isShutdown(err) {
 		return effect.ExitSuccess[Fault](effect.EndOfStream[Message]())
 	}

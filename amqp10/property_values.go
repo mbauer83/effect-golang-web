@@ -36,15 +36,15 @@ func Properties(object dynamic.Object) (map[string]any, error) {
 	if len(object.Fields) == 0 {
 		return nil, nil
 	}
-	made := make(map[string]any, len(object.Fields))
+	fields := make(map[string]any, len(object.Fields))
 	for _, property := range object.Fields {
-		crossed, err := propertyOf(property.Value)
+		field, err := propertyOf(property.Value)
 		if err != nil {
 			return nil, fmt.Errorf("property %q: %w", property.Name, err)
 		}
-		made[property.Name] = crossed
+		fields[property.Name] = field
 	}
-	return made, nil
+	return fields, nil
 }
 
 // Annotations is the annotation map an object makes.
@@ -57,15 +57,15 @@ func Annotations(object dynamic.Object) (broker.Annotations, error) {
 	if len(object.Fields) == 0 {
 		return nil, nil
 	}
-	made := make(broker.Annotations, len(object.Fields))
+	fields := make(broker.Annotations, len(object.Fields))
 	for _, annotation := range object.Fields {
-		crossed, err := propertyOf(annotation.Value)
+		field, err := propertyOf(annotation.Value)
 		if err != nil {
 			return nil, fmt.Errorf("annotation %q: %w", annotation.Name, err)
 		}
-		made[annotation.Name] = crossed
+		fields[annotation.Name] = field
 	}
-	return made, nil
+	return fields, nil
 }
 
 func propertyOf(value dynamic.Value) (any, error) {
@@ -97,26 +97,26 @@ func propertyOf(value dynamic.Value) (any, error) {
 }
 
 func propertiesOf(list dynamic.List) ([]any, error) {
-	made := make([]any, 0, len(list.Elements))
+	fields := make([]any, 0, len(list.Elements))
 	for index, element := range list.Elements {
-		crossed, err := propertyOf(element)
+		field, err := propertyOf(element)
 		if err != nil {
 			return nil, fmt.Errorf("element %d: %w", index, err)
 		}
-		made = append(made, crossed)
+		fields = append(fields, field)
 	}
-	return made, nil
+	return fields, nil
 }
 
-// Named is the object an application-property map makes.
+// ReadProperties is the object an application-property map makes.
 //
 // A kind the protocol permits and the representation does not is a property
 // this package cannot carry, and saying so beats dropping it: a consumer that
 // acted on the properties it could see would be acting on half the message.
-func Named(received map[string]any) (dynamic.Object, error) {
-	object := dynamic.Object{Fields: make([]dynamic.Field, 0, len(received))}
-	for _, name := range sortedNames(received) {
-		value, err := propertyValue(received[name])
+func ReadProperties(raw map[string]any) (dynamic.Object, error) {
+	object := dynamic.Object{Fields: make([]dynamic.Field, 0, len(raw))}
+	for _, name := range sortedNames(raw) {
+		value, err := propertyValue(raw[name])
 		if err != nil {
 			return dynamic.Object{}, fmt.Errorf("property %q: %w", name, err)
 		}
@@ -125,8 +125,8 @@ func Named(received map[string]any) (dynamic.Object, error) {
 	return object, nil
 }
 
-func propertyValue(received any) (dynamic.Value, error) {
-	switch value := received.(type) {
+func propertyValue(raw any) (dynamic.Value, error) {
+	switch value := raw.(type) {
 	case nil:
 		return dynamic.Absent{}, nil
 	case bool:
@@ -162,17 +162,17 @@ func propertyValue(received any) (dynamic.Value, error) {
 	case time.Time:
 		return dynamic.Timestamp{Value: value}, nil
 	case map[string]any:
-		return Named(value)
+		return ReadProperties(value)
 	case []any:
 		return elements(value)
 	default:
-		return nil, fmt.Errorf("a broker sent %T, which is not a value a property may hold", received)
+		return nil, fmt.Errorf("a broker sent %T, which is not a value a property may hold", raw)
 	}
 }
 
-func elements(received []any) (dynamic.Value, error) {
-	list := dynamic.List{Elements: make([]dynamic.Value, 0, len(received))}
-	for index, element := range received {
+func elements(raw []any) (dynamic.Value, error) {
+	list := dynamic.List{Elements: make([]dynamic.Value, 0, len(raw))}
+	for index, element := range raw {
 		value, err := propertyValue(element)
 		if err != nil {
 			return nil, fmt.Errorf("element %d: %w", index, err)
@@ -189,9 +189,9 @@ func elements(received []any) (dynamic.Value, error) {
 // order available here, and a deterministic one matters: a consumer that
 // forwards the properties it received would otherwise send them differently
 // each time.
-func sortedNames(received map[string]any) []string {
-	names := make([]string, 0, len(received))
-	for name := range received {
+func sortedNames(raw map[string]any) []string {
+	names := make([]string, 0, len(raw))
+	for name := range raw {
 		names = append(names, name)
 	}
 	sort.Strings(names)

@@ -20,7 +20,7 @@ import (
 type consigning[A any] = effect.Effect[effect.Unit, amqp10.Fault, A]
 
 // attached declares a node and hands back a link each way.
-func attached(t *testing.T, address string) (*inprocess.Broker, amqp10.Sending, amqp10.Receiving) {
+func attached(t *testing.T, address string) (*inprocess.Broker, amqp10.SenderLink, amqp10.ReceiverLink) {
 	t.Helper()
 	broker := inprocess.NewBroker()
 	broker.Declare(address)
@@ -111,40 +111,40 @@ func TestSettlingTheSameDeliveryTwiceIsRefused(t *testing.T) {
 
 // The three settlements this file needs, each built the way a program builds
 // one: a Received carries the link, so it is made by reading through Values.
-func settledTried(link amqp10.Receiving, delivery amqp10.Delivery, why string) consigning[effect.Unit] {
+func settledTried(link amqp10.ReceiverLink, delivery amqp10.Delivery, why string) consigning[effect.Unit] {
 	return effect.Try(
 		func(ctx context.Context, _ effect.Unit) (effect.Unit, error) {
 			return effect.Unit{}, link.Modify(ctx, delivery.Tag, amqp10.Change{
-				Tried: true,
+				DeliveryFailed: true,
 				Annotations: dynamic.Object{Fields: []dynamic.Field{
 					{Name: "refused-because", Value: dynamic.OfText(why)},
 				}},
 			})
 		},
 		func(err error) amqp10.Fault {
-			return amqp10.Fault{Doing: "modifying a message", Err: err}
+			return amqp10.Fault{Op: "modifying a message", Err: err}
 		},
 	)
 }
 
-func settledBack(link amqp10.Receiving, delivery amqp10.Delivery) consigning[effect.Unit] {
+func settledBack(link amqp10.ReceiverLink, delivery amqp10.Delivery) consigning[effect.Unit] {
 	return effect.Try(
 		func(ctx context.Context, _ effect.Unit) (effect.Unit, error) {
 			return effect.Unit{}, link.Release(ctx, delivery.Tag)
 		},
 		func(err error) amqp10.Fault {
-			return amqp10.Fault{Doing: "releasing a message", Err: err}
+			return amqp10.Fault{Op: "releasing a message", Err: err}
 		},
 	)
 }
 
-func settledDone(link amqp10.Receiving, delivery amqp10.Delivery) consigning[effect.Unit] {
+func settledDone(link amqp10.ReceiverLink, delivery amqp10.Delivery) consigning[effect.Unit] {
 	return effect.Try(
 		func(ctx context.Context, _ effect.Unit) (effect.Unit, error) {
 			return effect.Unit{}, link.Accept(ctx, delivery.Tag)
 		},
 		func(err error) amqp10.Fault {
-			return amqp10.Fault{Doing: "accepting a message", Err: err}
+			return amqp10.Fault{Op: "accepting a message", Err: err}
 		},
 	)
 }

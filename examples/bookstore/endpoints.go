@@ -20,21 +20,21 @@ func Surface(store *Store) (web.Routes[effect.Unit, Fault], error) {
 	return web.NewRoutes(routes(store)...)
 }
 
-// Published is the surface together with the route that serves its contract.
+// SurfaceWithContract is the surface together with the route that serves its contract.
 //
 // The contract describes the API's routes and not the route that serves it,
 // which is the ordinary arrangement: a client reads the document to learn what
 // it may ask for, and it already knows where the document is.
-func Published(store *Store) (web.Routes[effect.Unit, Fault], error) {
-	described, err := Surface(store)
+func SurfaceWithContract(store *Store) (web.Routes[effect.Unit, Fault], error) {
+	surface, err := Surface(store)
 	if err != nil {
 		return web.Routes[effect.Unit, Fault]{}, err
 	}
-	contract, err := Contract(described)
+	contract, err := Contract(surface)
 	if err != nil {
 		return web.Routes[effect.Unit, Fault]{}, err
 	}
-	return web.NewRoutes(append(routes(store), publishBook(contract))...)
+	return web.NewRoutes(append(routes(store), serveContract(contract))...)
 }
 
 // Contract projects the surface into an OpenAPI document.
@@ -60,13 +60,13 @@ func routes(store *Store) []web.Route[effect.Unit, Fault] {
 	}
 }
 
-// publishBook serves the contract as it stands. Its entity is already encoded,
+// serveContract serves the contract as it stands. Its entity is already encoded,
 // so it is answered as the bytes it is rather than through a schema.
-func publishBook(contract []byte) web.Route[effect.Unit, Fault] {
+func serveContract(contract []byte) web.Route[effect.Unit, Fault] {
 	return web.Handle(
 		web.GET("/openapi.json", web.Nothing(),
 			web.ReturnsRaw(http.StatusOK, "application/json")).
-			Summary("The contract this API is served from"),
+			WithSummary("The contract this API is served from"),
 		func(effect.Unit) storeEffect[[]byte] {
 			return effect.For[effect.Unit, Fault]().Succeed(contract)
 		},
@@ -83,22 +83,22 @@ var (
 	// ListBooks reads the catalogue.
 	ListBooks = web.GET("/books", web.Nothing(),
 		web.Returns(http.StatusOK, CatalogueSchema)).
-		Summary("List the catalogue").
-		Describe("Every entry, in the order the store holds them.")
+		WithSummary("List the catalogue").
+		WithDescription("Every entry, in the order the store holds them.")
 
 	// AddBook adds one, identified by its title.
 	AddBook = web.POST("/books", web.Entity(BookSchema),
 		web.Returns(http.StatusCreated, BookSchema)).
-		Summary("Add a book").
-		Describe("The entity is the book to add; its title identifies it.").
-		Failing(http.StatusConflict, "the store already holds that title")
+		WithSummary("Add a book").
+		WithDescription("The entity is the book to add; its title identifies it.").
+		WithFailure(http.StatusConflict, "the store already holds that title")
 
 	// FindBook reads one by title.
 	FindBook = web.GET("/books/{title}",
-		web.PathParam("title", schema.Text()).Documented("the title to look for"),
+		web.PathParam("title", schema.Text()).WithDescription("the title to look for"),
 		web.Returns(http.StatusOK, BookSchema)).
-		Summary("Find a book by title").
-		Failing(http.StatusNotFound, "no book with that title is held")
+		WithSummary("Find a book by title").
+		WithFailure(http.StatusNotFound, "no book with that title is held")
 )
 
 func listBooks(store *Store) web.Route[effect.Unit, Fault] {

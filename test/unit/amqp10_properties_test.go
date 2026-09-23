@@ -42,7 +42,7 @@ func TestEveryKindAPropertyMayHoldSurvivesTheRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	read, err := amqp10.Named(properties)
+	read, err := amqp10.ReadProperties(properties)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,7 +78,7 @@ func TestTheKindsOnlyThisProtocolSendsAreCarried(t *testing.T) {
 		0x8f, 0x14, 0xe4, 0x5f, 0xce, 0xea, 0x46, 0x7a,
 		0xa4, 0xfb, 0x1a, 0x9c, 0x73, 0xd0, 0xf2, 0xb1,
 	}
-	read, err := amqp10.Named(map[string]any{
+	read, err := amqp10.ReadProperties(map[string]any{
 		"tiny":     uint8(1),
 		"small":    uint16(2),
 		"wide":     uint32(3),
@@ -110,14 +110,14 @@ func TestTheKindsOnlyThisProtocolSendsAreCarried(t *testing.T) {
 func TestAPropertyThisSideCannotCarryIsNamedRatherThanDropped(t *testing.T) {
 	// A consumer that acted on the properties it could read would be acting on
 	// half the message, so the one it cannot is the whole conversion's answer.
-	if _, err := amqp10.Named(map[string]any{"odd": complex(1, 2)}); err == nil {
+	if _, err := amqp10.ReadProperties(map[string]any{"odd": complex(1, 2)}); err == nil {
 		t.Error("expected a value outside the representation to be refused")
 	} else if !strings.Contains(err.Error(), "odd") {
 		t.Errorf("expected the property named, got %v", err)
 	}
 
 	// With the position inside a list, because a list of twelve needs that.
-	_, err := amqp10.Named(map[string]any{"inside": []any{"fine", complex(1, 2)}})
+	_, err := amqp10.ReadProperties(map[string]any{"inside": []any{"fine", complex(1, 2)}})
 	if err == nil {
 		t.Fatal("expected the nested value to be refused")
 	}

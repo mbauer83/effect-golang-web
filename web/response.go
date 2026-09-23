@@ -62,13 +62,13 @@ func JSON[A any](status int, shape schema.Schema[A], value A) (Response, error) 
 	return Bytes(status, "application/json", document), nil
 }
 
-// Streaming is a response whose entity is produced as it is written, for the
+// Stream is a response whose entity is produced as it is written, for the
 // case where materialising it first is the wrong trade. Its length is not
 // declared, because it is not known.
 //
 // A failure part-way through cannot change the status, which has already gone
 // out. It is reported to the boundary, which records it.
-func Streaming(status int, contentType string, body func(io.Writer) error) Response {
+func Stream(status int, contentType string, body func(io.Writer) error) Response {
 	header := http.Header{}
 	header.Set("Content-Type", contentType)
 	return Response{

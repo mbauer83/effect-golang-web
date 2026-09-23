@@ -33,15 +33,15 @@ var ShipmentSchema = schema.Struct[Shipment]("Shipment",
 	schema.FieldOf("reference", schema.UUID(),
 		func(shipment Shipment) string { return shipment.Reference },
 		func(shipment *Shipment, reference string) { shipment.Reference = reference }),
-	schema.FieldOf("carrier", schema.Text().Constrained(schema.MinLength(1)),
+	schema.FieldOf("carrier", schema.Text().Check(schema.MinLength(1)),
 		func(shipment Shipment) string { return shipment.Carrier },
 		func(shipment *Shipment, carrier string) { shipment.Carrier = carrier }),
-	schema.FieldOf("weight", schema.Float64().Constrained(schema.Above[float64](0)),
+	schema.FieldOf("weight", schema.Float64().Check(schema.Above[float64](0)),
 		func(shipment Shipment) float64 { return shipment.Weight },
 		func(shipment *Shipment, weight float64) { shipment.Weight = weight }),
-).Documented("one shipment to be consigned")
+).WithDescription("one shipment to be consigned")
 
-type consigning[A any] = effect.Effect[effect.Unit, amqp10.Fault, A]
+type consignEffect[A any] = effect.Effect[effect.Unit, amqp10.Fault, A]
 
 // Consignments is the node shipments are sent to. A program's addresses come
 // from the broker's configuration, so it names the one it was told.
@@ -52,15 +52,15 @@ const Consignments = "consignments"
 // Lasting, because a shipment the broker forgot in a restart is a shipment the
 // customer paid for and no carrier will collect. The reference is the subject,
 // which is the field a broker's own rules are usually written against.
-func Hand(link amqp10.Sending, shipment Shipment) consigning[effect.Unit] {
+func Hand(link amqp10.SenderLink, shipment Shipment) consignEffect[effect.Unit] {
 	return effect.For[effect.Unit, amqp10.Fault]().
-		Suspend(func() consigning[effect.Unit] {
-			message, err := amqp10.Encoded(ShipmentSchema, shipment)
+		Suspend(func() consignEffect[effect.Unit] {
+			message, err := amqp10.Encode(ShipmentSchema, shipment)
 			if err != nil {
 				return effect.For[effect.Unit, amqp10.Fault]().
-					Fail[effect.Unit](amqp10.Fault{Doing: "handing over a shipment", Err: err})
+					Fail[effect.Unit](amqp10.Fault{Op: "handing over a shipment", Err: err})
 			}
-			message.Durability = amqp10.Lasting
+			message.Durability = amqp10.Durable
 			message.Subject = shipment.Reference
 			return amqp10.Send[effect.Unit](link, message)
 		})
@@ -75,17 +75,17 @@ type Outcome interface {
 	outcome()
 }
 
-// Collected means the carrier took it.
-type Collected struct{}
+// Collection means the carrier took it.
+type Collection struct{}
 
-// Refused means it did not, and says how final that is.
-type Refused struct {
+// Refusal means it did not, and says how final that is.
+type Refusal struct {
 	Finality Finality
 	Reason   string
 }
 
-func (Collected) outcome() {}
-func (Refused) outcome()   {}
+func (Collection) outcome() {}
+func (Refusal) outcome()    {}
 
 // Finality is how final a refusal is. Three states rather than two booleans,
 // because they are three and each maps to exactly one disposition.
@@ -116,46 +116,46 @@ const (
 //     failed deliveries. A release would put it back saying nothing, and a
 //     message that had failed nine times would look like one arriving fresh.
 func Collect(
-	link amqp10.Receiving,
-	carrier func(Shipment) consigning[Outcome],
+	link amqp10.ReceiverLink,
+	carrier func(Shipment) consignEffect[Outcome],
 ) effect.Stream[effect.Unit, amqp10.Fault, Shipment] {
 	return effect.CollectStreamEffect(
 		amqp10.Values[effect.Unit](link, ShipmentSchema),
-		func(received amqp10.Received[Shipment]) consigning[effect.Chunk[Shipment]] {
+		func(received amqp10.Envelope[Shipment]) consignEffect[effect.Chunk[Shipment]] {
 			return collectConsignment(received, carrier)
 		})
 }
 
 // collectConsignment is what happens to one delivery.
 func collectConsignment(
-	received amqp10.Received[Shipment],
-	carrier func(Shipment) consigning[Outcome],
-) consigning[effect.Chunk[Shipment]] {
+	received amqp10.Envelope[Shipment],
+	carrier func(Shipment) consignEffect[Outcome],
+) consignEffect[effect.Chunk[Shipment]] {
 	// Direct style: offer it, then settle it according to what came back. As a
 	// FlatMap the settling was nested inside the offering, which is the wrong
 	// way round for something that happens after it.
-	return effect.Gen(func(do *settling) effect.Chunk[Shipment] {
+	return effect.Gen(func(do *consignDo) effect.Chunk[Shipment] {
 		shipment, err := received.Read()
 		if err != nil {
 			return do.Await(amqp10.Reject[effect.Unit](received,
 				"the shipment cannot be read: "+err.Error()).As(effect.ChunkOf[Shipment]()))
 		}
 		outcome := do.Await(carrier(shipment))
-		return do.Await(validateConsignment(received, shipment, outcome))
+		return do.Await(settleConsignment(received, shipment, outcome))
 	})
 }
 
-// settling is the binder this program binds in. No defer in the body, which is
+// consignDo is the binder this program binds in. No defer in the body, which is
 // the condition for direct style.
-type settling = effect.Do[effect.Unit, amqp10.Fault]
+type consignDo = effect.Do[effect.Unit, amqp10.Fault]
 
-// validateConsignment turns the carrier's answer into the disposition that says it.
-func validateConsignment(
-	received amqp10.Received[Shipment],
+// settleConsignment turns the carrier's answer into the disposition that says it.
+func settleConsignment(
+	received amqp10.Envelope[Shipment],
 	shipment Shipment,
 	outcome Outcome,
-) consigning[effect.Chunk[Shipment]] {
-	refused, declined := outcome.(Refused)
+) consignEffect[effect.Chunk[Shipment]] {
+	refused, declined := outcome.(Refusal)
 	if !declined {
 		return amqp10.Accept[effect.Unit](received).As(effect.ChunkOf(shipment))
 	}
@@ -164,20 +164,20 @@ func validateConsignment(
 			As(effect.ChunkOf[Shipment]())
 	}
 	return amqp10.Modify[effect.Unit](received, amqp10.Change{
-		Tried:     refused.Finality == NotNow,
-		Elsewhere: refused.Finality == NotMe,
-		Annotations: recordConsignment("refused-because", refused.Reason,
+		DeliveryFailed:    refused.Finality == NotNow,
+		UndeliverableHere: refused.Finality == NotMe,
+		Annotations: annotations("refused-because", refused.Reason,
 			"attempts", strconv.FormatUint(uint64(received.Delivery.Attempts+1), 10)),
 	}).As(effect.ChunkOf[Shipment]())
 }
 
-// recordConsignment is what to write on a message being given back, so whoever gets it
+// annotations is what to write on a message being given back, so whoever gets it
 // next knows what happened to it here.
-func recordConsignment(pairs ...string) dynamic.Object {
-	written := dynamic.Object{}
+func annotations(pairs ...string) dynamic.Object {
+	object := dynamic.Object{}
 	for index := 0; index+1 < len(pairs); index += 2 {
-		written.Fields = append(written.Fields,
+		object.Fields = append(object.Fields,
 			dynamic.Field{Name: pairs[index], Value: dynamic.OfText(pairs[index+1])})
 	}
-	return written
+	return object
 }

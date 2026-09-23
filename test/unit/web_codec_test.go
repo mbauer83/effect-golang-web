@@ -139,7 +139,7 @@ func TestCodecDeclarationMistakesAreReportedRatherThanPanicking(t *testing.T) {
 			web.Both(
 				web.QueryParam("shelf", schema.Text()),
 				web.QueryParam("page", schema.Int()),
-			).Documented("both of them")),
+			).WithDescription("both of them")),
 	}
 	for mistake, err := range cases {
 		if err == nil {
@@ -149,7 +149,7 @@ func TestCodecDeclarationMistakesAreReportedRatherThanPanicking(t *testing.T) {
 }
 
 func TestProseOnAParameterReachesItsDeclaration(t *testing.T) {
-	codec := web.QueryParam("shelf", schema.Text()).Documented("which shelf to list")
+	codec := web.QueryParam("shelf", schema.Text()).WithDescription("which shelf to list")
 
 	if err := web.ValidateCodec(codec); err != nil {
 		t.Fatal(err)

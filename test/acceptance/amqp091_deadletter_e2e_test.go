@@ -36,13 +36,13 @@ func TestAMessageAConsumerDiscardsArrivesWhereTheQueueSaysItShould(t *testing.T)
 	}
 	topology, working, dead := lettered(t.Name())
 
-	program := effect.Scoped(func(scope effect.Scope) lettering[amqp091.Received[[]byte]] {
+	program := effect.Scoped(func(scope effect.Scope) lettering[amqp091.Envelope[[]byte]] {
 		return amqp091.Connect[effect.Unit](scope, address).
-			FlatMap(func(connection *amqp091.Connection) lettering[amqp091.Received[[]byte]] {
+			FlatMap(func(connection *amqp091.Connection) lettering[amqp091.Envelope[[]byte]] {
 				return amqp091.Open[effect.Unit](scope, connection).
-					FlatMap(func(channel *amqp091.Channel) lettering[amqp091.Received[[]byte]] {
+					FlatMap(func(channel *amqp091.Channel) lettering[amqp091.Envelope[[]byte]] {
 						return amqp091.Declare[effect.Unit](channel, topology).
-							FlatMap(func(effect.Unit) lettering[amqp091.Received[[]byte]] {
+							FlatMap(func(effect.Unit) lettering[amqp091.Envelope[[]byte]] {
 								return discarding(channel, working, dead)
 							})
 					})
@@ -72,23 +72,23 @@ func discarding(
 	channel *amqp091.Channel,
 	working string,
 	dead string,
-) lettering[amqp091.Received[[]byte]] {
+) lettering[amqp091.Envelope[[]byte]] {
 	return amqp091.Publish[effect.Unit](channel, amqp091.Target{Key: working},
 		amqp091.Message{Body: []byte("unactionable")}).
-		FlatMap(func(effect.Unit) lettering[amqp091.Received[[]byte]] {
+		FlatMap(func(effect.Unit) lettering[amqp091.Envelope[[]byte]] {
 			return first(channel, working, "reading the message to discard").
-				FlatMap(func(received amqp091.Received[[]byte]) lettering[amqp091.Received[[]byte]] {
+				FlatMap(func(received amqp091.Envelope[[]byte]) lettering[amqp091.Envelope[[]byte]] {
 					return amqp091.Discard[effect.Unit](received).
-						FlatMap(func(effect.Unit) lettering[amqp091.Received[[]byte]] {
+						FlatMap(func(effect.Unit) lettering[amqp091.Envelope[[]byte]] {
 							return acknowledged(channel, dead)
 						})
 				})
 		})
 }
 
-func acknowledged(channel *amqp091.Channel, dead string) lettering[amqp091.Received[[]byte]] {
+func acknowledged(channel *amqp091.Channel, dead string) lettering[amqp091.Envelope[[]byte]] {
 	return first(channel, dead, "reading the dead-lettered message").
-		FlatMap(func(received amqp091.Received[[]byte]) lettering[amqp091.Received[[]byte]] {
+		FlatMap(func(received amqp091.Envelope[[]byte]) lettering[amqp091.Envelope[[]byte]] {
 			return amqp091.Ack[effect.Unit](received).As(received)
 		})
 }
@@ -103,12 +103,12 @@ func first(
 	channel *amqp091.Channel,
 	queue string,
 	doing string,
-) lettering[amqp091.Received[[]byte]] {
+) lettering[amqp091.Envelope[[]byte]] {
 	return effect.RunCollect(amqp091.Consume[effect.Unit](channel, queue).TakeStream(1)).
-		FlatMap(func(held []amqp091.Received[[]byte]) lettering[amqp091.Received[[]byte]] {
+		FlatMap(func(held []amqp091.Envelope[[]byte]) lettering[amqp091.Envelope[[]byte]] {
 			if len(held) == 0 {
-				return effect.Fail[effect.Unit, amqp091.Received[[]byte]](
-					amqp091.Fault{Doing: doing})
+				return effect.Fail[effect.Unit, amqp091.Envelope[[]byte]](
+					amqp091.Fault{Op: doing})
 			}
 			return effect.Succeed[effect.Unit, amqp091.Fault](held[0])
 		})
@@ -125,10 +125,10 @@ func lettered(name string) (amqp091.Topology, string, string) {
 		},
 		Queues: []amqp091.Queue{
 			{
-				Name: working, Durability: amqp091.Transient, Access: amqp091.Owned,
+				Name: working, Durability: amqp091.Transient, Access: amqp091.Exclusive,
 				DeadLetter: amqp091.DeadLetter{Exchange: exchange, Key: dead},
 			},
-			{Name: dead, Durability: amqp091.Transient, Access: amqp091.Owned},
+			{Name: dead, Durability: amqp091.Transient, Access: amqp091.Exclusive},
 		},
 		Bindings: []amqp091.Binding{
 			{Exchange: exchange, Queue: dead, Key: dead},

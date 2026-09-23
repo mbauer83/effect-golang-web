@@ -24,7 +24,7 @@ type consigning[A any] = effect.Effect[effect.Unit, amqp10.Fault, A]
 // consigned declares the node, attaches both links, and runs the work.
 func consigned[A any](
 	t *testing.T,
-	work func(amqp10.Sending, amqp10.Receiving) consigning[A],
+	work func(amqp10.SenderLink, amqp10.ReceiverLink) consigning[A],
 ) (*inprocess.Broker, effect.Exit[amqp10.Fault, A]) {
 	t.Helper()
 	runtime, err := effect.NewRuntime(effect.WithDebugTracking())
@@ -61,13 +61,13 @@ var consignment = consign.Shipment{
 
 // taking is a carrier that takes everything.
 func taking(consign.Shipment) consigning[consign.Outcome] {
-	return effect.For[effect.Unit, amqp10.Fault]().Succeed[consign.Outcome](consign.Collected{})
+	return effect.For[effect.Unit, amqp10.Fault]().Succeed[consign.Outcome](consign.Collection{})
 }
 
 func TestAShipmentCollectedIsAccepted(t *testing.T) {
 	broker, exit := consigned(t, func(
-		sender amqp10.Sending,
-		receiver amqp10.Receiving,
+		sender amqp10.SenderLink,
+		receiver amqp10.ReceiverLink,
 	) consigning[[]consign.Shipment] {
 		return consign.Hand(sender, consignment).
 			FlatMap(func(effect.Unit) consigning[[]consign.Shipment] {
@@ -85,7 +85,7 @@ func TestAShipmentCollectedIsAccepted(t *testing.T) {
 	if accepted := broker.Accepted(); len(accepted) != 1 {
 		t.Fatalf("expected one acceptance, got %v", accepted)
 	}
-	if waiting := broker.Waiting(consign.Consignments); waiting != 0 {
+	if waiting := broker.Depth(consign.Consignments); waiting != 0 {
 		t.Fatalf("expected the node empty, got %d waiting", waiting)
 	}
 }
@@ -96,8 +96,8 @@ func TestAShipmentNobodyCanReadIsRejectedWithTheReason(t *testing.T) {
 	// travels with it, because whoever reads the dead-letter node afterwards
 	// has the only explanation there is going to be.
 	broker, exit := consigned(t, func(
-		sender amqp10.Sending,
-		receiver amqp10.Receiving,
+		sender amqp10.SenderLink,
+		receiver amqp10.ReceiverLink,
 	) consigning[[]consign.Shipment] {
 		return amqp10.Send[effect.Unit](sender, amqp10.Message{
 			Body: []byte(`{"reference":"not a uuid","carrier":"","weight":0}`),

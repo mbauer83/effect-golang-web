@@ -43,12 +43,12 @@ func (channel *Channel) Publish(ctx context.Context, target Target, message Mess
 // unique on the channel, so a counter is enough.
 func (channel *Channel) Consume(ctx context.Context, queue string) (Deliveries, error) {
 	tag := fmt.Sprintf("%s-%d", queue, consumers.Add(1))
-	arriving, err := channel.channel.ConsumeWithContext(ctx, queue, tag,
+	deliveries, err := channel.channel.ConsumeWithContext(ctx, queue, tag,
 		false, false, false, false, nil)
 	if err != nil {
 		return nil, err
 	}
-	return &subscribed{channel: channel.channel, arriving: arriving, tag: tag}, nil
+	return &subscription{channel: channel.channel, deliveries: deliveries, tag: tag}, nil
 }
 
 // consumers names the consumers this process opens. Uniqueness is required per
@@ -58,29 +58,29 @@ var consumers atomic.Uint64
 // DeclareExchange states one exchange.
 func (channel *Channel) DeclareExchange(_ context.Context, exchange Exchange) error {
 	return channel.channel.ExchangeDeclare(exchange.Name, routingKind(exchange.Routing),
-		exchange.Durability == Lasting, false, false, false, nil)
+		exchange.Durability == Durable, false, false, false, nil)
 }
 
 // DeclareQueue states one queue.
 func (channel *Channel) DeclareQueue(_ context.Context, queue Queue) error {
 	_, err := channel.channel.QueueDeclare(queue.Name,
-		queue.Durability == Lasting, false, queue.Access == Owned, false,
-		arguments(queue.DeadLetter))
+		queue.Durability == Durable, false, queue.Access == Exclusive, false,
+		deadLetterArguments(queue.DeadLetter))
 	return err
 }
 
-// arguments are the broker's own settings for a queue, which is where a dead
+// deadLetterArguments are the broker's own settings for a queue, which is where a dead
 // letter lives: the protocol carries it as a table rather than as a field, and
 // nothing else this package declares needs one.
-func arguments(letter DeadLetter) broker.Table {
+func deadLetterArguments(letter DeadLetter) broker.Table {
 	if !letter.IsStated() {
 		return nil
 	}
-	stated := broker.Table{"x-dead-letter-exchange": letter.Exchange}
+	table := broker.Table{"x-dead-letter-exchange": letter.Exchange}
 	if letter.Key != "" {
-		stated["x-dead-letter-routing-key"] = letter.Key
+		table["x-dead-letter-routing-key"] = letter.Key
 	}
-	return stated
+	return table
 }
 
 // Bind sends a queue the messages an exchange routes by a key.
@@ -89,7 +89,7 @@ func (channel *Channel) Bind(_ context.Context, binding Binding) error {
 }
 
 func deliveryMode(durability Durability) uint8 {
-	if durability == Lasting {
+	if durability == Durable {
 		return broker.Persistent
 	}
 	return broker.Transient

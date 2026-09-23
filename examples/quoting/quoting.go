@@ -33,35 +33,35 @@ type Rate struct {
 
 // EnquirySchema describes an enquiry.
 var EnquirySchema = schema.Struct[Enquiry]("Enquiry",
-	schema.FieldOf("origin", schema.Text().Constrained(schema.MinLength(1)),
+	schema.FieldOf("origin", schema.Text().Check(schema.MinLength(1)),
 		func(enquiry Enquiry) string { return enquiry.Origin },
 		func(enquiry *Enquiry, value string) { enquiry.Origin = value }).
-		Numbered(1).
-		Documented("Origin is where the shipment starts."),
-	schema.FieldOf("destination", schema.Text().Constrained(schema.MinLength(1)),
+		WithNumber(1).
+		WithDescription("Origin is where the shipment starts."),
+	schema.FieldOf("destination", schema.Text().Check(schema.MinLength(1)),
 		func(enquiry Enquiry) string { return enquiry.Destination },
 		func(enquiry *Enquiry, value string) { enquiry.Destination = value }).
-		Numbered(2).
-		Documented("Destination is where it is going."),
-	schema.FieldOf("kilos", schema.Float64().Constrained(schema.Above[float64](0)),
+		WithNumber(2).
+		WithDescription("Destination is where it is going."),
+	schema.FieldOf("kilos", schema.Float64().Check(schema.Above[float64](0)),
 		func(enquiry Enquiry) float64 { return enquiry.Kilos },
 		func(enquiry *Enquiry, value float64) { enquiry.Kilos = value }).
-		Numbered(3).
-		Documented("Kilos is what it weighs, and it weighs something."),
-).Documented("Enquiry asks what a shipment would cost.")
+		WithNumber(3).
+		WithDescription("Kilos is what it weighs, and it weighs something."),
+).WithDescription("Enquiry asks what a shipment would cost.")
 
 // RateSchema describes a rate.
 var RateSchema = schema.Struct[Rate]("Rate",
-	schema.FieldOf("carrier", schema.Text().Constrained(schema.MinLength(1)),
+	schema.FieldOf("carrier", schema.Text().Check(schema.MinLength(1)),
 		func(rate Rate) string { return rate.Carrier },
-		func(rate *Rate, value string) { rate.Carrier = value }).Numbered(1),
-	schema.FieldOf("currency", schema.Text().Constrained(schema.Matching(`^[A-Z]{3}$`)),
+		func(rate *Rate, value string) { rate.Carrier = value }).WithNumber(1),
+	schema.FieldOf("currency", schema.Text().Check(schema.Pattern(`^[A-Z]{3}$`)),
 		func(rate Rate) string { return rate.Currency },
-		func(rate *Rate, value string) { rate.Currency = value }).Numbered(2),
-	schema.FieldOf("cents", schema.Int64().Constrained(schema.AtLeast[int64](1)),
+		func(rate *Rate, value string) { rate.Currency = value }).WithNumber(2),
+	schema.FieldOf("cents", schema.Int64().Check(schema.AtLeast[int64](1)),
 		func(rate Rate) int64 { return rate.Cents },
-		func(rate *Rate, value int64) { rate.Cents = value }).Numbered(3),
-).Documented("Rate is what a carrier would charge.")
+		func(rate *Rate, value int64) { rate.Cents = value }).WithNumber(3),
+).WithDescription("Rate is what a carrier would charge.")
 
 // Service is the fully-qualified proto service name, which is what forms the
 // path a gRPC client calls.
@@ -69,7 +69,7 @@ const Service = "logistics.v1.Rates"
 
 // Quote is the procedure.
 var Quote = grpc.Unary(Service, "Quote", EnquirySchema, RateSchema).
-	Documented("Quote prices one shipment, or says why it cannot be priced.")
+	WithDescription("Quote prices one shipment, or says why it cannot be priced.")
 
 // Refusal is why this service would not answer.
 //
@@ -97,12 +97,12 @@ func (refusal Refusal) Error() string {
 	return "quoting: " + refusal.Details
 }
 
-// Coded is what each refusal answers with.
+// FailureFor is what each refusal answers with.
 //
 // NoRoute is NotFound because the route does not exist; TooHeavy is
 // FailedPrecondition because the system could not do it in any state a retry
 // would reach; NoCapacity is Unavailable because tomorrow it might.
-func Coded(refusal Refusal) grpc.Failure {
+func FailureFor(refusal Refusal) grpc.Failure {
 	switch refusal.Reason {
 	case TooHeavy:
 		return grpc.Failure{Code: grpc.FailedPrecondition, Message: refusal.Details}
@@ -113,21 +113,21 @@ func Coded(refusal Refusal) grpc.Failure {
 	}
 }
 
-type quoting[A any] = effect.Effect[effect.Unit, Refusal, A]
+type quoteEffect[A any] = effect.Effect[effect.Unit, Refusal, A]
 
-// heaviest is what any carrier here will take.
-const heaviest = 24000.0
+// maxKilos is what any carrier here will take.
+const maxKilos = 24000.0
 
-// Priced answers an enquiry from a table of routes.
+// Price answers an enquiry from a table of routes.
 //
 // A function of the rates rather than a method on a service object, because
 // what it needs is the table and nothing else -- and a handler that takes what
 // it needs is a handler a test can call.
-func Priced(rates map[string]Rate) func(Enquiry) quoting[Rate] {
-	return func(enquiry Enquiry) quoting[Rate] {
+func Price(rates map[string]Rate) func(Enquiry) quoteEffect[Rate] {
+	return func(enquiry Enquiry) quoteEffect[Rate] {
 		return effect.For[effect.Unit, Refusal]().
-			Suspend(func() quoting[Rate] {
-				if enquiry.Kilos > heaviest {
+			Suspend(func() quoteEffect[Rate] {
+				if enquiry.Kilos > maxKilos {
 					return quoteRefusal(TooHeavy, "no carrier takes more than 24 tonnes")
 				}
 				rate, carried := rates[enquiry.Origin+"-"+enquiry.Destination]
@@ -142,7 +142,7 @@ func Priced(rates map[string]Rate) func(Enquiry) quoting[Rate] {
 	}
 }
 
-func quoteRefusal(reason Reason, details string) quoting[Rate] {
+func quoteRefusal(reason Reason, details string) quoteEffect[Rate] {
 	return effect.For[effect.Unit, Refusal]().
 		Fail[Rate](Refusal{Reason: reason, Details: details})
 }
@@ -155,5 +155,5 @@ func Answer(
 	if boundary == nil {
 		return errors.New("quoting: a service needs a boundary")
 	}
-	return grpc.Answer(boundary, Quote, Priced(rates))
+	return grpc.Answer(boundary, Quote, Price(rates))
 }

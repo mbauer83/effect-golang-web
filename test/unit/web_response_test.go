@@ -82,7 +82,7 @@ func TestAnUnencodableValueIsRefusedBeforeAnythingIsWritten(t *testing.T) {
 		t.Fatal("expected a value that cannot be encoded to be refused")
 	}
 	var fault web.Fault
-	if !errors.As(err, &fault) || fault.Doing != "encoding the response body" {
+	if !errors.As(err, &fault) || fault.Op != "encoding the response body" {
 		t.Fatalf("expected the stage named, got %v", err)
 	}
 }
@@ -107,7 +107,7 @@ func TestAddingAHeaderLeavesTheOriginalResponseAlone(t *testing.T) {
 }
 
 func TestAStreamingResponseWritesAsItGoes(t *testing.T) {
-	response := web.Streaming(http.StatusOK, "text/plain", func(writer io.Writer) error {
+	response := web.Stream(http.StatusOK, "text/plain", func(writer io.Writer) error {
 		for _, chunk := range []string{"one ", "two ", "three"} {
 			if _, err := writer.Write([]byte(chunk)); err != nil {
 				return err

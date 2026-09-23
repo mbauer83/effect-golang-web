@@ -33,14 +33,14 @@ func (route Route[R, E]) Declaration() Declaration {
 	return route.declaration
 }
 
-// withWrapper returns the route with each built handler passed through the
+// withMiddleware returns the route with each built handler passed through the
 // wrapper, together with the declaration it belongs to.
 //
 // The wrapper sees the route's whole work: the codecs as well as the handler,
 // because it wraps what dispatch calls. That is the useful boundary -- a route
 // whose response is expensive to encode is expensive to serve, whatever the
 // handler cost.
-func (route Route[R, E]) withWrapper(each Matched[R, E]) Route[R, E] {
+func (route Route[R, E]) withMiddleware(each RouteMiddleware[R, E]) Route[R, E] {
 	if route.fault != nil || route.build == nil {
 		return route
 	}
@@ -82,19 +82,19 @@ func Handle[R, E, In, Out any](
 		// Decode, handle, encode -- as three steps, so each can be a span of
 		// its own.
 		phased := func(request Request) effect.Effect[R, E, Response] {
-			reading := operations.Suspend(func() effect.Effect[R, E, read[In]] {
+			decode := operations.Suspend(func() effect.Effect[R, E, decodeResult[In]] {
 				input, err := Decode(endpoint.input, request)
-				return operations.Succeed(read[In]{value: input, refusal: err})
+				return operations.Succeed(decodeResult[In]{value: input, refusal: err})
 			})
-			return within(reading, phases.decoding, phases.sample).
-				FlatMap(func(decoded read[In]) effect.Effect[R, E, Response] {
+			return instrumentPhase(decode, phases.decodeSpan, phases.sampler).
+				FlatMap(func(decoded decodeResult[In]) effect.Effect[R, E, Response] {
 					if decoded.refusal != nil {
-						return refusedRequest[R, E](route.declaration, decoded.refusal).
+						return logRefusal[R, E](route.declaration, decoded.refusal).
 							As(reject(decoded.refusal))
 					}
-					return within(handle(decoded.value), phases.handling, phases.sample).
+					return instrumentPhase(handle(decoded.value), phases.handleSpan, phases.sampler).
 						FlatMap(func(value Out) effect.Effect[R, E, Response] {
-							return within(encode(value), phases.encoding, phases.sample)
+							return instrumentPhase(encode(value), phases.encodeSpan, phases.sampler)
 						})
 				})
 		}
@@ -114,13 +114,13 @@ func Handle[R, E, In, Out any](
 			return operations.Suspend(func() effect.Effect[R, E, Response] {
 				input, err := Decode(endpoint.input, request)
 				if err != nil {
-					return refusedRequest[R, E](route.declaration, err).As(reject(err))
+					return logRefusal[R, E](route.declaration, err).As(reject(err))
 				}
 				return handle(input).FlatMap(encode)
 			})
 		}
 
-		if phases.quiet() {
+		if phases.isQuiet() {
 			return plain
 		}
 		return phased
@@ -128,25 +128,25 @@ func Handle[R, E, In, Out any](
 	return route
 }
 
-// read is what decoding produced: the value, or why the request was refused.
+// decodeResult is what decoding produced: the value, or why the request was refused.
 //
 // Carried rather than short-circuited, because decoding is a phase of its own
 // now and a phase reports what it did -- a refusal is an outcome of the
 // decoding and not a reason to abandon the composition around it.
-type read[In any] struct {
+type decodeResult[In any] struct {
 	value   In
 	refusal error
 }
 
-// withSampling returns the route with its own parts named, so a trace shows
+// withPhases returns the route with its own parts named, so a trace shows
 // decoding and encoding beside the handler, and measured by the sampler if one
 // was given.
-func (route Route[R, E]) withSampling(sample Sampling) Route[R, E] {
+func (route Route[R, E]) withPhases(sampler PhaseSampler) Route[R, E] {
 	if route.fault != nil {
 		return route
 	}
 	route.phases = phaseNames()
-	route.phases.sample = sample
+	route.phases.sampler = sampler
 	return route
 }
 
@@ -191,7 +191,7 @@ func rejectRequest(err error) Response {
 
 var errNoHandler = errors.New("a route has a handler")
 
-// refusedRequest notes a request a codec would not read.
+// logRefusal notes a request a codec would not read.
 //
 // Through the program's own logger rather than the boundary's report sink, and
 // the difference is deliberate: a body a client sent wrong is a fact about
@@ -208,7 +208,7 @@ var errNoHandler = errors.New("a route has a handler")
 //
 // The route's pattern and not the path asked for: the pattern is what
 // aggregates, and a path carries whatever identities the caller put in it.
-func refusedRequest[R, E any](
+func logRefusal[R, E any](
 	declaration Declaration,
 	refusal error,
 ) effect.Effect[R, E, effect.Unit] {

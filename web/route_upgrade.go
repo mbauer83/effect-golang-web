@@ -12,13 +12,13 @@ import (
 	"net/http"
 )
 
-// Upgrading declares a route whose handler takes over the connection.
+// Upgrade declares a route whose handler takes over the connection.
 //
 // Its declaration says what is true of the HTTP part: a GET that answers 101
 // and carries no entity. What happens after the upgrade is a different protocol
 // and is not something an OpenAPI document can describe, which is why the
 // declaration stops there rather than pretending.
-func Upgrading[R, E any](path string, summary string, handler Handler[R, E]) Route[R, E] {
+func Upgrade[R, E any](path string, summary string, handler Handler[R, E]) Route[R, E] {
 	segments, err := parsePattern(path)
 	if err != nil {
 		return Route[R, E]{fault: err}

@@ -30,20 +30,20 @@ func runConsign(runtime *effect.Runtime) {
 		fail(err)
 	}
 
-	// Refuses once and then takes it, because a shipment given back is offered
+	// Refuses once and then takes it, because a shipment given back is attempts
 	// again: a carrier that always refused would loop, which is what the
 	// disposition means.
-	offered := 0
-	carrier := func(consign.Shipment) collecting[consign.Outcome] {
+	attempts := 0
+	carrier := func(consign.Shipment) consignEffect[consign.Outcome] {
 		return effect.For[effect.Unit, amqp10.Fault]().
-			Suspend(func() collecting[consign.Outcome] {
-				offered++
-				if offered > 1 {
+			Suspend(func() consignEffect[consign.Outcome] {
+				attempts++
+				if attempts > 1 {
 					return effect.For[effect.Unit, amqp10.Fault]().
-						Succeed[consign.Outcome](consign.Collected{})
+						Succeed[consign.Outcome](consign.Collection{})
 				}
 				return effect.For[effect.Unit, amqp10.Fault]().
-					Succeed[consign.Outcome](consign.Refused{
+					Succeed[consign.Outcome](consign.Refusal{
 					Finality: consign.NotNow,
 					Reason:   "no room on today's van",
 				})
@@ -53,7 +53,7 @@ func runConsign(runtime *effect.Runtime) {
 	// Direct style: three things in order, which as FlatMaps read inside-out
 	// with the last nested deepest. No defer in the body, which is the
 	// condition for using it.
-	program := effect.Gen(func(do *consigning) []consign.Shipment {
+	program := effect.Gen(func(do *consignDo) []consign.Shipment {
 		do.Await(amqp10.Send[effect.Unit](sender, amqp10.Message{
 			Body: []byte(`{"reference":"not a uuid","carrier":"","weight":0}`),
 		}))
@@ -78,10 +78,10 @@ func runConsign(runtime *effect.Runtime) {
 	}
 	for _, modification := range broker.Modified() {
 		fmt.Printf("  given back: tried=%v elsewhere=%v\n",
-			modification.Change.Tried, modification.Change.Elsewhere)
+			modification.Change.DeliveryFailed, modification.Change.UndeliverableHere)
 	}
 }
 
 // The channel this scenario works in, and the binder it binds with.
-type collecting[A any] = effect.Effect[effect.Unit, amqp10.Fault, A]
-type consigning = effect.Do[effect.Unit, amqp10.Fault]
+type consignEffect[A any] = effect.Effect[effect.Unit, amqp10.Fault, A]
+type consignDo = effect.Do[effect.Unit, amqp10.Fault]

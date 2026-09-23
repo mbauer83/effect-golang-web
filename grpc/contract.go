@@ -17,12 +17,12 @@ import (
 	"github.com/mbauer83/effect-golang-schema/schema/structure"
 )
 
-// Declaring is a procedure a contract can be projected from.
+// Declaration is a procedure a contract can be projected from.
 //
 // An interface rather than a generic parameter because a contract covers
 // several procedures whose types differ, and there is nothing to gain from
 // naming them: what a projection needs is the name and the two descriptions.
-type Declaring interface {
+type Declaration interface {
 	Service() string
 	Method() string
 	Doc() string
@@ -35,18 +35,18 @@ type Declaring interface {
 // Every shape is declared once and shared, so a type used by ten procedures
 // appears once -- and the order is the order the procedures were given, so the
 // same set always produces the same file and the file can be checked in.
-func Contract(packageName string, procedures ...Declaring) (protobuf.Document, error) {
-	declared := make([]protobuf.Declared, 0, len(procedures))
+func Contract(packageName string, procedures ...Declaration) (protobuf.Document, error) {
+	declared := make([]protobuf.Procedure, 0, len(procedures))
 	for _, procedure := range procedures {
 		if err := procedure.Fault(); err != nil {
 			return protobuf.Document{}, err
 		}
-		bare, err := within(packageName, procedure.Service())
+		bare, err := bareServiceName(packageName, procedure.Service())
 		if err != nil {
 			return protobuf.Document{}, err
 		}
 		request, response := procedure.Shapes()
-		declared = append(declared, protobuf.Declared{
+		declared = append(declared, protobuf.Procedure{
 			Service:  bare,
 			Method:   procedure.Method(),
 			Doc:      procedure.Doc(),
@@ -57,14 +57,14 @@ func Contract(packageName string, procedures ...Declaring) (protobuf.Document, e
 	return protobuf.ProjectServices(packageName, declared...)
 }
 
-// within is the service's own name inside the package that declares it.
+// bareServiceName is the service's own name inside the package that declares it.
 //
 // A procedure names its service in full, because the full name is what forms
 // the path a client calls. A proto file names it bare, because the package
 // declaration supplies the rest. So the two have to agree, and a service whose
 // name is not inside the package being projected is a mistake worth naming: the
 // file would compile and declare a service at an address nobody calls.
-func within(packageName string, service string) (string, error) {
+func bareServiceName(packageName string, service string) (string, error) {
 	prefix := packageName + "."
 	if !strings.HasPrefix(service, prefix) {
 		return "", faultOf("projecting a contract", service,

@@ -58,7 +58,7 @@ func Open[R any](scope effect.Scope, connection *Connection) effect.Effect[R, Fa
 		func(err error) Fault { return faultOf("opening a channel", "", err) },
 	).WithName("open-channel")
 
-	return scope.AcquireRelease(acquire, closeConnection[R])
+	return scope.AcquireRelease(acquire, closeChannel[R])
 }
 
 // Prefetch limits how many unacknowledged deliveries the broker will send this
@@ -79,23 +79,23 @@ func Prefetch[R any](channel *Channel, count int) effect.Effect[R, Fault, effect
 
 func disconnect[R any](connection *Connection) effect.Effect[R, effect.Never, effect.Unit] {
 	return effect.AddFinalizer[R](func(context.Context) error {
-		return closedAlready(connection.connection.Close())
+		return ignoreClosed(connection.connection.Close())
 	})
 }
 
-func closeConnection[R any](channel *Channel) effect.Effect[R, effect.Never, effect.Unit] {
+func closeChannel[R any](channel *Channel) effect.Effect[R, effect.Never, effect.Unit] {
 	return effect.AddFinalizer[R](func(context.Context) error {
-		return closedAlready(channel.channel.Close())
+		return ignoreClosed(channel.channel.Close())
 	})
 }
 
-// closedAlready treats a closed connection as the outcome the release wanted.
+// ignoreClosed treats a closed connection as the outcome the release wanted.
 //
 // The broker closes a channel or a connection of its own accord -- a refused
 // declaration, a shutdown -- and by the time the scope ends there is nothing
 // left to close. A release that reported that would report a fault for every
 // program the broker disconnected first.
-func closedAlready(err error) error {
+func ignoreClosed(err error) error {
 	if err == nil || err == broker.ErrClosed {
 		return nil
 	}

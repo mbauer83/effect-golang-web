@@ -29,7 +29,7 @@ func QueryParam[A any](name string, shape schema.Schema[A]) Codec[A] {
 // Absent and empty are different: ?page= carries an empty value, and a caller
 // that wants to tell those apart can.
 func OptionalQueryParam[A any](name string, shape schema.Schema[A]) Codec[*A] {
-	return optional(name, InQuery, shape, queryValue(name))
+	return optionalParameter(name, InQuery, shape, queryValue(name))
 }
 
 // HeaderParam reads a required header.
@@ -40,23 +40,23 @@ func HeaderParam[A any](name string, shape schema.Schema[A]) Codec[A] {
 // OptionalHeaderParam reads a header that may be absent, yielding nil when it
 // is.
 func OptionalHeaderParam[A any](name string, shape schema.Schema[A]) Codec[*A] {
-	return optional(name, InHeader, shape, headerValue(name))
+	return optionalParameter(name, InHeader, shape, headerValue(name))
 }
 
-// Documented attaches prose to a codec's parameter, for the published document.
+// WithDescription attaches prose to a codec's parameter, for the published document.
 //
 // It applies to a codec that reads exactly one parameter, because prose about
 // "the parameters" would not tell a reader which one it meant. It is a method
 // because it modifies a codec rather than building one, as every modifier in
 // this module is.
-func (codec Codec[A]) Documented(doc string) Codec[A] {
+func (codec Codec[A]) WithDescription(doc string) Codec[A] {
 	if len(codec.parameters) != 1 {
 		codec.fault = faultOf("describing a parameter", errNotOneParameter)
 		return codec
 	}
-	described := append([]Parameter{}, codec.parameters...)
-	described[0].Doc = doc
-	codec.parameters = described
+	parameters := append([]Parameter{}, codec.parameters...)
+	parameters[0].Doc = doc
+	codec.parameters = parameters
 	return codec
 }
 
@@ -89,8 +89,8 @@ func requiredParameter[A any](
 	}
 }
 
-// optional builds a codec for a parameter that may be absent.
-func optional[A any](
+// optionalParameter builds a codec for a parameter that may be absent.
+func optionalParameter[A any](
 	name string,
 	in Location,
 	shape schema.Schema[A],
@@ -150,8 +150,8 @@ func parameterFault[A any](name string, shape schema.Schema[A]) error {
 // the query parameter page" is.
 func parameterRefusal(parameter Parameter, err error) error {
 	return Fault{
-		Doing: "reading the " + string(parameter.In) + " parameter " + parameter.Name,
-		Err:   err,
+		Op:  "reading the " + string(parameter.In) + " parameter " + parameter.Name,
+		Err: err,
 	}
 }
 

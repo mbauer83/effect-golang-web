@@ -159,7 +159,7 @@ func TestAServerWithNothingToServeOnIsRefused(t *testing.T) {
 		t.Fatal("expected a server with neither an address nor a listener to be refused")
 	}
 	failures := cause.Failures()
-	if len(failures) != 1 || failures[0].Doing != "opening the listener" {
+	if len(failures) != 1 || failures[0].Op != "opening the listener" {
 		t.Fatalf("expected the stage named, got %+v", cause)
 	}
 }

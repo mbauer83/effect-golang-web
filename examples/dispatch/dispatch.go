@@ -28,15 +28,15 @@ var OrderSchema = schema.Struct[Order]("Order",
 	schema.FieldOf("reference", schema.UUID(),
 		func(order Order) string { return order.Reference },
 		func(order *Order, reference string) { order.Reference = reference }),
-	schema.FieldOf("item", schema.Text().Constrained(schema.MinLength(1)),
+	schema.FieldOf("item", schema.Text().Check(schema.MinLength(1)),
 		func(order Order) string { return order.Item },
 		func(order *Order, item string) { order.Item = item }),
-	schema.FieldOf("quantity", schema.Int32().Constrained(schema.AtLeast[int32](1)),
+	schema.FieldOf("quantity", schema.Int32().Check(schema.AtLeast[int32](1)),
 		func(order Order) int32 { return order.Quantity },
 		func(order *Order, quantity int32) { order.Quantity = quantity }),
-).Documented("one order to be shipped")
+).WithDescription("one order to be shipped")
 
-type dispatching[A any] = effect.Effect[effect.Unit, amqp091.Fault, A]
+type dispatchEffect[A any] = effect.Effect[effect.Unit, amqp091.Fault, A]
 
 // Where the messages go. A program that owns its topology says so in one place.
 const (
@@ -51,10 +51,10 @@ const (
 // Topology is what this program needs the broker to hold.
 var Topology = amqp091.Topology{
 	Exchanges: []amqp091.Exchange{
-		{Name: Orders, Routing: amqp091.Direct, Durability: amqp091.Lasting},
+		{Name: Orders, Routing: amqp091.Direct, Durability: amqp091.Durable},
 	},
 	Queues: []amqp091.Queue{
-		{Name: Shipping, Durability: amqp091.Lasting},
+		{Name: Shipping, Durability: amqp091.Durable},
 	},
 	Bindings: []amqp091.Binding{
 		{Exchange: Orders, Queue: Shipping, Key: Placed},
@@ -63,7 +63,7 @@ var Topology = amqp091.Topology{
 
 // Prepare states the topology. A program declares it at start-up, so a
 // disagreement about a name is heard then rather than at the first message.
-func Prepare(channel amqp091.Declaring) dispatching[effect.Unit] {
+func Prepare(channel amqp091.Declarer) dispatchEffect[effect.Unit] {
 	return amqp091.Declare[effect.Unit](channel, Topology)
 }
 
@@ -71,15 +71,15 @@ func Prepare(channel amqp091.Declaring) dispatching[effect.Unit] {
 //
 // Lasting, because an order the broker forgot in a restart is an order the
 // customer placed and nobody will ship.
-func Place(channel amqp091.Publishing, order Order) dispatching[effect.Unit] {
+func Place(channel amqp091.Publisher, order Order) dispatchEffect[effect.Unit] {
 	return effect.For[effect.Unit, amqp091.Fault]().
-		Suspend(func() dispatching[effect.Unit] {
-			message, err := amqp091.Encoded(OrderSchema, order)
+		Suspend(func() dispatchEffect[effect.Unit] {
+			message, err := amqp091.Encode(OrderSchema, order)
 			if err != nil {
 				return effect.For[effect.Unit, amqp091.Fault]().
-					Fail[effect.Unit](amqp091.Fault{Doing: "placing an order", Err: err})
+					Fail[effect.Unit](amqp091.Fault{Op: "placing an order", Err: err})
 			}
-			message.Durability = amqp091.Lasting
+			message.Durability = amqp091.Durable
 			return amqp091.Publish[effect.Unit](channel,
 				amqp091.Target{Exchange: Orders, Key: Placed}, message)
 		})
@@ -101,30 +101,30 @@ func Place(channel amqp091.Publishing, order Order) dispatching[effect.Unit] {
 // and cannot be anything else -- which is the reason acknowledgement is
 // explicit rather than a policy this package chose.
 func Ship(
-	channel amqp091.Consuming,
-	pack func(Order) dispatching[effect.Unit],
+	channel amqp091.Consumer,
+	pack func(Order) dispatchEffect[effect.Unit],
 ) effect.Stream[effect.Unit, amqp091.Fault, Order] {
 	return effect.CollectStreamEffect(
 		amqp091.Values[effect.Unit](channel, Shipping, OrderSchema),
-		func(received amqp091.Received[Order]) dispatching[effect.Chunk[Order]] {
+		func(received amqp091.Envelope[Order]) dispatchEffect[effect.Chunk[Order]] {
 			return shipOrder(received, pack)
 		})
 }
 
 // shipOrder is what happens to one delivery.
 func shipOrder(
-	received amqp091.Received[Order],
-	pack func(Order) dispatching[effect.Unit],
-) dispatching[effect.Chunk[Order]] {
+	received amqp091.Envelope[Order],
+	pack func(Order) dispatchEffect[effect.Unit],
+) dispatchEffect[effect.Chunk[Order]] {
 	order, err := received.Read()
 	if err != nil {
 		return amqp091.Discard[effect.Unit](received).As(effect.ChunkOf[Order]())
 	}
 	return pack(order).
-		FlatMap(func(effect.Unit) dispatching[effect.Chunk[Order]] {
+		FlatMap(func(effect.Unit) dispatchEffect[effect.Chunk[Order]] {
 			return amqp091.Ack[effect.Unit](received).As(effect.ChunkOf(order))
 		}).
-		CatchAll(func(amqp091.Fault) dispatching[effect.Chunk[Order]] {
+		CatchAll(func(amqp091.Fault) dispatchEffect[effect.Chunk[Order]] {
 			return amqp091.Requeue[effect.Unit](received).As(effect.ChunkOf[Order]())
 		})
 }

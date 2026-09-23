@@ -58,12 +58,12 @@ func surfaceThatRefuses(t *testing.T, quiet bool) (string, *recorded) {
 	}
 	boundary = boundary.WithReport(sink.note)
 	if quiet {
-		boundary = boundary.Quietly()
+		boundary = boundary.Quiet()
 	}
 
 	route := web.Handle(
 		web.GET("/thing", web.Nothing(), web.ReturnsNothing(http.StatusOK)).
-			Summary("Read a thing"),
+			WithSummary("Read a thing"),
 		func(effect.Unit) effect.Effect[effect.Unit, error, effect.Unit] {
 			return effect.Fail[effect.Unit, effect.Unit](errors.New("no such thing"))
 		},
@@ -76,7 +76,7 @@ func surfaceThatRefuses(t *testing.T, quiet bool) (string, *recorded) {
 	// puts something other than a line in the record. A surface that also
 	// names its requests -- inspect.Observing -- puts the route there
 	// instead, which is better still and is a deployment's choice.
-	front := httptest.NewServer(boundary.Handler(surface.Detailing().Handler()))
+	front := httptest.NewServer(boundary.Handler(surface.WithPhaseSpans().Handler()))
 	t.Cleanup(front.Close)
 	return front.URL, sink
 }
@@ -153,7 +153,7 @@ func TestARequestRefusedByACodecIsNoted(t *testing.T) {
 	// the codec rather than by the handler.
 	route := web.Handle(
 		web.GET("/thing", web.QueryParam("q", schema.Text()),
-			web.ReturnsNothing(http.StatusOK)).Summary("Read a thing"),
+			web.ReturnsNothing(http.StatusOK)).WithSummary("Read a thing"),
 		func(string) effect.Effect[effect.Unit, error, effect.Unit] {
 			return effect.For[effect.Unit, error]().Succeed(effect.Unit{})
 		},

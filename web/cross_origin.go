@@ -28,43 +28,43 @@ import (
 // has not been told which origins may read it is a surface only its own origin
 // may read.
 type CrossOrigin struct {
-	// Origins are the origins allowed, spelled as a browser sends them --
+	// AllowedOrigins are the origins allowed, spelled as a browser sends them --
 	// scheme, host and port, as in "https://films.example" or
 	// "http://localhost:5173". Compared exactly and echoed back one at a
 	// time, because an answer names the origin that asked rather than the
 	// list: a cache holding one answer for several origins is how a page at
 	// one of them reads an answer meant for another.
-	Origins []string
-	// Headers are the request headers a browser may send beyond the few it
+	AllowedOrigins []string
+	// AllowedHeaders are the request headers a browser may send beyond the few it
 	// considers safe. "Authorization" and "Content-Type" are the two this
 	// kind of API needs, and neither is on the safe list.
-	Headers []string
-	// Expose are the answer's headers a page may read beyond the few it can
+	AllowedHeaders []string
+	// ExposedHeaders are the answer's headers a page may read beyond the few it can
 	// read anyway. Empty for an API whose answers are all body.
-	Expose []string
-	// Remember is how long a browser may skip asking permission again for the
+	ExposedHeaders []string
+	// MaxAge is how long a browser may skip asking permission again for the
 	// same path and method. Zero leaves it to the browser, which asks every
 	// time: correct, and one extra round trip per request.
-	Remember time.Duration
+	MaxAge time.Duration
 }
 
 // IsStated reports whether this shares anything at all.
-func (sharing CrossOrigin) IsStated() bool { return len(sharing.Origins) > 0 }
+func (crossOrigin CrossOrigin) IsStated() bool { return len(crossOrigin.AllowedOrigins) > 0 }
 
 // allows reports whether an origin is one of the stated ones.
 //
 // Exact, and no wildcard: a surface that answered every origin would let any
 // page anybody visits read what this one's readers can read. A deployment that
 // genuinely serves everybody states the origins it serves.
-func (sharing CrossOrigin) allows(origin string) bool {
-	return origin != "" && slices.Contains(sharing.Origins, origin)
+func (crossOrigin CrossOrigin) allows(origin string) bool {
+	return origin != "" && slices.Contains(crossOrigin.AllowedOrigins, origin)
 }
 
-// asked is the origin of a request a browser wants an answer for, and whether
+// allowedOrigin is the origin of a request a browser wants an answer for, and whether
 // this surface shares with it.
-func (sharing CrossOrigin) asked(request *http.Request) (string, bool) {
+func (crossOrigin CrossOrigin) allowedOrigin(request *http.Request) (string, bool) {
 	origin := request.Header.Get("Origin")
-	if !sharing.allows(origin) {
+	if !crossOrigin.allows(origin) {
 		return "", false
 	}
 	return origin, true
@@ -81,7 +81,7 @@ func isPreflight(request *http.Request) bool {
 		request.Header.Get("Access-Control-Request-Method") != ""
 }
 
-// permitting is the answer to a preflight: yes, for the method and headers
+// preflightResponse is the answer to a preflight: yes, for the method and headers
 // that were asked about.
 //
 // The method is echoed rather than enumerated, and that is not a shortcut. The
@@ -89,17 +89,17 @@ func isPreflight(request *http.Request) bool {
 // a method this path has is a question the routing already answers -- so a
 // permitted preflight followed by a 405 tells a page exactly what is wrong,
 // where a refused preflight tells it only that something is.
-func (sharing CrossOrigin) permitting(request *http.Request, origin string) Response {
+func (crossOrigin CrossOrigin) preflightResponse(request *http.Request, origin string) Response {
 	answer := Empty(http.StatusNoContent).
 		WithHeader("Access-Control-Allow-Origin", origin).
 		WithHeader("Access-Control-Allow-Methods", request.Header.Get("Access-Control-Request-Method")).
 		WithHeader("Vary", "Origin, Access-Control-Request-Method, Access-Control-Request-Headers")
-	if headers := sharing.headersFor(request); headers != "" {
+	if headers := crossOrigin.headersFor(request); headers != "" {
 		answer = answer.WithHeader("Access-Control-Allow-Headers", headers)
 	}
-	if sharing.Remember > 0 {
+	if crossOrigin.MaxAge > 0 {
 		answer = answer.WithHeader("Access-Control-Max-Age",
-			strconv.Itoa(int(sharing.Remember.Seconds())))
+			strconv.Itoa(int(crossOrigin.MaxAge.Seconds())))
 	}
 	return answer
 }
@@ -112,36 +112,36 @@ func (sharing CrossOrigin) permitting(request *http.Request, origin string) Resp
 // that states its headers gets them checked, and one that has not stated any
 // is not silently answering yes to everything: with no Headers stated and none
 // asked about, nothing is said at all.
-func (sharing CrossOrigin) headersFor(request *http.Request) string {
-	if len(sharing.Headers) > 0 {
-		return strings.Join(sharing.Headers, ", ")
+func (crossOrigin CrossOrigin) headersFor(request *http.Request) string {
+	if len(crossOrigin.AllowedHeaders) > 0 {
+		return strings.Join(crossOrigin.AllowedHeaders, ", ")
 	}
 	return request.Header.Get("Access-Control-Request-Headers")
 }
 
-// sharedWith is a response a page at this origin may read.
+// share is a response a page at this origin may read.
 //
 // Vary because the answer names one origin: a cache that kept it without this
 // would hand a page at one origin the answer that named another, and the
 // browser would refuse it.
-func (sharing CrossOrigin) sharedWith(response Response, origin string) Response {
+func (crossOrigin CrossOrigin) share(response Response, origin string) Response {
 	shared := response.
 		WithHeader("Access-Control-Allow-Origin", origin).
-		WithHeader("Vary", varyingAlsoByOrigin(response))
-	if len(sharing.Expose) > 0 {
+		WithHeader("Vary", varyByOrigin(response))
+	if len(crossOrigin.ExposedHeaders) > 0 {
 		shared = shared.WithHeader("Access-Control-Expose-Headers",
-			strings.Join(sharing.Expose, ", "))
+			strings.Join(crossOrigin.ExposedHeaders, ", "))
 	}
 	return shared
 }
 
-// varyingAlsoByOrigin is the response's own Vary with Origin among it.
+// varyByOrigin is the response's own Vary with Origin among it.
 //
 // Added to rather than replacing, because a handler that varies by Accept or
 // by Accept-Encoding said something true about its answer and this is saying
 // one more thing about the same answer -- and a cache told only the second
 // would serve a compressed body to a client that cannot read one.
-func varyingAlsoByOrigin(response Response) string {
+func varyByOrigin(response Response) string {
 	already := response.Header().Values("Vary")
 	for _, stated := range already {
 		for _, name := range strings.Split(stated, ",") {

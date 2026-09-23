@@ -81,7 +81,7 @@ func temporary(name string) amqp091.Topology {
 			{Name: exchange, Routing: amqp091.Direct, Durability: amqp091.Transient},
 		},
 		Queues: []amqp091.Queue{
-			{Name: queue, Durability: amqp091.Transient, Access: amqp091.Owned},
+			{Name: queue, Durability: amqp091.Transient, Access: amqp091.Exclusive},
 		},
 		Bindings: []amqp091.Binding{
 			{Exchange: exchange, Queue: queue, Key: dispatch.Placed},
@@ -96,15 +96,15 @@ func TestAMessageCrossesARealBrokerWithItsHeadersAndComesBackAsItself(t *testing
 		Body:        []byte(`{"reference":"8f14e45f-ceea-467a-a4fb-1a9c73d0f2b1","item":"lamp","quantity":2}`),
 		ContentType: "application/json",
 		Headers:     everyHeaderKind(),
-		Durability:  amqp091.Lasting,
+		Durability:  amqp091.Durable,
 	}
 
 	exit := brokered(t, func(
 		channel *amqp091.Channel,
 		topology amqp091.Topology,
-	) dispatching[[]amqp091.Received[[]byte]] {
+	) dispatching[[]amqp091.Envelope[[]byte]] {
 		return amqp091.Publish[effect.Unit](channel, published(topology), sent).
-			FlatMap(func(effect.Unit) dispatching[[]amqp091.Received[[]byte]] {
+			FlatMap(func(effect.Unit) dispatching[[]amqp091.Envelope[[]byte]] {
 				return effect.RunCollect(
 					amqp091.Consume[effect.Unit](channel, topology.Queues[0].Name).TakeStream(1))
 			})
@@ -141,19 +141,19 @@ func TestStoppingEarlyStopsTheBrokerSendingAndLeavesTheRestWaiting(t *testing.T)
 	exit := brokered(t, func(
 		channel *amqp091.Channel,
 		topology amqp091.Topology,
-	) dispatching[[]amqp091.Received[[]byte]] {
+	) dispatching[[]amqp091.Envelope[[]byte]] {
 		queue := topology.Queues[0].Name
 		return effect.ForEach([]int{1, 2, 3}, func(int) dispatching[effect.Unit] {
 			return amqp091.Publish[effect.Unit](channel, published(topology),
 				amqp091.Message{Body: []byte("{}")})
 		}).
-			FlatMap(func([]effect.Unit) dispatching[[]amqp091.Received[[]byte]] {
+			FlatMap(func([]effect.Unit) dispatching[[]amqp091.Envelope[[]byte]] {
 				// One, unacknowledged, then the scope that held the
 				// subscription closes.
 				return effect.RunCollect(
 					amqp091.Consume[effect.Unit](channel, queue).TakeStream(1))
 			}).
-			FlatMap(func(first []amqp091.Received[[]byte]) dispatching[[]amqp091.Received[[]byte]] {
+			FlatMap(func(first []amqp091.Envelope[[]byte]) dispatching[[]amqp091.Envelope[[]byte]] {
 				if len(first) != 1 {
 					t.Errorf("expected one delivery from the first consumer, got %d", len(first))
 				}
@@ -180,10 +180,10 @@ func TestStoppingEarlyStopsTheBrokerSendingAndLeavesTheRestWaiting(t *testing.T)
 
 // acknowledging accepts each delivery as it is read.
 func acknowledging(
-	deliveries effect.Stream[effect.Unit, amqp091.Fault, amqp091.Received[[]byte]],
-) effect.Stream[effect.Unit, amqp091.Fault, amqp091.Received[[]byte]] {
+	deliveries effect.Stream[effect.Unit, amqp091.Fault, amqp091.Envelope[[]byte]],
+) effect.Stream[effect.Unit, amqp091.Fault, amqp091.Envelope[[]byte]] {
 	return effect.MapStreamEffect(deliveries,
-		func(received amqp091.Received[[]byte]) dispatching[amqp091.Received[[]byte]] {
+		func(received amqp091.Envelope[[]byte]) dispatching[amqp091.Envelope[[]byte]] {
 			return amqp091.Ack[effect.Unit](received).As(received)
 		})
 }

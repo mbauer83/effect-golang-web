@@ -35,15 +35,15 @@ func Table(object dynamic.Object) (map[string]any, error) {
 	if len(object.Fields) == 0 {
 		return nil, nil
 	}
-	made := make(map[string]any, len(object.Fields))
+	fields := make(map[string]any, len(object.Fields))
 	for _, header := range object.Fields {
-		crossed, err := fieldOf(header.Value)
+		field, err := fieldOf(header.Value)
 		if err != nil {
 			return nil, fmt.Errorf("header %q: %w", header.Name, err)
 		}
-		made[header.Name] = crossed
+		fields[header.Name] = field
 	}
-	return made, nil
+	return fields, nil
 }
 
 func fieldOf(value dynamic.Value) (any, error) {
@@ -84,15 +84,15 @@ func fieldOf(value dynamic.Value) (any, error) {
 }
 
 func fieldsOf(list dynamic.List) ([]any, error) {
-	made := make([]any, 0, len(list.Elements))
+	fields := make([]any, 0, len(list.Elements))
 	for index, element := range list.Elements {
-		crossed, err := fieldOf(element)
+		field, err := fieldOf(element)
 		if err != nil {
 			return nil, fmt.Errorf("element %d: %w", index, err)
 		}
-		made = append(made, crossed)
+		fields = append(fields, field)
 	}
-	return made, nil
+	return fields, nil
 }
 
 // Headers is the object a field table makes.
@@ -100,10 +100,10 @@ func fieldsOf(list dynamic.List) ([]any, error) {
 // A kind the protocol permits and the representation does not is a header this
 // package cannot carry, and saying so beats dropping it: a consumer that acted
 // on the headers it could see would be acting on half the message.
-func Headers(received map[string]any) (dynamic.Object, error) {
-	object := dynamic.Object{Fields: make([]dynamic.Field, 0, len(received))}
-	for _, name := range sortedNames(received) {
-		value, err := fieldValue(received[name])
+func Headers(raw map[string]any) (dynamic.Object, error) {
+	object := dynamic.Object{Fields: make([]dynamic.Field, 0, len(raw))}
+	for _, name := range sortedNames(raw) {
+		value, err := fieldValue(raw[name])
 		if err != nil {
 			return dynamic.Object{}, fmt.Errorf("header %q: %w", name, err)
 		}
@@ -112,8 +112,8 @@ func Headers(received map[string]any) (dynamic.Object, error) {
 	return object, nil
 }
 
-func fieldValue(received any) (dynamic.Value, error) {
-	switch value := received.(type) {
+func fieldValue(raw any) (dynamic.Value, error) {
+	switch value := raw.(type) {
 	case nil:
 		return dynamic.Absent{}, nil
 	case bool:
@@ -147,13 +147,13 @@ func fieldValue(received any) (dynamic.Value, error) {
 	case []any:
 		return elements(value)
 	default:
-		return nil, fmt.Errorf("a broker sent %T, which is not a value a header may hold", received)
+		return nil, fmt.Errorf("a broker sent %T, which is not a value a header may hold", raw)
 	}
 }
 
-func elements(received []any) (dynamic.Value, error) {
-	list := dynamic.List{Elements: make([]dynamic.Value, 0, len(received))}
-	for index, element := range received {
+func elements(raw []any) (dynamic.Value, error) {
+	list := dynamic.List{Elements: make([]dynamic.Value, 0, len(raw))}
+	for index, element := range raw {
 		value, err := fieldValue(element)
 		if err != nil {
 			return nil, fmt.Errorf("element %d: %w", index, err)
@@ -170,9 +170,9 @@ func elements(received []any) (dynamic.Value, error) {
 // order available here, and a deterministic one matters: a consumer that
 // forwards the headers it received would otherwise send them differently each
 // time.
-func sortedNames(received map[string]any) []string {
-	names := make([]string, 0, len(received))
-	for name := range received {
+func sortedNames(raw map[string]any) []string {
+	names := make([]string, 0, len(raw))
+	for name := range raw {
 		names = append(names, name)
 	}
 	sort.Strings(names)

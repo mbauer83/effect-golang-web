@@ -54,8 +54,8 @@ func Unary[In, Out any](
 	return procedure
 }
 
-// Documented attaches prose the projected .proto carries.
-func (procedure Procedure[In, Out]) Documented(doc string) Procedure[In, Out] {
+// WithDescription attaches prose the projected .proto carries.
+func (procedure Procedure[In, Out]) WithDescription(doc string) Procedure[In, Out] {
 	procedure.doc = doc
 	return procedure
 }

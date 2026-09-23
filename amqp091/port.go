@@ -13,22 +13,22 @@ import (
 	"github.com/mbauer83/effect-golang-schema/schema/dynamic"
 )
 
-// Publishing sends messages.
-type Publishing interface {
+// Publisher sends messages.
+type Publisher interface {
 	Publish(ctx context.Context, target Target, message Message) error
 }
 
-// Consuming reads them.
-type Consuming interface {
+// Consumer reads them.
+type Consumer interface {
 	// Consume subscribes to a queue. The broker pushes; the returned handle is
 	// pulled, so a consumer reads at the rate it can work.
 	Consume(ctx context.Context, queue string) (Deliveries, error)
 }
 
-// Declaring states what the broker should hold. It is separate because a
+// Declarer states what the broker should hold. It is separate because a
 // program declares its topology once, at start-up, and the rest of it has no
 // business reshaping the broker.
-type Declaring interface {
+type Declarer interface {
 	DeclareExchange(ctx context.Context, exchange Exchange) error
 	DeclareQueue(ctx context.Context, queue Queue) error
 	Bind(ctx context.Context, binding Binding) error
@@ -101,8 +101,8 @@ type Durability uint8
 const (
 	// Transient is lost when the broker restarts.
 	Transient Durability = iota
-	// Lasting survives it.
-	Lasting
+	// Durable survives it.
+	Durable
 )
 
 // Routing is how an exchange decides where a message goes.
@@ -133,14 +133,14 @@ const (
 	// Shared lets any connection consume from the queue, which is what a queue
 	// named in a topology is for.
 	Shared Access = iota
-	// Owned restricts it to the connection that declared it, and the broker
+	// Exclusive restricts it to the connection that declared it, and the broker
 	// deletes it when that connection closes -- a reply queue, or one
 	// instance's own subscription.
 	//
 	// It is also how a queue says it needs no keeping: a broker may refuse one
-	// that is neither Lasting nor Owned, because a queue nothing persists and
+	// that is neither Lasting nor Exclusive, because a queue nothing persists and
 	// nobody owns is one it cannot account for. RabbitMQ 4 does.
-	Owned
+	Exclusive
 )
 
 // Queue is a place messages wait.

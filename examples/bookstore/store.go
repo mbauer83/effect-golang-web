@@ -68,23 +68,23 @@ func (store *Store) All() storeEffect[[]Book] {
 // rather than as an error a caller has to interrogate; nothing here knows it
 // will become a status.
 func (store *Store) Add(book Book) storeEffect[effect.Unit] {
-	added := effect.Modify[effect.Unit](store.books, func(bookGiven []Book) ([]Book, bool) {
-		if slices.ContainsFunc(bookGiven, sameTitle(book.Title)) {
-			return bookGiven, false
+	added := effect.Modify[effect.Unit](store.books, func(books []Book) ([]Book, bool) {
+		if slices.ContainsFunc(books, sameTitle(book.Title)) {
+			return books, false
 		}
-		return append(bookGiven, book), true
+		return append(books, book), true
 	})
 	// Direct style: read the answer, then decide. As a FlatMap the deciding
 	// was nested inside the reading, which is the wrong way round for
 	// something that happens after it -- and a refusal is bound like anything
 	// else, because binding one abandons the body, which is what a refusal
 	// means.
-	return effect.Gen(func(do *storing) effect.Unit {
+	return effect.Gen(func(do *storeDo) effect.Unit {
 		if do.Await(widenFault(added)) {
 			return effect.Unit{}
 		}
 		do.Await(effect.For[effect.Unit, Fault]().Fail[effect.Unit](Fault{
-			Kind: AlreadyHeld,
+			Kind: AlreadyExists,
 			Err:  errors.New(book.Title + " is already held"),
 		}))
 		return effect.Unit{}
@@ -93,24 +93,24 @@ func (store *Store) Add(book Book) storeEffect[effect.Unit] {
 
 // Find returns the book with the given title, or refuses because there is none.
 func (store *Store) Find(title string) storeEffect[Book] {
-	return effect.Gen(func(do *storing) Book {
-		getEntry := do.Await(widenFault(store.books.Get[effect.Unit]()))
-		index := slices.IndexFunc(getEntry, sameTitle(title))
+	return effect.Gen(func(do *storeDo) Book {
+		books := do.Await(widenFault(store.books.Get[effect.Unit]()))
+		index := slices.IndexFunc(books, sameTitle(title))
 		if index < 0 {
 			do.Await(effect.For[effect.Unit, Fault]().
 				Fail[Book](Fault{Kind: NotFound}))
 		}
-		return getEntry[index]
+		return books[index]
 	}).WithName("find-book")
 }
 
-// storing is the binder the store's operations bind in.
+// storeDo is the binder the store's operations bind in.
 //
 // Direct style throughout, because every one of them reads the cell and then
 // decides -- and as FlatMaps the deciding was nested inside the reading. None
 // of these bodies holds a defer, which is the condition: in direct style a
 // defer runs on an ordinary domain failure and not only on a panic.
-type storing = effect.Do[effect.Unit, Fault]
+type storeDo = effect.Do[effect.Unit, Fault]
 
 func sameTitle(title string) func(Book) bool {
 	return func(book Book) bool { return book.Title == title }

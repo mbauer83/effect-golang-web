@@ -15,7 +15,7 @@ import (
 // It refuses an address no node is at, because that is what a real broker
 // refuses -- at attach, before a single message -- and a fake that invented the
 // node would hide a wrong address until deployment.
-func (broker *Broker) Sender(address string) (amqp10.Sending, error) {
+func (broker *Broker) Sender(address string) (amqp10.SenderLink, error) {
 	broker.mutex.Lock()
 	defer broker.mutex.Unlock()
 	if _, known := broker.nodes[address]; !known {
@@ -25,7 +25,7 @@ func (broker *Broker) Sender(address string) (amqp10.Sending, error) {
 }
 
 // Receiver attaches a link from a node.
-func (broker *Broker) Receiver(address string) (amqp10.Receiving, error) {
+func (broker *Broker) Receiver(address string) (amqp10.ReceiverLink, error) {
 	broker.mutex.Lock()
 	defer broker.mutex.Unlock()
 	if _, known := broker.nodes[address]; !known {
@@ -62,7 +62,7 @@ func (link *sender) Send(_ context.Context, message amqp10.Message) error {
 		return errNoSuchNode
 	}
 	link.broker.tag++
-	node.waiting = append(node.waiting, amqp10.Delivery{
+	node.backlog = append(node.backlog, amqp10.Delivery{
 		Body:        message.Body,
 		ContentType: message.ContentType,
 		Subject:     message.Subject,
@@ -113,12 +113,12 @@ func (link *receiver) Receive(ctx context.Context) (amqp10.Delivery, bool, error
 		link.broker.mutex.Unlock()
 		return amqp10.Delivery{}, false, errNoSuchNode
 	}
-	if len(node.waiting) == 0 {
+	if len(node.backlog) == 0 {
 		link.broker.mutex.Unlock()
 		return amqp10.Delivery{}, false, nil
 	}
-	delivery := node.waiting[0]
-	node.waiting = node.waiting[1:]
+	delivery := node.backlog[0]
+	node.backlog = node.backlog[1:]
 	link.broker.mutex.Unlock()
 
 	link.mutex.Lock()

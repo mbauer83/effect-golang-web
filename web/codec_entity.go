@@ -26,12 +26,12 @@ func Entity[A any](shape schema.Schema[A]) Codec[A] {
 			body := request.Underlying().Body
 			if body == nil {
 				var missing A
-				return missing, Fault{Doing: "reading the request body", Err: errNoEntity}
+				return missing, Fault{Op: "reading the request body", Err: errNoEntity}
 			}
 			decoded, err := schema.DecodeJSONFrom(shape, body)
 			if err != nil {
 				var missing A
-				return missing, Fault{Doing: "reading the request body", Err: err}
+				return missing, Fault{Op: "reading the request body", Err: err}
 			}
 			return decoded, nil
 		},

@@ -61,16 +61,16 @@ func booksSurface(t *testing.T) []web.Route[effect.Unit, Refusal] {
 		web.Handle(
 			web.GET("/books", web.OptionalQueryParam("shelf", schema.Text()),
 				web.Returns(http.StatusOK, schema.List(bookSchema))).
-				Summary("List the catalogue"),
+				WithSummary("List the catalogue"),
 			func(*string) webEffect[[]Book] {
 				return effect.For[effect.Unit, Refusal]().Succeed([]Book{})
 			}),
 		web.Handle(
 			web.POST("/books", web.Entity(bookSchema),
 				web.Returns(http.StatusCreated, bookSchema)).
-				Summary("Add a book").
-				Failing(http.StatusInternalServerError, "the store could not be reached").
-				Failing(http.StatusConflict, "that title is already held"),
+				WithSummary("Add a book").
+				WithFailure(http.StatusInternalServerError, "the store could not be reached").
+				WithFailure(http.StatusConflict, "that title is already held"),
 			func(book Book) webEffect[Book] {
 				return effect.For[effect.Unit, Refusal]().Succeed(book)
 			}),
@@ -213,7 +213,7 @@ func TestComponentsArePointedAtWhereTheDocumentKeepsThem(t *testing.T) {
 		t.Fatalf("unexpected pointer %q", pointer)
 	}
 
-	projected, components := jsonschema.ProjectAllReferencing(
+	projected, components := jsonschema.ProjectAllWithPointer(
 		openapi.ComponentPointer, bookSchema.Structure())
 	if len(projected) != 1 || projected[0].Ref != openapi.ComponentPointer("Book") {
 		t.Fatalf("expected the caller's pointer form, got %#v", projected)

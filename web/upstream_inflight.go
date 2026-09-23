@@ -26,18 +26,18 @@ import (
 	"github.com/mbauer83/effect-golang/effect"
 )
 
-// underwayReadings is what each key's waiting callers are waiting on: the
+// inFlightReads is what each key's waiting callers are waiting on: the
 // reading that was started for them, whatever its outcome turns out to be.
-type underwayReadings struct {
-	mutex    sync.Mutex
-	underway map[string]effect.Deferred[Fault, Received]
+type inFlightReads struct {
+	mutex   sync.Mutex
+	pending map[string]effect.Deferred[Fault, ClientResponse]
 }
 
-func newUnderwayReadings() *underwayReadings {
-	return &underwayReadings{underway: map[string]effect.Deferred[Fault, Received]{}}
+func newInFlightReads() *inFlightReads {
+	return &inFlightReads{pending: map[string]effect.Deferred[Fault, ClientResponse]{}}
 }
 
-// readOnceForEveryCaller is one reading of a key, however many callers ask for it.
+// readOnce is one reading of a key, however many callers ask for it.
 //
 // Every caller awaits; none of them performs the reading. The reading itself
 // is forked detached, which is what makes this safe rather than merely
@@ -52,26 +52,26 @@ func newUnderwayReadings() *underwayReadings {
 //
 // It is not an orphan: detached work is owned by the runtime, so closing the
 // runtime interrupts it like anything else.
-func readOnceForEveryCaller[R any](
+func readOnce[R any](
 	upstream *UpstreamClient,
-	filed string,
-	read effect.Effect[R, Fault, Received],
-) effect.Effect[R, Fault, Received] {
+	key string,
+	read effect.Effect[R, Fault, ClientResponse],
+) effect.Effect[R, Fault, ClientResponse] {
 	operations := effect.For[R, Fault]()
-	return operations.WidenError(joinOrStart[R](upstream, filed)).
-		FlatMap(func(claimed joined) effect.Effect[R, Fault, Received] {
-			if !claimed.ours {
+	return operations.WidenError(joinOrStart[R](upstream, key)).
+		FlatMap(func(claimed claim) effect.Effect[R, Fault, ClientResponse] {
+			if !claimed.leader {
 				return claimed.answer.Await[R]()
 			}
-			return forkTheReading[R](upstream, filed, claimed.answer, read)
+			return forkRead[R](upstream, key, claimed.answer, read)
 		})
 }
 
-// joined is the deferred a caller will await, and whether this caller is the one
+// claim is the deferred a caller will await, and whether this caller is the one
 // that has to start the reading it will be fulfilled by.
-type joined struct {
-	answer effect.Deferred[Fault, Received]
-	ours   bool
+type claim struct {
+	answer effect.Deferred[Fault, ClientResponse]
+	leader bool
 }
 
 // joinOrStart is the whole of the coordination: under one lock, either join the
@@ -80,54 +80,54 @@ type joined struct {
 // Creating the deferred is an effect, so it is created before the lock is
 // taken and discarded if somebody else got there first. A discarded
 // unfulfilled deferred is a value nobody holds and costs nothing.
-func joinOrStart[R any](upstream *UpstreamClient, filed string) effect.Effect[R, effect.Never, joined] {
-	return effect.NewDeferred[R, Fault, Received]().
-		Map(func(fresh effect.Deferred[Fault, Received]) joined {
-			upstream.sharing.mutex.Lock()
-			defer upstream.sharing.mutex.Unlock()
-			if already, waiting := upstream.sharing.underway[filed]; waiting {
-				return joined{answer: already}
+func joinOrStart[R any](upstream *UpstreamClient, key string) effect.Effect[R, effect.Never, claim] {
+	return effect.NewDeferred[R, Fault, ClientResponse]().
+		Map(func(fresh effect.Deferred[Fault, ClientResponse]) claim {
+			upstream.inFlight.mutex.Lock()
+			defer upstream.inFlight.mutex.Unlock()
+			if already, waiting := upstream.inFlight.pending[key]; waiting {
+				return claim{answer: already}
 			}
-			upstream.sharing.underway[filed] = fresh
-			return joined{answer: fresh, ours: true}
+			upstream.inFlight.pending[key] = fresh
+			return claim{answer: fresh, leader: true}
 		})
 }
 
-// forkTheReading forks the reading and awaits it like everybody else.
+// forkRead forks the reading and awaits it like everybody else.
 //
 // The outcome is handed to the deferred whole, including a defect or an
 // interruption, so a reading that died in a way nobody anticipated is a
 // failure the waiters see rather than a wait that never ends. The key is
 // released in the same step: it is released on every outcome, because a key
 // left behind by a failed reading would be a key nobody ever asks for again.
-func forkTheReading[R any](
+func forkRead[R any](
 	upstream *UpstreamClient,
-	filed string,
-	answer effect.Deferred[Fault, Received],
-	read effect.Effect[R, Fault, Received],
-) effect.Effect[R, Fault, Received] {
+	key string,
+	answer effect.Deferred[Fault, ClientResponse],
+	read effect.Effect[R, Fault, ClientResponse],
+) effect.Effect[R, Fault, ClientResponse] {
 	operations := effect.For[R, Fault]()
-	return operations.WidenError(effect.ForkDaemon[R, Fault, Received](
-		read.OnExit(func(outcome effect.Exit[Fault, Received]) effect.Effect[R, effect.Never, effect.Unit] {
-			return forgetKey[R](upstream, filed).
+	return operations.WidenError(effect.ForkDaemon[R, Fault, ClientResponse](
+		read.OnExit(func(outcome effect.Exit[Fault, ClientResponse]) effect.Effect[R, effect.Never, effect.Unit] {
+			return forgetKey[R](upstream, key).
 				FlatMap(func(effect.Unit) effect.Effect[R, effect.Never, effect.Unit] {
 					return answer.Complete[R](outcome).As(effect.Unit{})
 				})
 		}),
 	)).
-		FlatMap(func(effect.Fiber[Fault, Received]) effect.Effect[R, Fault, Received] {
+		FlatMap(func(effect.Fiber[Fault, ClientResponse]) effect.Effect[R, Fault, ClientResponse] {
 			return answer.Await[R]()
 		})
 }
 
 // forgetKey forgets the key, so the next caller starts a new reading rather
 // than awaiting one that is over.
-func forgetKey[R any](upstream *UpstreamClient, filed string) effect.Effect[R, effect.Never, effect.Unit] {
+func forgetKey[R any](upstream *UpstreamClient, key string) effect.Effect[R, effect.Never, effect.Unit] {
 	return effect.Succeed[R, effect.Never](effect.Unit{}).
 		Map(func(effect.Unit) effect.Unit {
-			upstream.sharing.mutex.Lock()
-			defer upstream.sharing.mutex.Unlock()
-			delete(upstream.sharing.underway, filed)
+			upstream.inFlight.mutex.Lock()
+			defer upstream.inFlight.mutex.Unlock()
+			delete(upstream.inFlight.pending, key)
 			return effect.Unit{}
 		})
 }

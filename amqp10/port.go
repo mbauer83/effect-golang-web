@@ -12,8 +12,8 @@ import (
 	"github.com/mbauer83/effect-golang-schema/schema/dynamic"
 )
 
-// Sending is a link to a node that accepts messages.
-type Sending interface {
+// SenderLink is a link to a node that accepts messages.
+type SenderLink interface {
 	Send(ctx context.Context, message Message) error
 	// Address is the node this link is attached to. The link knows it, so a
 	// caller reporting a fault should not have to repeat it and cannot get it
@@ -23,12 +23,12 @@ type Sending interface {
 	Close(ctx context.Context) error
 }
 
-// Receiving is a link from a node that produces them.
+// ReceiverLink is a link from a node that produces them.
 //
 // The dispositions are here rather than on a Delivery because it is the link
 // that owes the broker an answer, and a delivery outliving its link can no
 // longer be settled at all.
-type Receiving interface {
+type ReceiverLink interface {
 	// Receive waits for the next message, reporting false when the link has
 	// been detached and there will be no more.
 	Receive(ctx context.Context) (Delivery, bool, error)
@@ -89,12 +89,12 @@ type Delivery struct {
 // attempted. Naming them as fields is what keeps them from being two positional
 // booleans at a call site.
 type Change struct {
-	// Tried says the delivery was attempted and failed, which is what a broker
+	// DeliveryFailed says the delivery was attempted and failed, which is what a broker
 	// counts when it decides a message has failed enough times.
-	Tried bool
-	// Elsewhere says this receiver cannot handle the message but another may,
+	DeliveryFailed bool
+	// UndeliverableHere says this receiver cannot handle the message but another may,
 	// so the broker should not offer it here again.
-	Elsewhere bool
+	UndeliverableHere bool
 	// Annotations are what to record on the message, for whoever gets it next.
 	Annotations dynamic.Object
 }
@@ -105,6 +105,6 @@ type Durability uint8
 const (
 	// Transient is lost when the broker restarts.
 	Transient Durability = iota
-	// Lasting survives it.
-	Lasting
+	// Durable survives it.
+	Durable
 )

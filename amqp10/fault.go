@@ -4,9 +4,9 @@ import "errors"
 
 // Fault is what went wrong, and where.
 type Fault struct {
-	// Doing names the stage, so a report says which of the several things a
+	// Op names the stage, so a report says which of the several things a
 	// message passes through refused it.
-	Doing string
+	Op string
 	// Address is the node the link was attached to, where the stage had one. A
 	// broker error without it is nearly useless, and it is the program's own
 	// text rather than a user's.
@@ -15,7 +15,7 @@ type Fault struct {
 }
 
 func (fault Fault) Error() string {
-	rendered := "amqp10: " + fault.Doing
+	rendered := "amqp10: " + fault.Op
 	if fault.Address != "" {
 		rendered += " [" + fault.Address + "]"
 	}
@@ -31,8 +31,8 @@ func (fault Fault) Unwrap() error {
 	return fault.Err
 }
 
-func faultOf(doing string, address string, err error) Fault {
-	return Fault{Doing: doing, Address: address, Err: err}
+func faultOf(op string, address string, err error) Fault {
+	return Fault{Op: op, Address: address, Err: err}
 }
 
 var (

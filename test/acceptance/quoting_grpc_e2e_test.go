@@ -49,14 +49,14 @@ func (held *seen) read() (string, string) {
 
 // overGRPC starts the service behind h2c and returns a gRPC client for it,
 // along with what the server saw.
-func overGRPC(t *testing.T) (*grpc.Dialled, *seen) {
+func overGRPC(t *testing.T) (*grpc.ConnectClient, *seen) {
 	t.Helper()
 	runtime, err := effect.NewRuntime(effect.WithDebugTracking())
 	if err != nil {
 		t.Fatal(err)
 	}
-	transport := grpc.NewConnected()
-	boundary, err := grpc.NewBoundary(runtime, effect.Unit{}, transport, quoting.Coded)
+	transport := grpc.NewConnectServer()
+	boundary, err := grpc.NewBoundary(runtime, effect.Unit{}, transport, quoting.FailureFor)
 	if err != nil {
 		t.Fatal(err)
 	}

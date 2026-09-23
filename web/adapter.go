@@ -22,7 +22,7 @@ type Adapter[R, E any] struct {
 	onFailure   func(E) Response
 	onDefect    func(effect.Cause[E]) Response
 	report      func(context.Context, error)
-	sharing     CrossOrigin
+	crossOrigin CrossOrigin
 	quiet       bool
 }
 
@@ -73,7 +73,7 @@ func (adapter Adapter[R, E]) WithReport(report func(context.Context, error)) Ada
 	return adapter
 }
 
-// Sharing declares which other origins a browser may let read these answers.
+// WithCrossOrigin declares which other origins a browser may let read these answers.
 //
 // At the boundary because this is the only place that sees every answer: a
 // page has to be able to read a 401 to know to sign in again, and a 401 is
@@ -82,7 +82,7 @@ func (adapter Adapter[R, E]) WithReport(report func(context.Context, error)) Ada
 // asks for before it will send a token at all, which no route declares
 // because no route is being asked for.
 //
-//	boundary = boundary.Sharing(web.CrossOrigin{
+//	boundary = boundary.WithCrossOrigin(web.CrossOrigin{
 //	    Origins:  []string{"https://films.example"},
 //	    Headers:  []string{"Authorization", "Content-Type"},
 //	    Remember: 10 * time.Minute,
@@ -90,8 +90,8 @@ func (adapter Adapter[R, E]) WithReport(report func(context.Context, error)) Ada
 //
 // Declaring nothing shares nothing, which is what a surface only its own
 // origin reads wants.
-func (adapter Adapter[R, E]) Sharing(across CrossOrigin) Adapter[R, E] {
-	adapter.sharing = across
+func (adapter Adapter[R, E]) WithCrossOrigin(crossOrigin CrossOrigin) Adapter[R, E] {
+	adapter.crossOrigin = crossOrigin
 	return adapter
 }
 
@@ -136,9 +136,9 @@ func (adapter Adapter[R, E]) Handler(handler Handler[R, E]) http.Handler {
 // -- which a browser reads as "no" and then never sends the request it was
 // asking about.
 func (adapter Adapter[R, E]) answer(handler Handler[R, E], request *http.Request) Response {
-	origin, shared := adapter.sharing.asked(request)
+	origin, shared := adapter.crossOrigin.allowedOrigin(request)
 	if shared && isPreflight(request) {
-		return adapter.sharing.permitting(request, origin)
+		return adapter.crossOrigin.preflightResponse(request, origin)
 	}
 	// The request's context carries the cancellation, so a client that goes
 	// away interrupts the handler without any mechanism of its own.
@@ -151,7 +151,7 @@ func (adapter Adapter[R, E]) answer(handler Handler[R, E], request *http.Request
 	if !shared {
 		return response
 	}
-	return adapter.sharing.sharedWith(response, origin)
+	return adapter.crossOrigin.share(response, origin)
 }
 
 // responseForCause decides what a failed outcome answers with. A defect
@@ -190,14 +190,14 @@ func (adapter Adapter[R, E]) recordRefusal(cause effect.Cause[E]) {
 		errors.New("web: refused: "+cause.String()))
 }
 
-// Quietly stops this boundary recording the refusals it answers with.
+// Quiet stops this boundary recording the refusals it answers with.
 //
 // For a surface where a refusal is the ordinary case and the volume would bury
 // everything else -- a validating endpoint behind a form, a health check
 // somebody polls. Off by default, because a refusal nobody recorded is a
 // question nobody can answer afterwards, and that was the state this started
 // in.
-func (adapter Adapter[R, E]) Quietly() Adapter[R, E] {
+func (adapter Adapter[R, E]) Quiet() Adapter[R, E] {
 	adapter.quiet = true
 	return adapter
 }

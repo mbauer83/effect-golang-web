@@ -23,17 +23,17 @@ var errWarehouseBusy = errors.New("the warehouse is busy")
 
 func runDispatch(runtime *effect.Runtime) {
 	broker := inprocess.NewBroker()
-	packed := 0
+	attempts := 0
 
 	// Refuses once, then packs: an order sent back is offered again, which is
 	// what requeueing means.
-	packing := func(dispatch.Order) shipping[effect.Unit] {
+	pack := func(dispatch.Order) dispatchEffect[effect.Unit] {
 		return effect.For[effect.Unit, amqp091.Fault]().
-			Suspend(func() shipping[effect.Unit] {
-				packed++
-				if packed == 1 {
+			Suspend(func() dispatchEffect[effect.Unit] {
+				attempts++
+				if attempts == 1 {
 					return effect.For[effect.Unit, amqp091.Fault]().
-						Fail[effect.Unit](amqp091.Fault{Doing: "packing", Err: errWarehouseBusy})
+						Fail[effect.Unit](amqp091.Fault{Op: "packing", Err: errWarehouseBusy})
 				}
 				return effect.For[effect.Unit, amqp091.Fault]().Succeed(effect.Unit{})
 			})
@@ -44,7 +44,7 @@ func runDispatch(runtime *effect.Runtime) {
 	// only to say "then". The body holds no defer, which is the condition --
 	// in direct style a defer runs on an ordinary domain failure and not only
 	// on a panic.
-	program := effect.Gen(func(do *dispatching) []dispatch.Order {
+	program := effect.Gen(func(do *dispatchDo) []dispatch.Order {
 		do.Await(dispatch.Prepare(broker))
 		// A body nothing can read, so the discard is shown rather than
 		// described.
@@ -56,7 +56,7 @@ func runDispatch(runtime *effect.Runtime) {
 			Item:      "lamp",
 			Quantity:  2,
 		}))
-		return do.Await(effect.RunCollect(dispatch.Ship(broker, packing).TakeStream(1)))
+		return do.Await(effect.RunCollect(dispatch.Ship(broker, pack).TakeStream(1)))
 	})
 
 	exit := runtime.Run(context.Background(), effect.Unit{}, program)
@@ -74,5 +74,5 @@ func runDispatch(runtime *effect.Runtime) {
 
 // The channel this scenario works in, and the binder it binds with, named so a
 // signature says what it is rather than repeating itself.
-type shipping[A any] = effect.Effect[effect.Unit, amqp091.Fault, A]
-type dispatching = effect.Do[effect.Unit, amqp091.Fault]
+type dispatchEffect[A any] = effect.Effect[effect.Unit, amqp091.Fault, A]
+type dispatchDo = effect.Do[effect.Unit, amqp091.Fault]

@@ -35,7 +35,7 @@ type Settings struct {
 // Server is a running server's handle.
 type Server struct {
 	address net.Addr
-	serving effect.Fiber[Fault, effect.Unit]
+	fiber   effect.Fiber[Fault, effect.Unit]
 }
 
 // Address is where the server is actually listening, which is what a caller
@@ -63,12 +63,12 @@ func ServeWith[R any](scope effect.Scope, settings Settings, handler http.Handle
 	operations := effect.For[R, Fault]()
 	return listen[R](scope, settings).
 		FlatMap(func(listener net.Listener) effect.Effect[R, Fault, Server] {
-			return logServing[R](scope).
+			return reportAbandoned[R](scope).
 				FlatMap(func(abandoned chan error) effect.Effect[R, Fault, Server] {
 					loop := serveLoop[R](httpServer(settings, handler), listener, settings.Grace, abandoned)
 					return operations.ForkIn(scope, loop).
 						Map(func(fiber effect.Fiber[Fault, effect.Unit]) Server {
-							return Server{address: listener.Addr(), serving: fiber}
+							return Server{address: listener.Addr(), fiber: fiber}
 						})
 				})
 		}).
@@ -79,5 +79,5 @@ func ServeWith[R any](scope effect.Scope, settings Settings, handler http.Handle
 // other than being shut down. It is what a program that exists to serve waits
 // on.
 func Await[R any](server Server) effect.Effect[R, Fault, effect.Unit] {
-	return server.serving.Join[R]()
+	return server.fiber.Join[R]()
 }

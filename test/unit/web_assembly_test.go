@@ -105,7 +105,7 @@ func TestASurfaceWithoutRoutesOrWithoutARejectionIsRefused(t *testing.T) {
 	if err := assembled(); err == nil {
 		t.Error("expected a surface with no routes to be refused")
 	}
-	if _, err := web.NewRoutesRejecting[effect.Unit, Refusal](nil,
+	if _, err := web.NewRoutesWithRejection[effect.Unit, Refusal](nil,
 		naming(http.MethodGet, "/books", "get")); err == nil {
 		t.Error("expected a missing rejection format to be refused")
 	}

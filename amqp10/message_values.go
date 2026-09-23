@@ -12,8 +12,8 @@ import (
 	broker "github.com/Azure/go-amqp"
 )
 
-// libraryMessage is the library's message for one of ours.
-func libraryMessage(message Message) (*broker.Message, error) {
+// brokerMessage is the library's message for one of ours.
+func brokerMessage(message Message) (*broker.Message, error) {
 	properties, err := Properties(message.Properties)
 	if err != nil {
 		return nil, err
@@ -21,7 +21,7 @@ func libraryMessage(message Message) (*broker.Message, error) {
 
 	sent := broker.NewMessage(message.Body)
 	sent.ApplicationProperties = properties
-	sent.Header = &broker.MessageHeader{Durable: message.Durability == Lasting}
+	sent.Header = &broker.MessageHeader{Durable: message.Durability == Durable}
 	if message.ContentType != "" || message.Subject != "" {
 		sent.Properties = &broker.MessageProperties{}
 		if message.ContentType != "" {
@@ -41,21 +41,21 @@ func libraryMessage(message Message) (*broker.Message, error) {
 // arriving as something the consumer will fail to acknowledge. That happens when
 // the link was attached in the settle-on-send mode, which this package does not
 // use.
-func deliveryOf(received *broker.Message) (Delivery, error) {
-	if len(received.DeliveryTag) == 0 {
+func deliveryOf(message *broker.Message) (Delivery, error) {
+	if len(message.DeliveryTag) == 0 {
 		return Delivery{}, errNoTag
 	}
-	properties, err := Named(received.ApplicationProperties)
+	properties, err := ReadProperties(message.ApplicationProperties)
 	if err != nil {
 		return Delivery{}, err
 	}
 	return Delivery{
-		Body:        body(received),
-		ContentType: text(contentType(received)),
-		Subject:     text(subject(received)),
+		Body:        body(message),
+		ContentType: text(contentType(message)),
+		Subject:     text(subject(message)),
 		Properties:  properties,
-		Tag:         string(received.DeliveryTag),
-		Attempts:    attempts(received),
+		Tag:         string(message.DeliveryTag),
+		Attempts:    attempts(message),
 	}, nil
 }
 
@@ -64,29 +64,29 @@ func deliveryOf(received *broker.Message) (Delivery, error) {
 // The protocol permits several, and they are one body: a sender that split a
 // document across two is not sending two messages. Joining is what the
 // specification says the body is.
-func body(received *broker.Message) []byte {
-	if len(received.Data) == 1 {
-		return received.Data[0]
+func body(message *broker.Message) []byte {
+	if len(message.Data) == 1 {
+		return message.Data[0]
 	}
 	whole := []byte{}
-	for _, section := range received.Data {
+	for _, section := range message.Data {
 		whole = append(whole, section...)
 	}
 	return whole
 }
 
-func contentType(received *broker.Message) *string {
-	if received.Properties == nil {
+func contentType(message *broker.Message) *string {
+	if message.Properties == nil {
 		return nil
 	}
-	return received.Properties.ContentType
+	return message.Properties.ContentType
 }
 
-func subject(received *broker.Message) *string {
-	if received.Properties == nil {
+func subject(message *broker.Message) *string {
+	if message.Properties == nil {
 		return nil
 	}
-	return received.Properties.Subject
+	return message.Properties.Subject
 }
 
 func text(text *string) string {
@@ -97,9 +97,9 @@ func text(text *string) string {
 }
 
 // attempts is the broker's count of previous deliveries.
-func attempts(received *broker.Message) uint32 {
-	if received.Header == nil {
+func attempts(message *broker.Message) uint32 {
+	if message.Header == nil {
 		return 0
 	}
-	return received.Header.DeliveryCount
+	return message.Header.DeliveryCount
 }

@@ -13,7 +13,7 @@ import (
 	"github.com/mbauer83/effect-golang/effect"
 )
 
-// logServing registers the finalizer that surfaces a shutdown which gave up on
+// reportAbandoned registers the finalizer that surfaces a shutdown which gave up on
 // requests still in flight.
 //
 // It has to be a finalizer rather than the serve fiber's own outcome. A forked
@@ -22,7 +22,7 @@ import (
 // would be exactly the one that is. A scope composes its finalizers' faults
 // into the closing cause whatever happened to the body, which is where this
 // belongs.
-func logServing[R any](scope effect.Scope) effect.Effect[R, Fault, chan error] {
+func reportAbandoned[R any](scope effect.Scope) effect.Effect[R, Fault, chan error] {
 	abandoned := make(chan error, 1)
 	return scope.AcquireRelease(
 		effect.For[R, Fault]().Succeed(abandoned),
@@ -54,15 +54,15 @@ func listen[R any](scope effect.Scope, settings Settings) effect.Effect[R, Fault
 			}
 			return net.Listen("tcp", settings.Address)
 		},
-		func(err error) Fault { return Fault{Doing: "opening the listener", Err: err} },
+		func(err error) Fault { return Fault{Op: "opening the listener", Err: err} },
 	).WithName("listen")
 
-	return scope.AcquireRelease(acquire, closingListener[R])
+	return scope.AcquireRelease(acquire, closeListener[R])
 }
 
-// closingListener releases the socket. A shutdown has usually closed it
+// closeListener releases the socket. A shutdown has usually closed it
 // already, which is not a failure: it is the ordinary path.
-func closingListener[R any](listener net.Listener) effect.Effect[R, effect.Never, effect.Unit] {
+func closeListener[R any](listener net.Listener) effect.Effect[R, effect.Never, effect.Unit] {
 	return effect.AddFinalizer[R](func(context.Context) error {
 		if err := listener.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
 			return err
@@ -103,7 +103,7 @@ func serveLoop[R any](
 
 		select {
 		case err := <-loop.stopped:
-			return serveRequest(err)
+			return loopExit(err)
 		case <-ctx.Done():
 			loop.shutDown(ctx)
 			// Being shut down is how a server is meant to end, so the loop
@@ -129,19 +129,19 @@ func (loop acceptLoop) shutDown(ctx context.Context) {
 	}
 
 	if err := loop.server.Shutdown(closing); err != nil {
-		loop.abandoned <- Fault{Doing: "waiting for in-flight requests", Err: err}
+		loop.abandoned <- Fault{Op: "waiting for in-flight requests", Err: err}
 		return
 	}
 	<-loop.stopped
 }
 
-// serveRequest reports why the accept loop stopped. A closed server is the ordinary
+// loopExit reports why the accept loop stopped. A closed server is the ordinary
 // end of one, not a failure.
-func serveRequest(err error) effect.Exit[Fault, effect.Unit] {
+func loopExit(err error) effect.Exit[Fault, effect.Unit] {
 	if err == nil || errors.Is(err, http.ErrServerClosed) {
 		return effect.ExitSuccess[Fault](effect.Unit{})
 	}
-	return effect.ExitFailure[Fault, effect.Unit](Fault{Doing: "serving", Err: err})
+	return effect.ExitFailure[Fault, effect.Unit](Fault{Op: "serving", Err: err})
 }
 
 func httpServer(settings Settings, handler http.Handler) *http.Server {

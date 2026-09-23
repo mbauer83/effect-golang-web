@@ -38,52 +38,52 @@ import (
 // plain Client beside it is the transport; this is the transport plus what
 // this program owes whoever is being asked.
 type UpstreamClient struct {
-	client  *Client
-	terms   UpstreamTerms
-	keeping cache.Store
-	pacing  rate.Limiter
-	sharing *underwayReadings
+	client   *Client
+	terms    UpstreamTerms
+	store    cache.Store
+	limiter  rate.Limiter
+	inFlight *inFlightReads
 }
 
 // UpstreamTerms are what a service is read under: how long its answers are
 // worth keeping, how often it may be asked, how long this caller will queue
 // for a turn, and how it is asked again when it could not answer.
 type UpstreamTerms struct {
-	// Named identifies the service in the keys its answers are kept under.
+	// Name identifies the service in the keys its answers are kept under.
 	// Two services read by one program must not share it, or one would be
 	// served the other's answer to the same path.
-	Named string
-	// Allowed is how often this program may ask.
-	Allowed rate.Allowance
-	// Longest is how long this program will queue for a turn before refusing.
+	Name string
+	// Allowance is how often this program may ask.
+	Allowance rate.Allowance
+	// MaxWait is how long this program will queue for a turn before refusing.
 	// A request that would wait four minutes is one whose caller has long
 	// since gone. Zero waits however long the turn is.
-	Longest time.Duration
-	// Fresh is how long one of this service's answers is worth keeping.
-	Fresh time.Duration
-	// Patience is how a service that could not answer is asked again.
-	Patience Patience
+	MaxWait time.Duration
+	// TimeToLive is how long one of this service's answers is worth keeping.
+	TimeToLive time.Duration
+	// Retry is how a service that could not answer is asked again.
+	Retry RetryPolicy
 }
 
 // IsStated reports whether these terms say enough to read a service by.
 func (terms UpstreamTerms) IsStated() bool {
-	return terms.Named != "" && terms.Allowed.IsStated() && terms.Fresh > 0
+	return terms.Name != "" && terms.Allowance.IsStated() && terms.TimeToLive > 0
 }
 
-// Patience is how a service that could not answer is asked again: a first wait
+// RetryPolicy is how a service that could not answer is asked again: a first wait
 // that doubles up to a bound, and a number of attempts after the first.
 //
 // Zero is no asking again, which is the right policy for a service being read
 // while somebody waits for the answer.
-type Patience struct {
-	First   time.Duration
-	Longest time.Duration
+type RetryPolicy struct {
+	Base    time.Duration
+	MaxWait time.Duration
 	Retries uint64
 }
 
 // IsPatient reports whether this policy would try again at all.
-func (patience Patience) IsPatient() bool {
-	return patience.Retries > 0 && patience.First > 0
+func (policy RetryPolicy) IsPatient() bool {
+	return policy.Retries > 0 && policy.Base > 0
 }
 
 // NewUpstreamClient is a service read under these terms, or a refusal to read
@@ -95,30 +95,30 @@ func (patience Patience) IsPatient() bool {
 func NewUpstreamClient(
 	client *Client,
 	terms UpstreamTerms,
-	keeping cache.Store,
-	pacing rate.Limiter,
+	store cache.Store,
+	limiter rate.Limiter,
 ) (*UpstreamClient, error) {
 	switch {
 	case client == nil || client.client == nil:
 		return nil, errNoHTTPClient
 	case !terms.IsStated():
 		return nil, ErrUnstatedTerms
-	case keeping == nil || pacing == nil:
+	case store == nil || limiter == nil:
 		return nil, ErrUnstatedTerms
 	}
 	return &UpstreamClient{
-		client:  client,
-		terms:   terms,
-		keeping: keeping,
-		pacing:  pacing,
-		sharing: newUnderwayReadings(),
+		client:   client,
+		terms:    terms,
+		store:    store,
+		limiter:  limiter,
+		inFlight: newInFlightReads(),
 	}, nil
 }
 
-// Named is the service's own name, as the terms gave it.
-func (upstream *UpstreamClient) Named() string { return upstream.terms.Named }
+// Name is the service's own name, as the terms gave it.
+func (upstream *UpstreamClient) Name() string { return upstream.terms.Name }
 
-// FetchFromUpstream reads a path: the answer this program already has while it is
+// FetchUpstream reads a path: the answer this program already has while it is
 // worth keeping, and the service's otherwise.
 //
 // Fetch with the three concerns applied, and it answers the same way. The
@@ -132,21 +132,21 @@ func (upstream *UpstreamClient) Named() string { return upstream.terms.Named }
 // One reading serves every caller that wants the same key at the same moment.
 // The keeping is inside that, not around it, so the caller that started the
 // reading is not the only one whose answer got kept.
-func FetchFromUpstream[R any](
+func FetchUpstream[R any](
 	upstream *UpstreamClient,
 	method string,
 	path string,
-	requesting Requesting,
-) effect.Effect[R, Fault, Received] {
-	filed := upstream.cacheKey(method, path, requesting)
-	return getCached[R](upstream, filed).
-		FlatMap(func(cached cache.Lookup) effect.Effect[R, Fault, Received] {
-			if received, replayed := responseFrom(cached); replayed {
+	request ClientRequest,
+) effect.Effect[R, Fault, ClientResponse] {
+	key := upstream.cacheKey(method, path, request)
+	return lookupCache[R](upstream, key).
+		FlatMap(func(lookup cache.Lookup) effect.Effect[R, Fault, ClientResponse] {
+			if received, replayed := responseFrom(lookup); replayed {
 				return effect.Succeed[R, Fault](received)
 			}
-			return readOnceForEveryCaller[R](upstream, filed,
-				askUpstream[R](upstream, method, path, requesting).
-					FlatMap(putCached[R](upstream, filed, requesting.About)))
+			return readOnce[R](upstream, key,
+				askUpstream[R](upstream, method, path, request).
+					FlatMap(writeCache[R](upstream, key, request.About)))
 		}).
 		WithName("upstream read")
 }
@@ -160,17 +160,17 @@ func FetchFromUpstream[R any](
 func CallUpstream[R, In, Out any](
 	upstream *UpstreamClient,
 	endpoint Endpoint[In, Out],
-	requesting Requesting,
+	request ClientRequest,
 ) effect.Effect[R, Fault, Out] {
 	if fault := ValidateEndpoint(endpoint); fault != nil {
 		return effect.Fail[R, Out](asFault("calling an endpoint", fault))
 	}
-	path, err := fillPattern(endpoint.segments, requesting.Path)
+	path, err := fillPattern(endpoint.segments, request.Path)
 	if err != nil {
 		return effect.Fail[R, Out](asFault("building the path", err))
 	}
-	return FetchFromUpstream[R](upstream, endpoint.method, path, requesting).
-		FlatMap(func(received Received) effect.Effect[R, Fault, Out] {
+	return FetchUpstream[R](upstream, endpoint.method, path, request).
+		FlatMap(func(received ClientResponse) effect.Effect[R, Fault, Out] {
 			return decodeResponse[R](endpoint.output, received, endpoint.method+" "+path)
 		})
 }
@@ -189,15 +189,15 @@ func askUpstream[R any](
 	upstream *UpstreamClient,
 	method string,
 	path string,
-	requesting Requesting,
-) effect.Effect[R, Fault, Received] {
+	request ClientRequest,
+) effect.Effect[R, Fault, ClientResponse] {
 	return awaitTurn[R](upstream).
-		FlatMap(func(effect.Unit) effect.Effect[R, Fault, Received] {
-			return Fetch[R](upstream.client, method, path, requesting).
-				FlatMap(askRefusal[R](method + " " + path))
+		FlatMap(func(effect.Unit) effect.Effect[R, Fault, ClientResponse] {
+			return Fetch[R](upstream.client, method, path, request).
+				FlatMap(failUnsuccessful[R](method + " " + path))
 		}).
-		Retry(retrySchedule(upstream.terms.Patience)).
-		CatchAll(staleAnswer[R])
+		Retry(retrySchedule(upstream.terms.Retry)).
+		CatchAll(recoverRefusal[R])
 }
 
 // awaitTurn is this program's turn to ask.
@@ -207,34 +207,34 @@ func askUpstream[R any](
 // latency, and an unenforced rate limit costs a service's goodwill and this
 // program its access.
 func awaitTurn[R any](upstream *UpstreamClient) effect.Effect[R, Fault, effect.Unit] {
-	return rate.AwaitTurn[R](upstream.pacing, upstream.terms.Allowed, upstream.terms.Longest).
-		MapError(func(failed rate.Fault) Fault {
-			return Fault{Doing: "waiting for a turn at " + upstream.terms.Named, Err: failed}
+	return rate.AwaitTurn[R](upstream.limiter, upstream.terms.Allowance, upstream.terms.MaxWait).
+		MapError(func(fault rate.Fault) Fault {
+			return Fault{Op: "waiting for a turn at " + upstream.terms.Name, Err: fault}
 		})
 }
 
 // retrySchedule is the terms' patience as a schedule over what went wrong.
-func retrySchedule(patience Patience) effect.Schedule[Fault, effect.Unit] {
-	if !patience.IsPatient() {
+func retrySchedule(policy RetryPolicy) effect.Schedule[Fault, effect.Unit] {
+	if !policy.IsPatient() {
 		return effect.Stop[Fault]()
 	}
 	return effect.IntersectSchedules(
-		effect.Exponential[Fault](patience.First, patience.Longest),
-		effect.Recurs[Fault](patience.Retries),
+		effect.Exponential[Fault](policy.Base, policy.MaxWait),
+		effect.Recurs[Fault](policy.Retries),
 	).
 		MapOutput(func(effect.Product[time.Duration, uint64]) effect.Unit { return effect.Unit{} }).
-		WhileInput(worthAskingAgain)
+		WhileInput(isRetryable)
 }
 
-// worthAskingAgain reports whether what went wrong might not go wrong again.
+// isRetryable reports whether what went wrong might not go wrong again.
 //
 // A service that could not be reached, and a service that answered that it
 // could not answer. Every other status is an answer: it will be the same
 // answer next time, and asking again would spend an allowance to be told it
 // twice.
-func worthAskingAgain(failed Fault) bool {
+func isRetryable(fault Fault) bool {
 	var refusal Refusal
-	if !errors.As(failed, &refusal) {
+	if !errors.As(fault, &refusal) {
 		return true
 	}
 	return refusal.Status >= http.StatusInternalServerError

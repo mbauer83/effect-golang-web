@@ -35,7 +35,7 @@ func running(t *testing.T, store *bookstore.Store) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	surface, err := bookstore.Published(store)
+	surface, err := bookstore.SurfaceWithContract(store)
 	if err != nil {
 		t.Fatal(err)
 	}

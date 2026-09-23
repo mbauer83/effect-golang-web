@@ -19,17 +19,17 @@ import (
 	"github.com/mbauer83/effect-golang/effect"
 )
 
-var carried = map[string]quoting.Rate{
+var rates = map[string]quoting.Rate{
 	"Kiel-Hamburg": {Carrier: "overland", Currency: "EUR", Cents: 4000},
 }
 
-func runQuoting(runtime *effect.Runtime) {
-	transport := grpc.NewConnected()
-	boundary, err := grpc.NewBoundary(runtime, effect.Unit{}, transport, quoting.Coded)
+func runQuote(runtime *effect.Runtime) {
+	transport := grpc.NewConnectServer()
+	boundary, err := grpc.NewBoundary(runtime, effect.Unit{}, transport, quoting.FailureFor)
 	if err != nil {
 		fail(err)
 	}
-	if err := quoting.Answer(boundary, carried); err != nil {
+	if err := quoting.Answer(boundary, rates); err != nil {
 		fail(err)
 	}
 	handler, err := boundary.Handler()
@@ -64,7 +64,7 @@ func runQuoting(runtime *effect.Runtime) {
 	fmt.Printf("published contract:\n%s", contract.Render())
 }
 
-func askFor(runtime *effect.Runtime, client grpc.Calling, enquiry quoting.Enquiry) {
+func askFor(runtime *effect.Runtime, client grpc.ClientTransport, enquiry quoting.Enquiry) {
 	exit := runtime.Run(context.Background(), effect.Unit{},
 		grpc.Ask[effect.Unit](client, quoting.Quote, enquiry))
 

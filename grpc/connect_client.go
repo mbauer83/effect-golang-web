@@ -13,13 +13,13 @@ import (
 	"github.com/mbauer83/effect-golang/effect"
 )
 
-// Dialled is a Connect client behind the port.
+// ConnectClient is a Connect client behind the port.
 //
 // It holds the base address and the HTTP client, which is what a gRPC
 // connection is when the protocol runs over net/http: there is no separate
 // connection object to keep, and cancellation, timeouts and transport
 // configuration are the http.Client's.
-type Dialled struct {
+type ConnectClient struct {
 	client  rpc.HTTPClient
 	address string
 	// grpcProtocol says whether to speak gRPC's own protocol rather than
@@ -34,8 +34,8 @@ type Dialled struct {
 // procedure's path is appended per call. h2c is the caller's business: gRPC
 // proper needs HTTP/2, and over plain TCP that means an http.Client configured
 // for it, which is a decision about the deployment rather than about the RPC.
-func Dial(client *http.Client, address string) *Dialled {
-	return &Dialled{client: client, address: address, grpcProtocol: true}
+func Dial(client *http.Client, address string) *ConnectClient {
+	return &ConnectClient{client: client, address: address, grpcProtocol: true}
 }
 
 // DialConnect makes a client that speaks Connect's own protocol, which runs
@@ -44,17 +44,17 @@ func Dial(client *http.Client, address string) *Dialled {
 // It exists because that is what makes a test of this package a test rather
 // than a test of h2c, and because a caller whose peers are all Connect servers
 // has no reason to pay for HTTP/2.
-func DialConnect(client *http.Client, address string) *Dialled {
-	return &Dialled{client: client, address: address}
+func DialConnect(client *http.Client, address string) *ConnectClient {
+	return &ConnectClient{client: client, address: address}
 }
 
 // Call invokes a procedure.
-func (transport *Dialled) Call(
+func (transport *ConnectClient) Call(
 	ctx context.Context,
 	path string,
 	request []byte,
 ) ([]byte, *Failure) {
-	options := []rpc.ClientOption{rpc.WithCodec(passingThrough{})}
+	options := []rpc.ClientOption{rpc.WithCodec(passthroughCodec{})}
 	if transport.grpcProtocol {
 		options = append(options, rpc.WithGRPC())
 	}
@@ -75,7 +75,7 @@ func callRefusal(err error) *Failure {
 		// which is Unavailable rather than a code the service chose.
 		return &Failure{Code: Unavailable, Message: err.Error()}
 	}
-	return &Failure{Code: ourCode(refusal.Code()), Message: refusal.Message()}
+	return &Failure{Code: codeFromConnect(refusal.Code()), Message: refusal.Message()}
 }
 
 // Ask calls a procedure and decodes its answer, as an effect.
@@ -85,7 +85,7 @@ func callRefusal(err error) *Failure {
 // them into the application's own failures is the application's business --
 // the same separation the HTTP boundary makes between a status and a refusal.
 func Ask[R, In, Out any](
-	transport Calling,
+	transport ClientTransport,
 	procedure Procedure[In, Out],
 	request In,
 ) effect.Effect[R, Failure, Out] {
@@ -94,20 +94,20 @@ func Ask[R, In, Out any](
 			if err := procedure.Fault(); err != nil {
 				return callFault[R, Out](InvalidArgument, err.Error())
 			}
-			written, err := protobuf.Encode(procedure.request, request)
+			message, err := protobuf.Encode(procedure.request, request)
 			if err != nil {
 				// The caller's own request does not satisfy the contract, so
 				// nothing is sent: InvalidArgument is what the peer would have
 				// said, and saying it here saves a round trip.
 				return callFault[R, Out](InvalidArgument, err.Error())
 			}
-			return sendRequest[R](transport, procedure, written)
+			return sendRequest[R](transport, procedure, message)
 		}).
 		WithName("ask")
 }
 
 func sendRequest[R, In, Out any](
-	transport Calling,
+	transport ClientTransport,
 	procedure Procedure[In, Out],
 	request []byte,
 ) effect.Effect[R, Failure, Out] {
@@ -116,7 +116,7 @@ func sendRequest[R, In, Out any](
 		if failure != nil {
 			return effect.ExitFailure[Failure, Out](*failure)
 		}
-		read, err := protobuf.Decode(procedure.response, answer)
+		output, err := protobuf.Decode(procedure.response, answer)
 		if err != nil {
 			// The peer answered with something its own contract refuses, which
 			// is a fault of the peer rather than of this caller.
@@ -125,7 +125,7 @@ func sendRequest[R, In, Out any](
 				Message: "the response does not satisfy " + procedure.Path() + ": " + err.Error(),
 			})
 		}
-		return effect.ExitSuccess[Failure](read)
+		return effect.ExitSuccess[Failure](output)
 	}).WithName("call")
 }
 

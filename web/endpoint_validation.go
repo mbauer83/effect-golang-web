@@ -52,17 +52,17 @@ func firstEndpointFault[In, Out any](
 	if output.status < 100 || output.status > 599 {
 		return faultOf("declaring an endpoint", errUnstatusedOutput)
 	}
-	return capturesMatchParameters(segments, input.parameters)
+	return validateCaptures(segments, input.parameters)
 }
 
-// capturesMatchParameters reports a path parameter the path does not capture.
+// validateCaptures reports a path parameter the path does not capture.
 // A mistyped name would otherwise be a rejection on every request, discovered
 // in production rather than at start-up.
 //
 // The other direction is not a mistake: a pattern often needs a variable
 // segment whose value the handler has no use for, and requiring a reader for
 // every capture would make that unexpressible.
-func capturesMatchParameters(segments []segment, parameters []Parameter) error {
+func validateCaptures(segments []segment, parameters []Parameter) error {
 	captured := make(map[string]bool)
 	for _, part := range segments {
 		if part.kind != literalSegment {

@@ -90,8 +90,8 @@ func TestADocumentedFailureIsCarriedWithoutBeingPerformed(t *testing.T) {
 	// mapping, and nothing about the route changes because it was written.
 	endpoint := web.GET("/books/{title}", web.PathParam("title", schema.Text()),
 		web.Returns(http.StatusOK, bookSchema)).
-		Failing(http.StatusNotFound, "no book with that title is held").
-		Failing(http.StatusGone, "it was withdrawn")
+		WithFailure(http.StatusNotFound, "no book with that title is held").
+		WithFailure(http.StatusGone, "it was withdrawn")
 
 	failures := endpoint.Declaration().Failures
 	if len(failures) != 2 {
@@ -108,7 +108,7 @@ func TestADocumentedFailureIsCarriedWithoutBeingPerformed(t *testing.T) {
 
 func TestDocumentingAnEndpointLeavesTheOriginalAlone(t *testing.T) {
 	original := web.GET("/books", web.Nothing(), web.ReturnsNothing(http.StatusOK))
-	_ = original.Summary("List").Describe("Everything").Failing(http.StatusGone, "gone")
+	_ = original.WithSummary("List").WithDescription("Everything").WithFailure(http.StatusGone, "gone")
 
 	if declared := original.Declaration(); declared.Summary != "" ||
 		declared.Doc != "" || len(declared.Failures) != 0 {

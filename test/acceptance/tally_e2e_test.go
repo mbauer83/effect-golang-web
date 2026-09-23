@@ -75,7 +75,7 @@ func tallying(t *testing.T) (string, *reported) {
 			surface, assembled := web.NewRoutes(tally.Route(boundary, running))
 			if assembled != nil {
 				return serve.Fail[effect.Unit](web.Fault{
-					Doing: "assembling the surface", Err: assembled,
+					Op: "assembling the surface", Err: assembled,
 				})
 			}
 			return effect.Scoped(func(scope effect.Scope) effect.Effect[effect.Unit, web.Fault, effect.Unit] {

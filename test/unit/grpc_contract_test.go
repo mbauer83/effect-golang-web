@@ -123,7 +123,7 @@ func TestAShapeTwoProceduresShareIsDeclaredOnce(t *testing.T) {
 	// once. With one procedure it is untestable, so this is where it is tested.
 	revised := grpc.Unary(quoting.Service, "Revise",
 		quoting.EnquirySchema, quoting.RateSchema).
-		Documented("Revise prices a shipment again.")
+		WithDescription("Revise prices a shipment again.")
 
 	document, err := grpc.Contract("logistics.v1", quoting.Quote, revised)
 	if err != nil {

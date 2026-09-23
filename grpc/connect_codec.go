@@ -24,26 +24,26 @@ type payload struct {
 	bytes []byte
 }
 
-// passingThrough is the codec: it does nothing, because the schema layer has
+// passthroughCodec is the codec: it does nothing, because the schema layer has
 // already done it.
 //
 // Its name is "proto", which is what puts "application/grpc+proto" on the wire
 // -- so a gRPC client generated from the projected .proto file talks to this
 // without knowing anything about it. Naming it otherwise would produce a
 // content type no generated client asks for.
-type passingThrough struct{}
+type passthroughCodec struct{}
 
-func (passingThrough) Name() string { return "proto" }
+func (passthroughCodec) Name() string { return "proto" }
 
-func (passingThrough) Marshal(message any) ([]byte, error) {
-	heldValue, ours := message.(*payload)
+func (passthroughCodec) Marshal(message any) ([]byte, error) {
+	envelope, ours := message.(*payload)
 	if !ours {
 		return nil, fmt.Errorf("this codec carries bytes, and Connect offered a %T", message)
 	}
-	return heldValue.bytes, nil
+	return envelope.bytes, nil
 }
 
-func (passingThrough) Unmarshal(bytes []byte, into any) error {
+func (passthroughCodec) Unmarshal(bytes []byte, into any) error {
 	target, ours := into.(*payload)
 	if !ours {
 		return fmt.Errorf("this codec carries bytes, and Connect offered a %T", into)

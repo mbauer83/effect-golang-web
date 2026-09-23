@@ -30,7 +30,7 @@ func TestTheStoreRefusesInTheFailureChannelAndNotThroughAnError(t *testing.T) {
 		t.Fatalf("expected the duplicate to be refused, got %+v", exit)
 	}
 	failures := cause.Failures()
-	if len(failures) != 1 || failures[0].Kind != bookstore.AlreadyHeld {
+	if len(failures) != 1 || failures[0].Kind != bookstore.AlreadyExists {
 		t.Fatalf("expected the application's own refusal, got %+v", cause)
 	}
 

@@ -18,40 +18,40 @@ import (
 	"github.com/mbauer83/effect-golang/effect"
 )
 
-// calling is the client's channel: the transport's own faults, which is what a
+// callEffect is the client's channel: the transport's own faults, which is what a
 // caller of somebody else's server can be told.
-type calling[A any] = effect.Effect[effect.Unit, web.Fault, A]
+type callEffect[A any] = effect.Effect[effect.Unit, web.Fault, A]
 
-// runCalling adds a book and reads it back, both through the endpoints the
+// runClient adds a book and reads it back, both through the endpoints the
 // server is serving, and then asks for one that is not there.
-func runCalling(runtime *effect.Runtime, base string) {
+func runClient(runtime *effect.Runtime, base string) {
 	client := web.Dial(http.DefaultClient, base)
 	added := bookstore.Book{Title: "Called", Authors: []string{"A Client"}, Pages: 12}
 
 	program := effect.Gen(func(do *effect.Do[effect.Unit, web.Fault]) bookstore.Book {
-		sending, err := web.Carrying(web.Requesting{}, bookstore.BookSchema, added)
+		request, err := web.WithEntity(web.ClientRequest{}, bookstore.BookSchema, added)
 		if err != nil {
 			do.Await(effect.Fail[effect.Unit, bookstore.Book](
-				web.Fault{Doing: "encoding the book", Err: err}))
+				web.Fault{Op: "encoding the book", Err: err}))
 		}
-		do.Await(web.Call[effect.Unit](client, bookstore.AddBook, sending))
+		do.Await(web.Call[effect.Unit](client, bookstore.AddBook, request))
 		// The title fills the endpoint's captured segment by name, so the path
 		// is built from the declaration rather than pasted together here.
 		return do.Await(web.Call[effect.Unit](client, bookstore.FindBook,
-			web.Requesting{Path: map[string]string{"title": added.Title}}))
+			web.ClientRequest{Path: map[string]string{"title": added.Title}}))
 	})
 
-	read, ok := runtime.Run(context.Background(), effect.Unit{}, program).Value()
+	book, ok := runtime.Run(context.Background(), effect.Unit{}, program).Value()
 	if !ok {
 		fail(fmt.Errorf("calling: the round trip failed"))
 	}
 	fmt.Printf("calling: added and read back %q by %v, %d pages\n",
-		read.Title, read.Authors, read.Pages)
+		book.Title, book.Authors, book.Pages)
 
 	// A status the endpoint did not declare arrives as a Refusal, which
 	// carries what the server said about it.
 	missing := web.Call[effect.Unit](client, bookstore.FindBook,
-		web.Requesting{Path: map[string]string{"title": "Missing"}})
+		web.ClientRequest{Path: map[string]string{"title": "Missing"}})
 	if fault, refused := runtime.Run(context.Background(), effect.Unit{}, missing).Cause(); refused {
 		if failure, is := fault.Failure(); is {
 			fmt.Printf("calling: asking for one that is not there -- %v\n", failure.Err)

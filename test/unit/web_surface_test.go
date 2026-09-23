@@ -17,7 +17,7 @@ import (
 
 func TestTheRejectionFormatIsAPropertyOfTheWholeSurface(t *testing.T) {
 	// A client meets one API, not a collection of separately-worded ones.
-	surface, err := web.NewRoutesRejecting(
+	surface, err := web.NewRoutesWithRejection(
 		func(error) web.Response {
 			return web.Text(http.StatusUnprocessableEntity, "we could not read that")
 		},
@@ -50,9 +50,9 @@ func TestDeclarationsSurviveAssemblyInDeclaredOrder(t *testing.T) {
 		web.Handle(
 			web.POST("/books", web.Entity(bookSchema),
 				web.Returns(http.StatusCreated, bookSchema)).
-				Summary("Add a book").
-				Describe("The entity is the book to add.").
-				Failing(http.StatusConflict, "a book with that title is already held"),
+				WithSummary("Add a book").
+				WithDescription("The entity is the book to add.").
+				WithFailure(http.StatusConflict, "a book with that title is already held"),
 			func(book Book) webEffect[Book] {
 				return effect.For[effect.Unit, Refusal]().Succeed(book)
 			}),

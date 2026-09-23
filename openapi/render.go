@@ -18,19 +18,19 @@ const Version = "3.1.0"
 
 // Render writes the document as JSON.
 func (document Document) Render() ([]byte, error) {
-	var written bytes.Buffer
-	encoder := jsontext.NewEncoder(&written)
+	var buffer bytes.Buffer
+	encoder := jsontext.NewEncoder(&buffer)
 	if err := document.write(encoder); err != nil {
 		return nil, err
 	}
-	return written.Bytes(), nil
+	return buffer.Bytes(), nil
 }
 
 func (document Document) write(encoder *jsontext.Encoder) error {
 	if err := begin(encoder); err != nil {
 		return err
 	}
-	if err := text(encoder, "openapi", Version); err != nil {
+	if err := writeText(encoder, "openapi", Version); err != nil {
 		return err
 	}
 	if err := document.writeInfo(encoder); err != nil {
@@ -49,7 +49,7 @@ func (document Document) write(encoder *jsontext.Encoder) error {
 }
 
 func (document Document) writeInfo(encoder *jsontext.Encoder) error {
-	if err := member(encoder, "info"); err != nil {
+	if err := writeMember(encoder, "info"); err != nil {
 		return err
 	}
 	if err := begin(encoder); err != nil {
@@ -60,7 +60,7 @@ func (document Document) writeInfo(encoder *jsontext.Encoder) error {
 		{"version", document.Info.Version},
 		{"description", document.Info.Description},
 	} {
-		if err := text(encoder, field.name, field.value); err != nil {
+		if err := writeText(encoder, field.name, field.value); err != nil {
 			return err
 		}
 	}
@@ -71,7 +71,7 @@ func (document Document) writeServers(encoder *jsontext.Encoder) error {
 	if len(document.Servers) == 0 {
 		return nil
 	}
-	if err := member(encoder, "servers"); err != nil {
+	if err := writeMember(encoder, "servers"); err != nil {
 		return err
 	}
 	if err := encoder.WriteToken(jsontext.BeginArray); err != nil {
@@ -81,10 +81,10 @@ func (document Document) writeServers(encoder *jsontext.Encoder) error {
 		if err := begin(encoder); err != nil {
 			return err
 		}
-		if err := text(encoder, "url", server.URL); err != nil {
+		if err := writeText(encoder, "url", server.URL); err != nil {
 			return err
 		}
-		if err := text(encoder, "description", server.Description); err != nil {
+		if err := writeText(encoder, "description", server.Description); err != nil {
 			return err
 		}
 		if err := encoder.WriteToken(jsontext.EndObject); err != nil {
@@ -95,21 +95,21 @@ func (document Document) writeServers(encoder *jsontext.Encoder) error {
 }
 
 func (document Document) writePaths(encoder *jsontext.Encoder) error {
-	if err := member(encoder, "paths"); err != nil {
+	if err := writeMember(encoder, "paths"); err != nil {
 		return err
 	}
 	if err := begin(encoder); err != nil {
 		return err
 	}
 	for _, path := range document.Paths {
-		if err := member(encoder, path.Path); err != nil {
+		if err := writeMember(encoder, path.Path); err != nil {
 			return err
 		}
 		if err := begin(encoder); err != nil {
 			return err
 		}
 		for _, operation := range path.Operations {
-			if err := member(encoder, strings.ToLower(operation.Method)); err != nil {
+			if err := writeMember(encoder, strings.ToLower(operation.Method)); err != nil {
 				return err
 			}
 			if err := writeOperation(encoder, operation); err != nil {
@@ -127,20 +127,20 @@ func (document Document) writeComponents(encoder *jsontext.Encoder) error {
 	if len(document.Components) == 0 {
 		return nil
 	}
-	if err := member(encoder, "components"); err != nil {
+	if err := writeMember(encoder, "components"); err != nil {
 		return err
 	}
 	if err := begin(encoder); err != nil {
 		return err
 	}
-	if err := member(encoder, "schemas"); err != nil {
+	if err := writeMember(encoder, "schemas"); err != nil {
 		return err
 	}
 	if err := begin(encoder); err != nil {
 		return err
 	}
 	for _, name := range componentNames(document.Components) {
-		if err := member(encoder, name); err != nil {
+		if err := writeMember(encoder, name); err != nil {
 			return err
 		}
 		if err := writeSchema(encoder, document.Components[name]); err != nil {
@@ -173,16 +173,16 @@ func begin(encoder *jsontext.Encoder) error {
 	return encoder.WriteToken(jsontext.BeginObject)
 }
 
-func member(encoder *jsontext.Encoder, name string) error {
+func writeMember(encoder *jsontext.Encoder, name string) error {
 	return encoder.WriteToken(jsontext.String(name))
 }
 
-// text writes a member, or nothing when there is nothing to say.
-func text(encoder *jsontext.Encoder, name string, value string) error {
+// writeText writes a member, or nothing when there is nothing to say.
+func writeText(encoder *jsontext.Encoder, name string, value string) error {
 	if value == "" {
 		return nil
 	}
-	if err := member(encoder, name); err != nil {
+	if err := writeMember(encoder, name); err != nil {
 		return err
 	}
 	return encoder.WriteToken(jsontext.String(value))

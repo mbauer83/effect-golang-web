@@ -30,7 +30,7 @@ import (
 type Boundary[R, E any] struct {
 	runtime     *effect.Runtime
 	environment R
-	transport   Serving
+	transport   ServerTransport
 	onFailure   func(E) Failure
 	onDefect    func(effect.Cause[E]) Failure
 	report      func(context.Context, error)
@@ -41,7 +41,7 @@ type Boundary[R, E any] struct {
 func NewBoundary[R, E any](
 	runtime *effect.Runtime,
 	environment R,
-	transport Serving,
+	transport ServerTransport,
 	onFailure func(E) Failure,
 ) (*Boundary[R, E], error) {
 	switch {
@@ -124,7 +124,7 @@ func handleCall[R, E, In, Out any](
 	handle func(In) effect.Effect[R, E, Out],
 	request []byte,
 ) ([]byte, *Failure) {
-	asked, err := protobuf.Decode(procedure.request, request)
+	input, err := protobuf.Decode(procedure.request, request)
 	if err != nil {
 		// The description refused it, so the handler is never called: a
 		// request that does not satisfy the contract is InvalidArgument
@@ -137,21 +137,21 @@ func handleCall[R, E, In, Out any](
 
 	// The call's context carries the cancellation, so a caller that goes away
 	// interrupts the handler without any mechanism of its own.
-	exit := boundary.runtime.Run(ctx, boundary.environment, handle(asked))
+	exit := boundary.runtime.Run(ctx, boundary.environment, handle(input))
 	answer, succeeded := exit.Value()
 	if !succeeded {
 		cause, _ := exit.Cause()
 		return nil, boundary.failureForCause(ctx, cause)
 	}
 
-	written, err := protobuf.Encode(procedure.response, answer)
+	message, err := protobuf.Encode(procedure.response, answer)
 	if err != nil {
 		// The handler produced something its own description refuses, which is
 		// a fault of the service rather than of the caller.
 		boundary.report(ctx, faultOf("encoding a response", procedure.Path(), err))
 		return nil, &Failure{Code: Internal, Message: "the response could not be encoded"}
 	}
-	return written, nil
+	return message, nil
 }
 
 // failureForCause decides what a failed outcome answers with. A defect

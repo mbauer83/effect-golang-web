@@ -25,15 +25,15 @@ import (
 // The service's name is in it because two services read by one program answer
 // differently at the same path, and what a request was about is in it because
 // that is how everything about one thing is dropped together.
-func (upstream *UpstreamClient) cacheKey(method string, path string, requesting Requesting) string {
+func (upstream *UpstreamClient) cacheKey(method string, path string, request ClientRequest) string {
 	question := method + " " + path
-	if len(requesting.Query) > 0 {
-		question += "?" + requesting.Query.Encode()
+	if len(request.Query) > 0 {
+		question += "?" + request.Query.Encode()
 	}
-	return strings.Join([]string{upstream.terms.Named, requesting.About, question}, ":")
+	return strings.Join([]string{upstream.terms.Name, request.About, question}, ":")
 }
 
-// getCached asks the store, and answers "nothing kept" whether that is because
+// lookupCache asks the store, and answers "nothing kept" whether that is because
 // nothing is kept or because the store could not be read.
 //
 // The one absorbed failure here, and absorbed rather than ignored: a cache
@@ -42,48 +42,48 @@ func (upstream *UpstreamClient) cacheKey(method string, path string, requesting 
 // asking the service. It is logged with the key, because a cache that has been
 // unreachable for an hour is a rate limit about to be spent and has to be
 // visible before that happens.
-func getCached[R any](upstream *UpstreamClient, filed string) effect.Effect[R, Fault, cache.Lookup] {
+func lookupCache[R any](upstream *UpstreamClient, key string) effect.Effect[R, Fault, cache.Lookup] {
 	return effect.Fold(
-		cache.Read[R](upstream.keeping, filed).CatchAll(cacheFault[R, cache.Lookup]("reading", filed)),
+		cache.Read[R](upstream.store, key).CatchAll(logCacheFault[R, cache.Lookup]("reading", key)),
 		func(effect.Cause[cache.Fault]) cache.Lookup { return cache.Lookup{} },
-		func(cached cache.Lookup) cache.Lookup { return cached },
+		func(lookup cache.Lookup) cache.Lookup { return lookup },
 	).MapError(func(effect.Never) Fault { return Fault{} })
 }
 
-// putCached keeps an answer worth keeping, and answers with it whether or not the
+// writeCache keeps an answer worth keeping, and answers with it whether or not the
 // keeping worked -- for the same reason and with the same log as recalling.
 //
 // Only a successful answer: a path that was briefly a 500 must not be a 500
 // for the next hour.
-func putCached[R any](
+func writeCache[R any](
 	upstream *UpstreamClient,
-	filed string,
+	key string,
 	about string,
-) func(Received) effect.Effect[R, Fault, Received] {
-	return func(received Received) effect.Effect[R, Fault, Received] {
+) func(ClientResponse) effect.Effect[R, Fault, ClientResponse] {
+	return func(received ClientResponse) effect.Effect[R, Fault, ClientResponse] {
 		if !received.IsSuccessful() {
 			return effect.Succeed[R, Fault](received)
 		}
-		entity, err := written(received)
+		entity, err := marshalResponse(received)
 		if err != nil {
-			return effect.Fail[R, Received](asFault("keeping the answer", err))
+			return effect.Fail[R, ClientResponse](asFault("keeping the answer", err))
 		}
-		writeEntry := cache.Write[R](upstream.keeping, cache.Entry{
-			Key: filed, About: about, Entity: entity, Fresh: upstream.terms.Fresh,
-		}).CatchAll(cacheFault[R, effect.Unit]("keeping", filed))
+		writeEntry := cache.Write[R](upstream.store, cache.Entry{
+			Key: key, About: about, Entity: entity, Fresh: upstream.terms.TimeToLive,
+		}).CatchAll(logCacheFault[R, effect.Unit]("keeping", key))
 		return effect.Fold(writeEntry,
-			func(effect.Cause[cache.Fault]) Received { return received },
-			func(effect.Unit) Received { return received },
+			func(effect.Cause[cache.Fault]) ClientResponse { return received },
+			func(effect.Unit) ClientResponse { return received },
 		).MapError(func(effect.Never) Fault { return Fault{} })
 	}
 }
 
-func cacheFault[R, A any](doing string, filed string) func(cache.Fault) effect.Effect[R, cache.Fault, A] {
+func logCacheFault[R, A any](op string, key string) func(cache.Fault) effect.Effect[R, cache.Fault, A] {
 	return func(why cache.Fault) effect.Effect[R, cache.Fault, A] {
 		return effect.LogWarn[R, cache.Fault](
 			"the answer store could not be used; asking the service instead",
-			slog.String("doing", doing),
-			slog.String("key", filed),
+			slog.String("doing", op),
+			slog.String("key", key),
 			slog.String("fault", why.Error()),
 		).FlatMap(func(effect.Unit) effect.Effect[R, cache.Fault, A] {
 			return effect.Fail[R, A](why)
@@ -91,13 +91,13 @@ func cacheFault[R, A any](doing string, filed string) func(cache.Fault) effect.E
 	}
 }
 
-// written is a response as HTTP writes one.
+// marshalResponse is a response as HTTP writes one.
 //
 // Because that is a format which already round-trips a status, a set of
 // headers and a body, and is read back by the same standard library that wrote
 // it. Keeping only the entity would lose the content type, and inventing a
 // format to keep all three would be inventing one that already exists.
-func written(received Received) ([]byte, error) {
+func marshalResponse(received ClientResponse) ([]byte, error) {
 	response := http.Response{
 		Status:        http.StatusText(received.Status),
 		StatusCode:    received.Status,
@@ -108,11 +108,11 @@ func written(received Received) ([]byte, error) {
 		Body:          io.NopCloser(bytes.NewReader(received.Entity)),
 		ContentLength: int64(len(received.Entity)),
 	}
-	keptValue := bytes.Buffer{}
-	if err := response.Write(&keptValue); err != nil {
+	buffer := bytes.Buffer{}
+	if err := response.Write(&buffer); err != nil {
 		return nil, err
 	}
-	return keptValue.Bytes(), nil
+	return buffer.Bytes(), nil
 }
 
 // responseFrom is a kept answer as the response it was, and whether there was one.
@@ -120,20 +120,20 @@ func written(received Received) ([]byte, error) {
 // A kept answer that cannot be read back is treated as no answer: it is this
 // program's own writing, so a failure here is a bug rather than a thing to
 // report to a caller, and the service can still be asked.
-func responseFrom(cached cache.Lookup) (Received, bool) {
-	if !cached.Found {
-		return Received{}, false
+func responseFrom(lookup cache.Lookup) (ClientResponse, bool) {
+	if !lookup.Found {
+		return ClientResponse{}, false
 	}
-	response, err := http.ReadResponse(bufio.NewReader(bytes.NewReader(cached.Entity)), nil)
+	response, err := http.ReadResponse(bufio.NewReader(bytes.NewReader(lookup.Entity)), nil)
 	if err != nil {
-		return Received{}, false
+		return ClientResponse{}, false
 	}
 	defer func() { _ = response.Body.Close() }()
 	entity, err := io.ReadAll(response.Body)
 	if err != nil {
-		return Received{}, false
+		return ClientResponse{}, false
 	}
-	return Received{
+	return ClientResponse{
 		Status: response.StatusCode,
 		Header: response.Header,
 		Entity: entity,

@@ -14,11 +14,11 @@ import (
 	broker "github.com/rabbitmq/amqp091-go"
 )
 
-// subscribed is one consumer on a channel.
-type subscribed struct {
-	channel  *broker.Channel
-	arriving <-chan broker.Delivery
-	tag      string
+// subscription is one consumer on a channel.
+type subscription struct {
+	channel    *broker.Channel
+	deliveries <-chan broker.Delivery
+	tag        string
 }
 
 // Next waits for the next delivery.
@@ -27,13 +27,13 @@ type subscribed struct {
 // consumer, or the channel went. Either way there is nothing more to read, and
 // a stream that ended is the honest report -- the reason it ended, if the
 // channel went, is on the connection rather than here.
-func (from *subscribed) Next(ctx context.Context) (Delivery, bool, error) {
+func (subscription *subscription) Next(ctx context.Context) (Delivery, bool, error) {
 	select {
-	case arrived, more := <-from.arriving:
+	case raw, more := <-subscription.deliveries:
 		if !more {
 			return Delivery{}, false, nil
 		}
-		delivery, err := deliveryOf(arrived)
+		delivery, err := deliveryOf(raw)
 		if err != nil {
 			return Delivery{}, false, err
 		}
@@ -46,18 +46,18 @@ func (from *subscribed) Next(ctx context.Context) (Delivery, bool, error) {
 // Ack accepts one delivery. Never several: multiple acknowledgement accepts
 // every delivery up to a tag, which is a different operation with a different
 // failure mode, and expressing it as a flag on this one would hide that.
-func (from *subscribed) Ack(tag uint64) error {
-	return from.channel.Ack(tag, false)
+func (subscription *subscription) Ack(tag uint64) error {
+	return subscription.channel.Ack(tag, false)
 }
 
 // Discard rejects one delivery without return.
-func (from *subscribed) Discard(tag uint64) error {
-	return from.channel.Reject(tag, false)
+func (subscription *subscription) Discard(tag uint64) error {
+	return subscription.channel.Reject(tag, false)
 }
 
 // Requeue rejects one delivery and asks for it back.
-func (from *subscribed) Requeue(tag uint64) error {
-	return from.channel.Reject(tag, true)
+func (subscription *subscription) Requeue(tag uint64) error {
+	return subscription.channel.Reject(tag, true)
 }
 
 // Close cancels the consumer, and does not close the channel.
@@ -72,23 +72,23 @@ func (from *subscribed) Requeue(tag uint64) error {
 //
 // A channel the broker has already closed has no consumer left to cancel, which
 // is the outcome this wanted rather than a fault to report.
-func (from *subscribed) Close() error {
-	return closedAlready(from.channel.Cancel(from.tag, false))
+func (subscription *subscription) Close() error {
+	return ignoreClosed(subscription.channel.Cancel(subscription.tag, false))
 }
 
 // deliveryOf is what arrived, in the universal representation.
-func deliveryOf(arrived broker.Delivery) (Delivery, error) {
-	carried, err := Headers(arrived.Headers)
+func deliveryOf(raw broker.Delivery) (Delivery, error) {
+	headers, err := Headers(raw.Headers)
 	if err != nil {
 		return Delivery{}, err
 	}
 	return Delivery{
-		Body:        arrived.Body,
-		ContentType: arrived.ContentType,
-		Headers:     carried,
-		Exchange:    arrived.Exchange,
-		Key:         arrived.RoutingKey,
-		Tag:         arrived.DeliveryTag,
-		Redelivered: arrived.Redelivered,
+		Body:        raw.Body,
+		ContentType: raw.ContentType,
+		Headers:     headers,
+		Exchange:    raw.Exchange,
+		Key:         raw.RoutingKey,
+		Tag:         raw.DeliveryTag,
+		Redelivered: raw.Redelivered,
 	}, nil
 }

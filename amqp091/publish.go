@@ -16,7 +16,7 @@ import (
 // reached the broker's socket. A program that needs the broker to say it has
 // the message needs confirms, which is a thing to add when a caller asks.
 func Publish[R any](
-	channel Publishing,
+	channel Publisher,
 	target Target,
 	message Message,
 ) effect.Effect[R, Fault, effect.Unit] {
@@ -34,13 +34,13 @@ func Publish[R any](
 // is reported rather than published as a body the consumer would have to make
 // sense of.
 func PublishValue[R, A any](
-	channel Publishing,
+	channel Publisher,
 	target Target,
 	shape schema.Schema[A],
 	value A,
 ) effect.Effect[R, Fault, effect.Unit] {
 	return effect.Try(
-		func(context.Context, R) (Message, error) { return Encoded(shape, value) },
+		func(context.Context, R) (Message, error) { return Encode(shape, value) },
 		func(err error) Fault { return faultOf("encoding a message", target.Key, err) },
 	).
 		FlatMap(func(message Message) effect.Effect[R, Fault, effect.Unit] {
@@ -49,12 +49,12 @@ func PublishValue[R, A any](
 		WithName("publish-value")
 }
 
-// Encoded is the message a value makes.
+// Encode is the message a value makes.
 //
 // It is public because Message has more to say than a value does -- headers, a
 // durability -- and a caller that wants to set those should not have to choose
 // between the schema and them.
-func Encoded[A any](shape schema.Schema[A], value A) (Message, error) {
+func Encode[A any](shape schema.Schema[A], value A) (Message, error) {
 	document, err := schema.EncodeJSON(shape, value)
 	if err != nil {
 		return Message{}, err

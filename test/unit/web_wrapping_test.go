@@ -23,7 +23,7 @@ import (
 func through(
 	t *testing.T,
 	request *http.Request,
-	each web.Matched[effect.Unit, Refusal],
+	each web.RouteMiddleware[effect.Unit, Refusal],
 	routes ...web.Route[effect.Unit, Refusal],
 ) *http.Response {
 	t.Helper()
@@ -31,7 +31,7 @@ func through(
 	if err != nil {
 		t.Fatal(err)
 	}
-	return reaching(t, surface.Wrapping(each), request)
+	return reaching(t, surface.WithMiddleware(each), request)
 }
 
 // reaching sends one request through an assembled surface.
@@ -55,7 +55,7 @@ func reaching(
 }
 
 // noting records the route each request reached, by its pattern.
-func noting(seen *[]string) web.Matched[effect.Unit, Refusal] {
+func noting(seen *[]string) web.RouteMiddleware[effect.Unit, Refusal] {
 	return func(
 		declaration web.Declaration,
 		handler web.Handler[effect.Unit, Refusal],
@@ -98,7 +98,7 @@ func TestWrappingLeavesTheDeclarationsAndThePrecedenceAlone(t *testing.T) {
 		t.Fatal(err)
 	}
 	seen := []string{}
-	wrapped := surface.Wrapping(noting(&seen))
+	wrapped := surface.WithMiddleware(noting(&seen))
 
 	before, after := surface.Declarations(), wrapped.Declarations()
 	if len(before) != len(after) {
@@ -129,13 +129,13 @@ func TestWrappingWithNothingIsTheSurfaceItself(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if wrapped := surface.Wrapping(nil); len(wrapped.Declarations()) != 1 {
+	if wrapped := surface.WithMiddleware(nil); len(wrapped.Declarations()) != 1 {
 		t.Fatal("expected the surface unchanged")
 	}
 	// And a zero Routes wraps nothing rather than panicking.
 	var none web.Routes[effect.Unit, Refusal]
 	seen := []string{}
-	if wrapped := none.Wrapping(noting(&seen)); len(wrapped.Declarations()) != 0 {
+	if wrapped := none.WithMiddleware(noting(&seen)); len(wrapped.Declarations()) != 0 {
 		t.Fatal("expected a zero surface to stay zero")
 	}
 }
@@ -161,7 +161,7 @@ func TestAWrapperSeesTheCodecsAndNotOnlyTheHandler(t *testing.T) {
 	received := through(t, httptest.NewRequest(http.MethodGet, "/books/x", nil),
 		watching,
 		echo(http.MethodGet, "/books/{title}",
-			web.PathParam("title", schema.Text().Constrained(schema.MinLength(4)))))
+			web.PathParam("title", schema.Text().Check(schema.MinLength(4)))))
 
 	if received.StatusCode != http.StatusBadRequest {
 		t.Fatalf("expected the codec to refuse the short title, got %d", received.StatusCode)

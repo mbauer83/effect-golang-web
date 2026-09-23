@@ -15,7 +15,7 @@ func writeOperation(encoder *jsontext.Encoder, operation Operation) error {
 		{"summary", operation.Summary},
 		{"description", operation.Description},
 	} {
-		if err := text(encoder, field.name, field.value); err != nil {
+		if err := writeText(encoder, field.name, field.value); err != nil {
 			return err
 		}
 	}
@@ -35,7 +35,7 @@ func writeParameters(encoder *jsontext.Encoder, parameters []Parameter) error {
 	if len(parameters) == 0 {
 		return nil
 	}
-	if err := member(encoder, "parameters"); err != nil {
+	if err := writeMember(encoder, "parameters"); err != nil {
 		return err
 	}
 	if err := encoder.WriteToken(jsontext.BeginArray); err != nil {
@@ -53,24 +53,24 @@ func writeParameter(encoder *jsontext.Encoder, parameter Parameter) error {
 	if err := begin(encoder); err != nil {
 		return err
 	}
-	if err := text(encoder, "name", parameter.Name); err != nil {
+	if err := writeText(encoder, "name", parameter.Name); err != nil {
 		return err
 	}
-	if err := text(encoder, "in", parameter.In); err != nil {
+	if err := writeText(encoder, "in", parameter.In); err != nil {
 		return err
 	}
-	if err := text(encoder, "description", parameter.Description); err != nil {
+	if err := writeText(encoder, "description", parameter.Description); err != nil {
 		return err
 	}
 	// Required is written even when false, because absent and false mean the
 	// same thing here and a reader should not have to know that.
-	if err := member(encoder, "required"); err != nil {
+	if err := writeMember(encoder, "required"); err != nil {
 		return err
 	}
 	if err := encoder.WriteToken(jsontext.Bool(parameter.Required)); err != nil {
 		return err
 	}
-	if err := member(encoder, "schema"); err != nil {
+	if err := writeMember(encoder, "schema"); err != nil {
 		return err
 	}
 	if err := writeSchema(encoder, parameter.Schema); err != nil {
@@ -83,13 +83,13 @@ func writeRequestBody(encoder *jsontext.Encoder, body *RequestBody) error {
 	if body == nil {
 		return nil
 	}
-	if err := member(encoder, "requestBody"); err != nil {
+	if err := writeMember(encoder, "requestBody"); err != nil {
 		return err
 	}
 	if err := begin(encoder); err != nil {
 		return err
 	}
-	if err := member(encoder, "required"); err != nil {
+	if err := writeMember(encoder, "required"); err != nil {
 		return err
 	}
 	if err := encoder.WriteToken(jsontext.Bool(body.Required)); err != nil {
@@ -102,20 +102,20 @@ func writeRequestBody(encoder *jsontext.Encoder, body *RequestBody) error {
 }
 
 func writeResponses(encoder *jsontext.Encoder, responses []Response) error {
-	if err := member(encoder, "responses"); err != nil {
+	if err := writeMember(encoder, "responses"); err != nil {
 		return err
 	}
 	if err := begin(encoder); err != nil {
 		return err
 	}
 	for _, response := range responses {
-		if err := member(encoder, status(response.Status)); err != nil {
+		if err := writeMember(encoder, status(response.Status)); err != nil {
 			return err
 		}
 		if err := begin(encoder); err != nil {
 			return err
 		}
-		if err := text(encoder, "description", response.Description); err != nil {
+		if err := writeText(encoder, "description", response.Description); err != nil {
 			return err
 		}
 		if err := writeContent(encoder, response.MediaType, response.Schema); err != nil {
@@ -135,20 +135,20 @@ func writeContent(encoder *jsontext.Encoder, mediaType string, schema *jsonschem
 	if mediaType == "" {
 		return nil
 	}
-	if err := member(encoder, "content"); err != nil {
+	if err := writeMember(encoder, "content"); err != nil {
 		return err
 	}
 	if err := begin(encoder); err != nil {
 		return err
 	}
-	if err := member(encoder, mediaType); err != nil {
+	if err := writeMember(encoder, mediaType); err != nil {
 		return err
 	}
 	if err := begin(encoder); err != nil {
 		return err
 	}
 	if schema != nil {
-		if err := member(encoder, "schema"); err != nil {
+		if err := writeMember(encoder, "schema"); err != nil {
 			return err
 		}
 		if err := writeSchema(encoder, *schema); err != nil {

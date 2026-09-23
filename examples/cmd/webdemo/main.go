@@ -34,7 +34,7 @@ func main() {
 	runBookstore(runtime)
 	runDispatch(runtime)
 	runConsign(runtime)
-	runQuoting(runtime)
+	runQuote(runtime)
 }
 
 // runBookstore starts the HTTP program on a port the operating system chooses,
@@ -58,7 +58,7 @@ func runBookstore(runtime *effect.Runtime) {
 	if !made {
 		fail(errors.New("the store could not be built"))
 	}
-	surface, err := bookstore.Published(store)
+	surface, err := bookstore.SurfaceWithContract(store)
 	if err != nil {
 		fail(err)
 	}
@@ -81,15 +81,15 @@ func runBookstore(runtime *effect.Runtime) {
 	report(base+"/openapi.json", get(base+"/openapi.json"))
 
 	// And the same server, called through the declarations it serves.
-	runCalling(runtime, base)
+	runClient(runtime, base)
 
 	stop()
 	<-stopped
 
 	// The store's operations are effects, so counting what it holds is one
 	// too: the runtime interprets it like anything else.
-	background, _ := runtime.Run(context.Background(), effect.Unit{}, store.All()).Value()
-	fmt.Printf("bookstore: stopped with %d books\n", len(background))
+	books, _ := runtime.Run(context.Background(), effect.Unit{}, store.All()).Value()
+	fmt.Printf("bookstore: stopped with %d books\n", len(books))
 }
 
 func get(url string) *http.Response {

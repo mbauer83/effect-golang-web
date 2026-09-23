@@ -66,9 +66,9 @@ func readingFrom(t *testing.T, service *heldOpen) (*web.UpstreamClient, cache.St
 	upstream, err := web.NewUpstreamClient(
 		web.Dial(http.DefaultClient, service.server.URL),
 		web.UpstreamTerms{
-			Named:   "a service",
-			Allowed: rate.Allowance{Name: "a service", Most: 100, Every: time.Second},
-			Fresh:   time.Minute,
+			Name:       "a service",
+			Allowance:  rate.Allowance{Name: "a service", Most: 100, Every: time.Second},
+			TimeToLive: time.Minute,
 		},
 		keeping,
 		rate.NewMemoryLimiter(time.Now),
@@ -85,10 +85,10 @@ func TestTenCallersWantingOneAnswerAskOnce(t *testing.T) {
 	const callers = 10
 
 	// Every caller asks for the same key while none of them has an answer.
-	together := effect.ForEachPar(make([]int, callers), func(int) effect.Effect[effect.Unit, web.Fault, web.Received] {
-		return web.FetchFromUpstream[effect.Unit](upstream, http.MethodGet, "/film/603", aboutOne())
+	together := effect.ForEachPar(make([]int, callers), func(int) effect.Effect[effect.Unit, web.Fault, web.ClientResponse] {
+		return web.FetchUpstream[effect.Unit](upstream, http.MethodGet, "/film/603", aboutOne())
 	})
-	waiting := make(chan effect.Exit[web.Fault, []web.Received], 1)
+	waiting := make(chan effect.Exit[web.Fault, []web.ClientResponse], 1)
 	go func() { waiting <- called(t, together) }()
 
 	// One of them reaches the service. Nine are waiting on that one.
@@ -123,7 +123,7 @@ func TestACallerWhoGoesAwayDoesNotTakeTheReadingWithThem(t *testing.T) {
 
 	// A caller that starts the reading and is then interrupted while waiting.
 	abandoned := effect.Race(
-		web.FetchFromUpstream[effect.Unit](upstream, http.MethodGet, "/film/603", aboutOne()),
+		web.FetchUpstream[effect.Unit](upstream, http.MethodGet, "/film/603", aboutOne()),
 		givenUpOn(t),
 	)
 	go func() { _ = called(t, abandoned) }()
@@ -141,10 +141,10 @@ func TestACallerWhoGoesAwayDoesNotTakeTheReadingWithThem(t *testing.T) {
 }
 
 // givenUpOn is a caller giving up, which is what wins the race above.
-func givenUpOn(t *testing.T) effect.Effect[effect.Unit, web.Fault, web.Received] {
+func givenUpOn(t *testing.T) effect.Effect[effect.Unit, web.Fault, web.ClientResponse] {
 	t.Helper()
 	return effect.Sleep[effect.Unit, web.Fault](20 * time.Millisecond).
-		As(web.Received{})
+		As(web.ClientResponse{})
 }
 
 // keptWithin waits for the store to hold the answer, which is what says the

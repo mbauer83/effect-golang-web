@@ -38,11 +38,11 @@ type Refusal struct {
 }
 
 func (refusal Refusal) Error() string {
-	said := ""
+	detail := ""
 	if len(refusal.Entity) > 0 {
-		said = ": " + string(refusal.Entity)
+		detail = ": " + string(refusal.Entity)
 	}
-	return "the server answered " + strconv.Itoa(refusal.Status) + said
+	return "the server answered " + strconv.Itoa(refusal.Status) + detail
 }
 
 // Call sends a request to an endpoint and reads what the endpoint declared it
@@ -55,17 +55,17 @@ func (refusal Refusal) Error() string {
 func Call[R, In, Out any](
 	client *Client,
 	endpoint Endpoint[In, Out],
-	requesting Requesting,
+	request ClientRequest,
 ) effect.Effect[R, Fault, Out] {
 	if fault := ValidateEndpoint(endpoint); fault != nil {
 		return effect.Fail[R, Out](asFault("calling an endpoint", fault))
 	}
-	path, err := fillPattern(endpoint.segments, requesting.Path)
+	path, err := fillPattern(endpoint.segments, request.Path)
 	if err != nil {
 		return effect.Fail[R, Out](asFault("building the path", err))
 	}
-	return Fetch[R](client, endpoint.method, path, requesting).
-		FlatMap(func(received Received) effect.Effect[R, Fault, Out] {
+	return Fetch[R](client, endpoint.method, path, request).
+		FlatMap(func(received ClientResponse) effect.Effect[R, Fault, Out] {
 			return decodeResponse[R](endpoint.output, received, endpoint.method+" "+path)
 		})
 }
@@ -74,19 +74,19 @@ func Call[R, In, Out any](
 // instead.
 func decodeResponse[R, Out any](
 	output Output[Out],
-	received Received,
-	called string,
+	received ClientResponse,
+	target string,
 ) effect.Effect[R, Fault, Out] {
 	operations := effect.For[R, Fault]()
 	if received.Status != output.status {
 		return operations.Fail[Out](Fault{
-			Doing: "calling " + called,
-			Err:   Refusal{Status: received.Status, Entity: received.Entity},
+			Op:  "calling " + target,
+			Err: Refusal{Status: received.Status, Entity: received.Entity},
 		})
 	}
 	value, err := output.decode(received.Entity)
 	if err != nil {
-		return operations.Fail[Out](Fault{Doing: "reading the response body", Err: err})
+		return operations.Fail[Out](Fault{Op: "reading the response body", Err: err})
 	}
 	return operations.Succeed(value)
 }

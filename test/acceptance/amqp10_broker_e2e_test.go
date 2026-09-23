@@ -27,7 +27,7 @@ import (
 // work.
 func linked[A any](
 	t *testing.T,
-	work func(amqp10.Sending, amqp10.Receiving) consigning[A],
+	work func(amqp10.SenderLink, amqp10.ReceiverLink) consigning[A],
 ) effect.Exit[amqp10.Fault, A] {
 	t.Helper()
 	address := os.Getenv("EFFECT_GOLANG_AMQP10_URL")
@@ -70,12 +70,12 @@ func attachedBoth[A any](
 	scope effect.Scope,
 	session *amqp10.Session,
 	node string,
-	work func(amqp10.Sending, amqp10.Receiving) consigning[A],
+	work func(amqp10.SenderLink, amqp10.ReceiverLink) consigning[A],
 ) consigning[A] {
 	return amqp10.Sender[effect.Unit](scope, session, node).
-		FlatMap(func(sender amqp10.Sending) consigning[A] {
+		FlatMap(func(sender amqp10.SenderLink) consigning[A] {
 			return amqp10.Receiver[effect.Unit](scope, session, node, 1).
-				FlatMap(func(receiver amqp10.Receiving) consigning[A] {
+				FlatMap(func(receiver amqp10.ReceiverLink) consigning[A] {
 					return work(sender, receiver)
 				})
 		})
@@ -90,12 +90,12 @@ func TestAMessageCrossesARealNodeWithItsPropertiesAndComesBackAsItself(t *testin
 		ContentType: "application/json",
 		Subject:     "8f14e45f-ceea-467a-a4fb-1a9c73d0f2b1",
 		Properties:  everyPropertyKind(),
-		Durability:  amqp10.Lasting,
+		Durability:  amqp10.Durable,
 	}
 
 	exit := linked(t, func(
-		sender amqp10.Sending,
-		receiver amqp10.Receiving,
+		sender amqp10.SenderLink,
+		receiver amqp10.ReceiverLink,
 	) consigning[[]amqp10.Delivery] {
 		return amqp10.Send[effect.Unit](sender, sent).
 			FlatMap(func(effect.Unit) consigning[[]amqp10.Delivery] {
@@ -139,8 +139,8 @@ func TestTheProgramRunsAgainstARealNode(t *testing.T) {
 	// and accepted, with the four dispositions going through the library rather
 	// than through the in-process broker.
 	exit := linked(t, func(
-		sender amqp10.Sending,
-		receiver amqp10.Receiving,
+		sender amqp10.SenderLink,
+		receiver amqp10.ReceiverLink,
 	) consigning[[]consign.Shipment] {
 		return consign.Hand(sender, consignment).
 			FlatMap(func(effect.Unit) consigning[[]consign.Shipment] {
@@ -174,14 +174,14 @@ func everyPropertyKind() dynamic.Object {
 
 // accepting settles every delivery a test read, so a run leaves the node as it
 // found it.
-func accepting(link amqp10.Receiving, arrived []amqp10.Delivery) consigning[effect.Unit] {
+func accepting(link amqp10.ReceiverLink, arrived []amqp10.Delivery) consigning[effect.Unit] {
 	return effect.ForEach(arrived, func(delivery amqp10.Delivery) consigning[effect.Unit] {
 		return effect.Try(
 			func(ctx context.Context, _ effect.Unit) (effect.Unit, error) {
 				return effect.Unit{}, link.Accept(ctx, delivery.Tag)
 			},
 			func(err error) amqp10.Fault {
-				return amqp10.Fault{Doing: "accepting a message", Err: err}
+				return amqp10.Fault{Op: "accepting a message", Err: err}
 			},
 		)
 	}).As(effect.Unit{})

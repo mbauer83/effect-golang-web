@@ -148,21 +148,21 @@ func DELETE[In, Out any](path string, input Codec[In], output Output[Out]) Endpo
 	return Declare(http.MethodDelete, path, input, output)
 }
 
-// Summary is the one line a document lists the endpoint by.
-func (endpoint Endpoint[In, Out]) Summary(summary string) Endpoint[In, Out] {
+// WithSummary is the one line a document lists the endpoint by.
+func (endpoint Endpoint[In, Out]) WithSummary(summary string) Endpoint[In, Out] {
 	endpoint.summary = summary
 	return endpoint
 }
 
-// Describe is the prose a document shows beneath the summary.
-func (endpoint Endpoint[In, Out]) Describe(doc string) Endpoint[In, Out] {
+// WithDescription is the prose a document shows beneath the summary.
+func (endpoint Endpoint[In, Out]) WithDescription(doc string) Endpoint[In, Out] {
 	endpoint.doc = doc
 	return endpoint
 }
 
-// Failing records a status the endpoint can answer with when the application
+// WithFailure records a status the endpoint can answer with when the application
 // refuses, for the published document.
-func (endpoint Endpoint[In, Out]) Failing(status int, doc string) Endpoint[In, Out] {
+func (endpoint Endpoint[In, Out]) WithFailure(status int, doc string) Endpoint[In, Out] {
 	endpoint.failures = append(append([]FailureResponse{}, endpoint.failures...),
 		FailureResponse{Status: status, Doc: doc})
 	return endpoint

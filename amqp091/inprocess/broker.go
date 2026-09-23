@@ -28,7 +28,7 @@ type Broker struct {
 // a consumer that has not subscribed yet, which is the ordinary shape of a test:
 // publish three, then read them.
 type queue struct {
-	waiting   chan amqp091.Delivery
+	backlog   chan amqp091.Delivery
 	unsettled map[uint64]amqp091.Delivery
 }
 
@@ -38,9 +38,9 @@ type queue struct {
 // would hold the lock every reader needs, and the deadlock would look like a
 // hung test rather than a full queue. A full queue says so, which is a thing a
 // test can act on.
-func (waiting *queue) offer(delivery amqp091.Delivery) error {
+func (queue *queue) offer(delivery amqp091.Delivery) error {
 	select {
-	case waiting.waiting <- delivery:
+	case queue.backlog <- delivery:
 		return nil
 	default:
 		return errQueueFull
@@ -66,31 +66,31 @@ func NewBroker() *Broker {
 // each way. They are what a test asks about, because acknowledgement is the
 // decision the caller makes and a library should not.
 func (broker *Broker) Accepted() []uint64 {
-	return broker.settledAs(func(settled settlements) []uint64 { return settled.accepted })
+	return broker.tagsOf(func(settled settlements) []uint64 { return settled.accepted })
 }
 
 // Discarded is the tags rejected without return.
 func (broker *Broker) Discarded() []uint64 {
-	return broker.settledAs(func(settled settlements) []uint64 { return settled.discarded })
+	return broker.tagsOf(func(settled settlements) []uint64 { return settled.discarded })
 }
 
 // Requeued is the tags asked for again.
 func (broker *Broker) Requeued() []uint64 {
-	return broker.settledAs(func(settled settlements) []uint64 { return settled.requeued })
+	return broker.tagsOf(func(settled settlements) []uint64 { return settled.requeued })
 }
 
-// Waiting is how many messages a queue is holding that nobody has taken.
-func (broker *Broker) Waiting(name string) int {
+// Depth is how many messages a queue is holding that nobody has taken.
+func (broker *Broker) Depth(name string) int {
 	broker.mutex.Lock()
 	defer broker.mutex.Unlock()
-	waiting, known := broker.queues[name]
+	queue, known := broker.queues[name]
 	if !known {
 		return 0
 	}
-	return len(waiting.waiting)
+	return len(queue.backlog)
 }
 
-func (broker *Broker) settledAs(which func(settlements) []uint64) []uint64 {
+func (broker *Broker) tagsOf(which func(settlements) []uint64) []uint64 {
 	broker.mutex.Lock()
 	defer broker.mutex.Unlock()
 	return append([]uint64(nil), which(broker.settled)...)
@@ -100,11 +100,11 @@ func (broker *Broker) settledAs(which func(settlements) []uint64) []uint64 {
 // Declaring first is the broker's rule, not this package's: a real one refuses
 // a binding or a consumer on a queue it does not hold.
 func (broker *Broker) queueNamed(name string) (*queue, error) {
-	waiting, known := broker.queues[name]
+	queue, known := broker.queues[name]
 	if !known {
 		return nil, errNoSuchQueue
 	}
-	return waiting, nil
+	return queue, nil
 }
 
 var (

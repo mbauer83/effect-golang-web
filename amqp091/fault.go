@@ -4,9 +4,9 @@ import "errors"
 
 // Fault is what went wrong, and where.
 type Fault struct {
-	// Doing names the stage, so a report says which of the several things a
+	// Op names the stage, so a report says which of the several things a
 	// message passes through refused it.
-	Doing string
+	Op string
 	// Queue or Target is the subject, whichever the stage had one of. A broker
 	// error without the queue or exchange it was about is nearly useless, and
 	// both are the program's own text rather than a user's.
@@ -15,7 +15,7 @@ type Fault struct {
 }
 
 func (fault Fault) Error() string {
-	rendered := "amqp: " + fault.Doing
+	rendered := "amqp: " + fault.Op
 	if fault.Subject != "" {
 		rendered += " [" + fault.Subject + "]"
 	}
@@ -31,8 +31,8 @@ func (fault Fault) Unwrap() error {
 	return fault.Err
 }
 
-func faultOf(doing string, subject string, err error) Fault {
-	return Fault{Doing: doing, Subject: subject, Err: err}
+func faultOf(op string, subject string, err error) Fault {
+	return Fault{Op: op, Subject: subject, Err: err}
 }
 
 var (

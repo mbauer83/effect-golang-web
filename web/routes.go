@@ -28,16 +28,16 @@ type Routes[R, E any] struct {
 // NewRoutes assembles routes, answering a malformed request with 400 and the
 // reason the codec gave.
 func NewRoutes[R, E any](routes ...Route[R, E]) (Routes[R, E], error) {
-	return NewRoutesRejecting(rejectRequest, routes...)
+	return NewRoutesWithRejection(rejectRequest, routes...)
 }
 
-// NewRoutesRejecting assembles routes with its own answer to a request the
+// NewRoutesWithRejection assembles routes with its own answer to a request the
 // codecs refused.
 //
 // The format is a property of the whole surface rather than of one route,
 // because a client meets one API and not a collection of separately-worded
 // ones.
-func NewRoutesRejecting[R, E any](
+func NewRoutesWithRejection[R, E any](
 	reject func(error) Response,
 	routes ...Route[R, E],
 ) (Routes[R, E], error) {
@@ -82,14 +82,14 @@ func (routes Routes[R, E]) Declarations() []Declaration {
 // measure is a vocabulary that cannot fall behind it, and a route left out of
 // it is a route whose traffic is lumped in with everything undeclared.
 func DeclarationsOf[R, E any](routes ...Route[R, E]) []Declaration {
-	described := make([]Declaration, 0, len(routes))
+	declarations := make([]Declaration, 0, len(routes))
 	for _, route := range routes {
-		described = append(described, route.Declaration())
+		declarations = append(declarations, route.Declaration())
 	}
-	return described
+	return declarations
 }
 
-// Matched derives a handler from a handler, and is told which route it is
+// RouteMiddleware derives a handler from a handler, and is told which route it is
 // deriving it for.
 //
 // The shape every cross-cutting concern that has to name the route needs:
@@ -98,9 +98,9 @@ func DeclarationsOf[R, E any](routes ...Route[R, E]) []Declaration {
 // thing left of the route is the path the client asked for -- and a path is an
 // unbounded value, so naming anything after it is how a metric label or a span
 // name becomes one series per request.
-type Matched[R, E any] func(Declaration, Handler[R, E]) Handler[R, E]
+type RouteMiddleware[R, E any] func(Declaration, Handler[R, E]) Handler[R, E]
 
-// Wrapping applies one wrapper to every route, giving each the declaration it
+// WithMiddleware applies one wrapper to every route, giving each the declaration it
 // belongs to.
 //
 // A setting on the surface, applied in one place, rather than something a
@@ -109,30 +109,30 @@ type Matched[R, E any] func(Declaration, Handler[R, E]) Handler[R, E]
 // and nothing would say so.
 //
 //	surface, err := web.NewRoutes(routes...)
-//	surface = surface.Wrapping(inspect.Observing(costs))
+//	surface = surface.WithMiddleware(inspect.Observing(costs))
 //
 // It cannot fail. The patterns are the ones that already assembled, and a
 // wrapper does not change them, so there is nothing left to refuse. A zero
 // Routes wraps nothing and stays itself.
-func (routes Routes[R, E]) Wrapping(each Matched[R, E]) Routes[R, E] {
+func (routes Routes[R, E]) WithMiddleware(each RouteMiddleware[R, E]) Routes[R, E] {
 	if each == nil || len(routes.assembled) == 0 {
 		return routes
 	}
 	wrapped := make([]Route[R, E], 0, len(routes.assembled))
 	for _, route := range routes.assembled {
-		wrapped = append(wrapped, route.withWrapper(each))
+		wrapped = append(wrapped, route.withMiddleware(each))
 	}
 	// The same routes with the same patterns, so this cannot refuse what it
 	// already accepted; an error here would be a bug in the tree rather than
 	// a caller's mistake, and reporting it as the caller's would be a lie.
-	rebuilt, err := NewRoutesRejecting(routes.reject, wrapped...)
+	rebuilt, err := NewRoutesWithRejection(routes.reject, wrapped...)
 	if err != nil {
 		return routes
 	}
 	return rebuilt
 }
 
-// Detailing makes every route name the parts of its own work -- decoding,
+// WithPhaseSpans makes every route name the parts of its own work -- decoding,
 // handling, encoding -- so a trace shows them separately.
 //
 // A second setting rather than part of Wrapping, because they answer different
@@ -151,16 +151,16 @@ func (routes Routes[R, E]) Wrapping(each Matched[R, E]) Routes[R, E] {
 // microseconds, which will otherwise tell you about WithSpan rather than about
 // itself.
 //
-//	surface = surface.Detailing().Wrapping(inspect.Observing(costs))
+//	surface = surface.WithPhaseSpans().Wrapping(inspect.Observing(costs))
 //
 // Decoding and encoding are the route's work as much as the handler is. A
 // large document to unmarshal is real time, and a trace that showed one bar
 // for all three could not say which of them a slow request spent it in.
-func (routes Routes[R, E]) Detailing() Routes[R, E] {
-	return routes.withSampling(nil)
+func (routes Routes[R, E]) WithPhaseSpans() Routes[R, E] {
+	return routes.withPhases(nil)
 }
 
-// Measuring is Detailing that also hands each phase to a sampler, so a caller
+// WithPhaseSampler is Detailing that also hands each phase to a sampler, so a caller
 // who can measure the process -- which this module cannot; it reads no
 // counters and depends on nothing that does -- accounts for the phases as well
 // as naming them.
@@ -174,21 +174,21 @@ func (routes Routes[R, E]) Detailing() Routes[R, E] {
 // all. What the sampler itself costs is the sampler's business. The measurement
 // is in test/unit/web_cost_test.go.
 //
-//	surface = surface.Measuring(inspect.Sampling(watched.Costs)).
+//	surface = surface.WithPhaseSampler(inspect.Sampling(watched.Costs)).
 //	    Wrapping(inspect.Observing[Env, Refusal](watched.Costs))
-func (routes Routes[R, E]) Measuring(each Sampling) Routes[R, E] {
-	return routes.withSampling(each)
+func (routes Routes[R, E]) WithPhaseSampler(sampler PhaseSampler) Routes[R, E] {
+	return routes.withPhases(sampler)
 }
 
-func (routes Routes[R, E]) withSampling(sample Sampling) Routes[R, E] {
+func (routes Routes[R, E]) withPhases(sampler PhaseSampler) Routes[R, E] {
 	if len(routes.assembled) == 0 {
 		return routes
 	}
-	detailing := make([]Route[R, E], 0, len(routes.assembled))
+	copies := make([]Route[R, E], 0, len(routes.assembled))
 	for _, route := range routes.assembled {
-		detailing = append(detailing, route.withSampling(sample))
+		copies = append(copies, route.withPhases(sampler))
 	}
-	rebuilt, err := NewRoutesRejecting(routes.reject, detailing...)
+	rebuilt, err := NewRoutesWithRejection(routes.reject, copies...)
 	if err != nil {
 		return routes
 	}

@@ -41,11 +41,11 @@ func Dial(client *http.Client, address string) *Client {
 	return &Client{client: client, address: strings.TrimSuffix(address, "/")}
 }
 
-// Requesting is the parts of a request the caller supplies.
+// ClientRequest is the parts of a request the caller supplies.
 //
 // Every field is optional. A GET with nothing to say is the zero value, which
 // is why this is a struct and not five arguments.
-type Requesting struct {
+type ClientRequest struct {
 	// Path fills an endpoint's captured segments by name, so a caller writes
 	// {"title": "Zionomicon"} rather than building the path itself. Fetch
 	// takes the path whole and reads nothing here.
@@ -69,30 +69,30 @@ type Requesting struct {
 	About string
 }
 
-// Received is one response, read whole.
-type Received struct {
+// ClientResponse is one response, read whole.
+type ClientResponse struct {
 	Status int
 	Header http.Header
 	Entity []byte
 }
 
-// Carrying returns the request with a value encoded through its schema as the
+// WithEntity returns the request with a value encoded through its schema as the
 // entity.
 //
 // A package function because a method cannot introduce the type parameter its
 // own argument needs -- the rule the whole module follows.
-func Carrying[A any](
-	requesting Requesting,
+func WithEntity[A any](
+	request ClientRequest,
 	shape schema.Schema[A],
 	value A,
-) (Requesting, error) {
+) (ClientRequest, error) {
 	document, err := schema.EncodeJSON(shape, value)
 	if err != nil {
-		return Requesting{}, faultOf("encoding the request body", err)
+		return ClientRequest{}, faultOf("encoding the request body", err)
 	}
-	requesting.Entity = document
-	requesting.MediaType = "application/json"
-	return requesting, nil
+	request.Entity = document
+	request.MediaType = "application/json"
+	return request, nil
 }
 
 // Fetch sends a request to a path and reads the whole response.
@@ -110,11 +110,11 @@ func Fetch[R any](
 	client *Client,
 	method string,
 	path string,
-	requesting Requesting,
-) effect.Effect[R, Fault, Received] {
+	request ClientRequest,
+) effect.Effect[R, Fault, ClientResponse] {
 	return effect.Try(
-		func(ctx context.Context, _ R) (Received, error) {
-			return exchange(ctx, client, method, path, requesting)
+		func(ctx context.Context, _ R) (ClientResponse, error) {
+			return exchange(ctx, client, method, path, request)
 		},
 		func(err error) Fault { return asFault("calling "+method+" "+path, err) },
 	).WithName("fetch")
@@ -125,52 +125,52 @@ func exchange(
 	client *Client,
 	method string,
 	path string,
-	requesting Requesting,
-) (Received, error) {
+	request ClientRequest,
+) (ClientResponse, error) {
 	if client == nil || client.client == nil {
-		return Received{}, errNoHTTPClient
+		return ClientResponse{}, errNoHTTPClient
 	}
 	address := client.address + path
-	if len(requesting.Query) > 0 {
-		address += "?" + requesting.Query.Encode()
+	if len(request.Query) > 0 {
+		address += "?" + request.Query.Encode()
 	}
 
 	var entity io.Reader
-	if len(requesting.Entity) > 0 {
-		entity = bytes.NewReader(requesting.Entity)
+	if len(request.Entity) > 0 {
+		entity = bytes.NewReader(request.Entity)
 	}
-	request, err := http.NewRequestWithContext(ctx, method, address, entity)
+	httpRequest, err := http.NewRequestWithContext(ctx, method, address, entity)
 	if err != nil {
-		return Received{}, err
+		return ClientResponse{}, err
 	}
-	for name, values := range requesting.Header {
-		request.Header[http.CanonicalHeaderKey(name)] = values
+	for name, values := range request.Header {
+		httpRequest.Header[http.CanonicalHeaderKey(name)] = values
 	}
-	if requesting.MediaType != "" {
-		request.Header.Set("Content-Type", requesting.MediaType)
+	if request.MediaType != "" {
+		httpRequest.Header.Set("Content-Type", request.MediaType)
 	}
 
-	response, err := client.client.Do(request)
+	response, err := client.client.Do(httpRequest)
 	if err != nil {
-		return Received{}, err
+		return ClientResponse{}, err
 	}
 	defer func() { _ = response.Body.Close() }()
 
 	read, err := io.ReadAll(response.Body)
 	if err != nil {
-		return Received{}, err
+		return ClientResponse{}, err
 	}
-	return Received{Status: response.StatusCode, Header: response.Header, Entity: read}, nil
+	return ClientResponse{Status: response.StatusCode, Header: response.Header, Entity: read}, nil
 }
 
 // asFault keeps one Fault rather than wrapping a Fault in a Fault, so a caller
 // reading Doing sees what actually failed and not the outermost stage.
-func asFault(doing string, err error) Fault {
+func asFault(op string, err error) Fault {
 	var already Fault
 	if errors.As(err, &already) {
 		return already
 	}
-	return Fault{Doing: doing, Err: err}
+	return Fault{Op: op, Err: err}
 }
 
 var errNoHTTPClient = errors.New("a client needs an http.Client; see web.Dial")

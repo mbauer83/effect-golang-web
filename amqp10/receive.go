@@ -18,7 +18,7 @@ import (
 // leniency: a broker or an operator closing a link is the end of the messages,
 // and a consumer told the stream failed would retry against a link that is
 // gone.
-func Receive[R any](link Receiving) effect.Stream[R, Fault, Delivery] {
+func Receive[R any](link ReceiverLink) effect.Stream[R, Fault, Delivery] {
 	return effect.StreamFromSteps(func() effect.Effect[R, Fault, effect.Step[Delivery]] {
 		return effect.From(func(ctx context.Context, _ R) effect.Exit[Fault, effect.Step[Delivery]] {
 			delivery, more, err := link.Receive(ctx)
@@ -42,22 +42,22 @@ func Receive[R any](link Receiving) effect.Stream[R, Fault, Delivery] {
 // arrives as a Received whose Read refuses, and the consumer decides -- and here
 // there are four things it can decide rather than three.
 func Values[R, A any](
-	link Receiving,
+	link ReceiverLink,
 	shape schema.Schema[A],
-) effect.Stream[R, Fault, Received[A]] {
+) effect.Stream[R, Fault, Envelope[A]] {
 	return effect.MapStream(Receive[R](link),
-		func(delivery Delivery) Received[A] { return read(link, delivery, shape) })
+		func(delivery Delivery) Envelope[A] { return decodeDelivery(link, delivery, shape) })
 }
 
-// Received is one delivery, decoded, with the disposition still to make.
-type Received[A any] struct {
+// Envelope is one delivery, decoded, with the disposition still to make.
+type Envelope[A any] struct {
 	// Delivery is what arrived: the properties, the subject, and how many times
 	// the broker has offered it before.
 	Delivery Delivery
 
 	value   A
 	refusal error
-	from    Receiving
+	from    ReceiverLink
 }
 
 // Read is the value the delivery carried, or why it could not be read.
@@ -65,12 +65,12 @@ type Received[A any] struct {
 // A method rather than a field because a zero value that looked valid would be
 // a trap: a consumer that forgot to ask would act on a message that was never
 // there.
-func (received Received[A]) Read() (A, error) {
+func (received Envelope[A]) Read() (A, error) {
 	return received.value, received.refusal
 }
 
 // Accept says the message is done and the broker may forget it.
-func Accept[R, A any](received Received[A]) effect.Effect[R, Fault, effect.Unit] {
+func Accept[R, A any](received Envelope[A]) effect.Effect[R, Fault, effect.Unit] {
 	return settleDelivery[R](received, "accepting a message",
 		func(ctx context.Context, tag string) error { return received.from.Accept(ctx, tag) })
 }
@@ -79,7 +79,7 @@ func Accept[R, A any](received Received[A]) effect.Effect[R, Fault, effect.Unit]
 //
 // The reason travels with it: the broker records it, and whoever reads the
 // dead-letter node afterwards has the only explanation there is going to be.
-func Reject[R, A any](received Received[A], reason string) effect.Effect[R, Fault, effect.Unit] {
+func Reject[R, A any](received Envelope[A], reason string) effect.Effect[R, Fault, effect.Unit] {
 	return settleDelivery[R](received, "rejecting a message",
 		func(ctx context.Context, tag string) error {
 			return received.from.Reject(ctx, tag, reason)
@@ -92,7 +92,7 @@ func Reject[R, A any](received Received[A], reason string) effect.Effect[R, Faul
 // Nothing is recorded, so the broker's count of failed deliveries does not
 // move -- which is right when this receiver is shutting down or was never the
 // right one, and wrong when it tried and failed. Modify is that case.
-func Release[R, A any](received Received[A]) effect.Effect[R, Fault, effect.Unit] {
+func Release[R, A any](received Envelope[A]) effect.Effect[R, Fault, effect.Unit] {
 	return settleDelivery[R](received, "releasing a message",
 		func(ctx context.Context, tag string) error { return received.from.Release(ctx, tag) })
 }
@@ -105,7 +105,7 @@ func Release[R, A any](received Received[A]) effect.Effect[R, Fault, effect.Unit
 // go on. Here the receiver can say that it tried, that the message should go
 // elsewhere, and what it found out -- which is what makes a dead-letter policy
 // something the consumer participates in rather than something done to it.
-func Modify[R, A any](received Received[A], change Change) effect.Effect[R, Fault, effect.Unit] {
+func Modify[R, A any](received Envelope[A], change Change) effect.Effect[R, Fault, effect.Unit] {
 	return settleDelivery[R](received, "modifying a message",
 		func(ctx context.Context, tag string) error {
 			return received.from.Modify(ctx, tag, change)
@@ -113,27 +113,27 @@ func Modify[R, A any](received Received[A], change Change) effect.Effect[R, Faul
 }
 
 func settleDelivery[R, A any](
-	received Received[A],
-	doing string,
+	received Envelope[A],
+	op string,
 	settle func(context.Context, string) error,
 ) effect.Effect[R, Fault, effect.Unit] {
 	return effect.Try(
 		func(ctx context.Context, _ R) (effect.Unit, error) {
 			return effect.Unit{}, settle(ctx, received.Delivery.Tag)
 		},
-		func(err error) Fault { return faultOf(doing, received.Delivery.Subject, err) },
+		func(err error) Fault { return faultOf(op, received.Delivery.Subject, err) },
 	).WithName("settle")
 }
 
-// read decodes one delivery, keeping the refusal rather than raising it.
-func read[A any](link Receiving, delivery Delivery, shape schema.Schema[A]) Received[A] {
+// decodeDelivery decodes one delivery, keeping the refusal rather than raising it.
+func decodeDelivery[A any](link ReceiverLink, delivery Delivery, shape schema.Schema[A]) Envelope[A] {
 	value, err := schema.DecodeJSON(shape, delivery.Body)
 	if err != nil {
-		return Received[A]{
+		return Envelope[A]{
 			Delivery: delivery,
 			from:     link,
 			refusal:  faultOf("decoding a message", delivery.Subject, err),
 		}
 	}
-	return Received[A]{Delivery: delivery, from: link, value: value}
+	return Envelope[A]{Delivery: delivery, from: link, value: value}
 }

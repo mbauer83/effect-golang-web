@@ -21,19 +21,19 @@ import (
 // default: a surface nobody is watching should not pay for three spans per
 // request instead of none.
 type phases struct {
-	decoding string
-	handling string
-	encoding string
-	sample   Sampling
+	decodeSpan string
+	handleSpan string
+	encodeSpan string
+	sampler    PhaseSampler
 }
 
-// quiet is a surface that asked for neither names nor measurements.
-func (phases phases) quiet() bool {
-	return phases.sample == nil &&
-		phases.decoding == "" && phases.handling == "" && phases.encoding == ""
+// isQuiet is a surface that asked for neither names nor measurements.
+func (phases phases) isQuiet() bool {
+	return phases.sampler == nil &&
+		phases.decodeSpan == "" && phases.handleSpan == "" && phases.encodeSpan == ""
 }
 
-// Sampling measures one phase of a route. It is called when the phase begins,
+// PhaseSampler measures one phase of a route. It is called when the phase begins,
 // and the function it returns is called when the phase ends -- however it
 // ended, including a failure or an interruption.
 //
@@ -46,7 +46,7 @@ func (phases phases) quiet() bool {
 // not this module's business -- it depends on the runtime and on schemas, not
 // on anything that reads counters -- so the measuring belongs to whoever is
 // watching, and this is the seam they reach through.
-type Sampling func(phase string) func()
+type PhaseSampler func(phase string) func()
 
 // The names a detailing surface spans its phases under.
 //
@@ -70,24 +70,24 @@ func PhaseNames() []string {
 // phaseNames is the naming a surface uses when it details its phases.
 func phaseNames() phases {
 	return phases{
-		decoding: PhaseDecoding,
-		handling: PhaseHandling,
-		encoding: PhaseEncoding,
+		decodeSpan: PhaseDecoding,
+		handleSpan: PhaseHandling,
+		encodeSpan: PhaseEncoding,
 	}
 }
 
-// within names and measures one phase, and returns it untouched where neither
+// instrumentPhase names and measures one phase, and returns it untouched where neither
 // was asked for.
 //
 // One shape for all of it, so the composition in route.go is written once: a
 // surface that is not detailing pays for nothing, and no path is a second copy
 // of another that could drift from it.
-func within[R, E, A any](
+func instrumentPhase[R, E, A any](
 	fx effect.Effect[R, E, A],
 	name string,
-	sample Sampling,
+	sampler PhaseSampler,
 ) effect.Effect[R, E, A] {
-	return withSpan(measurePhase(fx, name, sample), name)
+	return withSpan(measurePhase(fx, name, sampler), name)
 }
 
 // withSpan names an effect when a name is given.
@@ -108,14 +108,14 @@ func withSpan[R, E, A any](fx effect.Effect[R, E, A], name string) effect.Effect
 func measurePhase[R, E, A any](
 	fx effect.Effect[R, E, A],
 	name string,
-	sample Sampling,
+	sampler PhaseSampler,
 ) effect.Effect[R, E, A] {
-	if sample == nil || name == "" {
+	if sampler == nil || name == "" {
 		return fx
 	}
 	operations := effect.For[R, E]()
 	return operations.Suspend(func() effect.Effect[R, E, A] {
-		ended := sample(name)
+		ended := sampler(name)
 		if ended == nil {
 			return fx
 		}

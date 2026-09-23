@@ -19,15 +19,15 @@ import (
 	rpc "connectrpc.com/connect"
 )
 
-// Connected is a Connect transport behind the port.
-type Connected struct {
-	answered map[string]bool
-	mux      *http.ServeMux
+// ConnectServer is a Connect transport behind the port.
+type ConnectServer struct {
+	paths map[string]bool
+	mux   *http.ServeMux
 }
 
-// NewConnected makes one.
-func NewConnected() *Connected {
-	return &Connected{answered: map[string]bool{}, mux: http.NewServeMux()}
+// NewConnectServer makes one.
+func NewConnectServer() *ConnectServer {
+	return &ConnectServer{paths: map[string]bool{}, mux: http.NewServeMux()}
 }
 
 // Answer mounts a procedure.
@@ -35,29 +35,29 @@ func NewConnected() *Connected {
 // A path answered twice is a declaration mistake rather than a precedence rule,
 // which is the same decision the routing tree makes about ambiguous routes: two
 // answers for one name means the author meant one thing and wrote two.
-func (transport *Connected) Answer(path string, answer Answering) error {
-	if transport.answered[path] {
+func (transport *ConnectServer) Answer(path string, answer UnaryHandler) error {
+	if transport.paths[path] {
 		return faultOf("answering a procedure", path, errAnsweredTwice)
 	}
-	transport.answered[path] = true
+	transport.paths[path] = true
 
 	handler := rpc.NewUnaryHandler(path,
 		func(ctx context.Context, request *rpc.Request[payload]) (*rpc.Response[payload], error) {
-			written, failure := answer(ctx, request.Msg.bytes)
+			message, failure := answer(ctx, request.Msg.bytes)
 			if failure != nil {
 				return nil, refusal(*failure)
 			}
-			return rpc.NewResponse(&payload{bytes: written}), nil
+			return rpc.NewResponse(&payload{bytes: message}), nil
 		},
-		rpc.WithCodec(passingThrough{}),
+		rpc.WithCodec(passthroughCodec{}),
 	)
 	transport.mux.Handle(path, handler)
 	return nil
 }
 
 // Handler is what the HTTP core mounts.
-func (transport *Connected) Handler() (http.Handler, error) {
-	if len(transport.answered) == 0 {
+func (transport *ConnectServer) Handler() (http.Handler, error) {
+	if len(transport.paths) == 0 {
 		return nil, faultOf("building a handler", "", errNoProcedures)
 	}
 	return transport.mux, nil
@@ -65,9 +65,9 @@ func (transport *Connected) Handler() (http.Handler, error) {
 
 // Paths are the procedures this transport answers, in no particular order. It
 // is here because a projection and a test both want to know what was mounted.
-func (transport *Connected) Paths() []string {
-	paths := make([]string, 0, len(transport.answered))
-	for path := range transport.answered {
+func (transport *ConnectServer) Paths() []string {
+	paths := make([]string, 0, len(transport.paths))
+	for path := range transport.paths {
 		paths = append(paths, path)
 	}
 	return paths
@@ -120,8 +120,8 @@ func connectCode(code Code) rpc.Code {
 	}
 }
 
-// ourCode is the reverse, for a client reading what a server said.
-func ourCode(code rpc.Code) Code {
+// codeFromConnect is the reverse, for a client reading what a server said.
+func codeFromConnect(code rpc.Code) Code {
 	for _, ours := range everyCode {
 		if connectCode(ours) == code {
 			return ours

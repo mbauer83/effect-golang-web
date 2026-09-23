@@ -36,7 +36,7 @@ func TestDetailingNamesTheRoutesOwnPartsAndNothingElseDoes(t *testing.T) {
 		t.Fatalf("expected no spans from a surface that asked for none, got %v", named)
 	}
 
-	named := spansOf(t, surface.Detailing(), "/books/Zionomicon")
+	named := spansOf(t, surface.WithPhaseSpans(), "/books/Zionomicon")
 	// The exported names, because a caller declaring a vocabulary uses these
 	// and a test that spelled them again could drift from them.
 	for _, phase := range web.PhaseNames() {
@@ -54,7 +54,7 @@ func TestDetailingComposesWithWrappingSoThePhasesSitUnderTheRoute(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	both := surface.Detailing().Wrapping(spanning)
+	both := surface.WithPhaseSpans().WithMiddleware(spanning)
 
 	observer := &effecttest.EventRecorder{}
 	runtime, err := effect.NewRuntime(effect.WithObserver(observer))

@@ -13,7 +13,7 @@ import (
 // layer exposes its structure at all.
 func Describe(info Info, declarations []web.Declaration, servers ...Server) Document {
 	gathered := gather(declarations)
-	projected, components := jsonschema.ProjectAllReferencing(ComponentPointer, gathered.nodes...)
+	projected, components := jsonschema.ProjectAllWithPointer(ComponentPointer, gathered.nodes...)
 	shapes := &cursor{projected: projected}
 
 	document := Document{Info: info, Servers: servers, Components: components}
@@ -25,12 +25,12 @@ func Describe(info Info, declarations []web.Declaration, servers ...Server) Docu
 
 // gathered holds every declaration together with the shapes it contributes, in
 // the one order both the projection and the assembly walk them in.
-type gathering struct {
-	declarations []contributed
+type collection struct {
+	declarations []entry
 	nodes        []structure.Node
 }
 
-type contributed struct {
+type entry struct {
 	declaration web.Declaration
 	parameters  int
 	hasEntity   bool
@@ -50,10 +50,10 @@ func (shapes *cursor) next() jsonschema.Node {
 	return node
 }
 
-func gather(declarations []web.Declaration) gathering {
-	collected := gathering{}
+func gather(declarations []web.Declaration) collection {
+	collected := collection{}
 	for _, declared := range declarations {
-		contribution := contributed{
+		contribution := entry{
 			declaration: declared,
 			parameters:  len(declared.Parameters),
 			hasEntity:   declared.Entity != nil && declared.Entity.Node != nil,

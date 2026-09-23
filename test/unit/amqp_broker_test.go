@@ -94,7 +94,7 @@ func TestTheDefaultExchangeRoutesByQueueName(t *testing.T) {
 			return amqp091.Publish[effect.Unit](broker,
 				amqp091.Target{Key: "work"}, amqp091.Message{Body: []byte("one")})
 		}).
-		FlatMap(func(effect.Unit) queueing[[]amqp091.Received[[]byte]] {
+		FlatMap(func(effect.Unit) queueing[[]amqp091.Envelope[[]byte]] {
 			return effect.RunCollect(amqp091.Consume[effect.Unit](broker, "work").TakeStream(1))
 		})
 
@@ -146,15 +146,15 @@ func TestFanoutReachesEveryBoundQueueAndDirectOnlyTheMatchingOne(t *testing.T) {
 	}
 	// Fanout ignored the key and reached both; direct reached the one bound by
 	// the key that was published.
-	if waiting := broker.Waiting("first"); waiting != 2 {
+	if waiting := broker.Depth("first"); waiting != 2 {
 		t.Errorf("expected two waiting on first, got %d", waiting)
 	}
-	if waiting := broker.Waiting("second"); waiting != 1 {
+	if waiting := broker.Depth("second"); waiting != 1 {
 		t.Errorf("expected one waiting on second, got %d", waiting)
 	}
 	// A queue that was never declared holds nothing rather than reporting that
 	// there is no such queue: asking is not publishing.
-	if waiting := broker.Waiting("third"); waiting != 0 {
+	if waiting := broker.Depth("third"); waiting != 0 {
 		t.Errorf("expected nothing waiting on an unknown queue, got %d", waiting)
 	}
 }
@@ -200,7 +200,7 @@ func TestHeadersReachTheConsumerAsTheyWereSent(t *testing.T) {
 			return amqp091.Publish[effect.Unit](broker, amqp091.Target{Key: "traced"},
 				amqp091.Message{Body: []byte("{}"), Headers: sent})
 		}).
-		FlatMap(func(effect.Unit) queueing[[]amqp091.Received[[]byte]] {
+		FlatMap(func(effect.Unit) queueing[[]amqp091.Envelope[[]byte]] {
 			return effect.RunCollect(amqp091.Consume[effect.Unit](broker, "traced").TakeStream(1))
 		})
 

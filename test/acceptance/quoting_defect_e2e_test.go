@@ -35,14 +35,14 @@ func breaking(quoting.Enquiry) effect.Effect[effect.Unit, quoting.Refusal, quoti
 func broken(
 	t *testing.T,
 	choose func(effect.Cause[quoting.Refusal]) grpc.Failure,
-) (*grpc.Dialled, chan error) {
+) (*grpc.ConnectClient, chan error) {
 	t.Helper()
 	runtime, err := effect.NewRuntime(effect.WithDebugTracking())
 	if err != nil {
 		t.Fatal(err)
 	}
 	boundary, err := grpc.NewBoundary(runtime, effect.Unit{},
-		grpc.NewConnected(), quoting.Coded)
+		grpc.NewConnectServer(), quoting.FailureFor)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,7 +82,7 @@ func broken(
 }
 
 // askedOfBroken calls the procedure and returns the failure it answered with.
-func askedOfBroken(t *testing.T, client *grpc.Dialled) grpc.Failure {
+func askedOfBroken(t *testing.T, client *grpc.ConnectClient) grpc.Failure {
 	t.Helper()
 	exit := ranCall(t, grpc.Ask[effect.Unit](client, quoting.Quote,
 		quoting.Enquiry{Origin: "Kiel", Destination: "Hamburg", Kilos: 1}))

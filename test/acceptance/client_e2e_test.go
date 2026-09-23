@@ -37,7 +37,7 @@ func TestAClientCallsTheEndpointsTheServerServes(t *testing.T) {
 	client := web.Dial(http.DefaultClient, running(t, store))
 	added := bookstore.Book{Title: "Called", Authors: []string{"A Client"}, Pages: 12}
 
-	sending, err := web.Carrying(web.Requesting{}, bookstore.BookSchema, added)
+	sending, err := web.WithEntity(web.ClientRequest{}, bookstore.BookSchema, added)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +53,7 @@ func TestAClientCallsTheEndpointsTheServerServes(t *testing.T) {
 	// The title fills the endpoint's captured segment by name, so the path is
 	// built from the declaration and not pasted together by the caller.
 	read, ok := called(t, web.Call[effect.Unit](client, bookstore.FindBook,
-		web.Requesting{Path: map[string]string{"title": added.Title}})).Value()
+		web.ClientRequest{Path: map[string]string{"title": added.Title}})).Value()
 	if !ok {
 		t.Fatal("expected the book read back")
 	}
@@ -62,7 +62,7 @@ func TestAClientCallsTheEndpointsTheServerServes(t *testing.T) {
 	}
 
 	catalogue, ok := called(t, web.Call[effect.Unit](client, bookstore.ListBooks,
-		web.Requesting{})).Value()
+		web.ClientRequest{})).Value()
 	if !ok || len(catalogue) != 1 {
 		t.Fatalf("unexpected catalogue: %#v", catalogue)
 	}
@@ -75,7 +75,7 @@ func TestAStatusTheEndpointDidNotDeclareArrivesAsARefusal(t *testing.T) {
 	client := web.Dial(http.DefaultClient, running(t, built(t, bookstore.NewStore())))
 
 	exit := called(t, web.Call[effect.Unit](client, bookstore.FindBook,
-		web.Requesting{Path: map[string]string{"title": "Missing"}}))
+		web.ClientRequest{Path: map[string]string{"title": "Missing"}}))
 	cause, failed := exit.Cause()
 	if !failed {
 		t.Fatalf("expected the call to fail, got %+v", exit)
@@ -98,13 +98,13 @@ func TestACaptureWithNothingToFillItIsRefusedBeforeAnythingIsSent(t *testing.T) 
 	// the caller is looking at the wrong end of its own mistake.
 	client := web.Dial(http.DefaultClient, "http://127.0.0.1:1")
 
-	exit := called(t, web.Call[effect.Unit](client, bookstore.FindBook, web.Requesting{}))
+	exit := called(t, web.Call[effect.Unit](client, bookstore.FindBook, web.ClientRequest{}))
 	cause, failed := exit.Cause()
 	if !failed {
 		t.Fatalf("expected the call to be refused, got %+v", exit)
 	}
 	fault, _ := cause.Failure()
-	if fault.Doing != "building the path" {
+	if fault.Op != "building the path" {
 		t.Fatalf("unexpected fault: %+v", fault)
 	}
 }
