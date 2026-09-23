@@ -58,7 +58,7 @@ func Hand(link amqp10.SenderLink, shipment Shipment) consignEffect[effect.Unit] 
 			message, err := amqp10.Encode(ShipmentSchema, shipment)
 			if err != nil {
 				return effect.For[effect.Unit, amqp10.Fault]().
-					Fail[effect.Unit](amqp10.Fault{Op: "handing over a shipment", Err: err})
+					Fail[effect.Unit](amqp10.Fault{Op: "hand over a shipment", Err: err})
 			}
 			message.Durability = amqp10.Durable
 			message.Subject = shipment.Reference

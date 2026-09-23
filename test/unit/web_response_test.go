@@ -82,7 +82,7 @@ func TestAnUnencodableValueIsRefusedBeforeAnythingIsWritten(t *testing.T) {
 		t.Fatal("expected a value that cannot be encoded to be refused")
 	}
 	var fault web.Fault
-	if !errors.As(err, &fault) || fault.Op != "encoding the response body" {
+	if !errors.As(err, &fault) || fault.Op != "encode the response body" {
 		t.Fatalf("expected the stage named, got %v", err)
 	}
 }

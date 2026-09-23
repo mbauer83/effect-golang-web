@@ -18,7 +18,7 @@ import (
 func Entity[A any](shape schema.Schema[A]) Codec[A] {
 	content := &Content{MediaType: "application/json", Node: shape.Structure()}
 	if fault := schema.Validate(shape); fault != nil {
-		return Codec[A]{entity: content, fault: faultOf("declaring the request body", fault)}
+		return Codec[A]{entity: content, fault: faultOf("declare the request body", fault)}
 	}
 	return Codec[A]{
 		entity: content,
@@ -26,12 +26,12 @@ func Entity[A any](shape schema.Schema[A]) Codec[A] {
 			body := request.Source().Body
 			if body == nil {
 				var zero A
-				return zero, Fault{Op: "reading the request body", Err: errNoEntity}
+				return zero, Fault{Op: "read the request body", Err: errNoEntity}
 			}
 			value, err := schema.DecodeJSONFrom(shape, body)
 			if err != nil {
 				var zero A
-				return zero, Fault{Op: "reading the request body", Err: err}
+				return zero, Fault{Op: "read the request body", Err: err}
 			}
 			return value, nil
 		},

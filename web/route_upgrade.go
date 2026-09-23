@@ -24,7 +24,7 @@ func Upgrade[R, E any](path string, summary string, handler Handler[R, E]) Route
 		return Route[R, E]{fault: err}
 	}
 	if handler == nil {
-		return Route[R, E]{fault: faultOf("upgrading "+path, errNoHandler)}
+		return Route[R, E]{fault: faultOf("upgrade "+path, errNoHandler)}
 	}
 	return Route[R, E]{
 		declaration: Declaration{

@@ -46,7 +46,7 @@ func Send[R any](socket Socket, message Message) effect.Effect[R, Fault, effect.
 		func(ctx context.Context, _ R) (effect.Unit, error) {
 			return effect.Unit{}, socket.connection.Write(ctx, messageType(message.Kind), message.Data)
 		},
-		func(err error) Fault { return faultOf("sending a message", err) },
+		func(err error) Fault { return faultOf("send a message", err) },
 	).WithName("send")
 }
 
@@ -64,7 +64,7 @@ func Receive[R any](socket Socket) effect.Effect[R, Fault, Message] {
 			}
 			return Message{Kind: messageKind(kind), Data: data}, nil
 		},
-		func(err error) Fault { return faultOf("reading a message", err) },
+		func(err error) Fault { return faultOf("read a message", err) },
 	).WithName("receive")
 }
 
@@ -83,7 +83,7 @@ func Close[R any](socket Socket, reason string) effect.Effect[R, Fault, effect.U
 		func(context.Context, R) (effect.Unit, error) {
 			return effect.Unit{}, socket.connection.Close(ws.StatusNormalClosure, reason)
 		},
-		func(err error) Fault { return faultOf("closing the connection", err) },
+		func(err error) Fault { return faultOf("close the connection", err) },
 	).WithName("close")
 }
 

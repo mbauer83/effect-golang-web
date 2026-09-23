@@ -24,7 +24,7 @@ func Receive[R any](link ReceiverLink) effect.Stream[R, Fault, Delivery] {
 			delivery, more, err := link.Receive(ctx)
 			if err != nil {
 				return effect.ExitFailure[Fault, effect.Step[Delivery]](
-					faultOf("waiting for a message", link.Address(), err))
+					faultOf("wait for a message", link.Address(), err))
 			}
 			if !more {
 				return effect.ExitSuccess[Fault](effect.EndOfStream[Delivery]())
@@ -132,7 +132,7 @@ func decodeDelivery[A any](link ReceiverLink, delivery Delivery, shape schema.Sc
 		return Envelope[A]{
 			Delivery: delivery,
 			from:     link,
-			refusal:  faultOf("decoding a message", delivery.Subject, err),
+			refusal:  faultOf("decode a message", delivery.Subject, err),
 		}
 	}
 	return Envelope[A]{Delivery: delivery, from: link, value: value}

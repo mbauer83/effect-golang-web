@@ -41,7 +41,7 @@ func PublishValue[R, A any](
 ) effect.Effect[R, Fault, effect.Unit] {
 	return effect.Try(
 		func(context.Context, R) (Message, error) { return Encode(shape, value) },
-		func(err error) Fault { return faultOf("encoding a message", target.Key, err) },
+		func(err error) Fault { return faultOf("encode a message", target.Key, err) },
 	).
 		FlatMap(func(message Message) effect.Effect[R, Fault, effect.Unit] {
 			return Publish[R](channel, target, message)

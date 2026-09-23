@@ -35,10 +35,10 @@ func NewAdapter[R, E any](
 	onFailure func(E) Response,
 ) (Adapter[R, E], error) {
 	if runtime == nil {
-		return Adapter[R, E]{}, faultOf("building an adapter", errNoRuntime)
+		return Adapter[R, E]{}, faultOf("build an adapter", errNoRuntime)
 	}
 	if onFailure == nil {
-		return Adapter[R, E]{}, faultOf("building an adapter", errNoFailureMapping)
+		return Adapter[R, E]{}, faultOf("build an adapter", errNoFailureMapping)
 	}
 	return Adapter[R, E]{
 		runtime:     runtime,
@@ -123,7 +123,7 @@ func (adapter Adapter[R, E]) Handler(handler Handler[R, E]) http.Handler {
 
 		if err := response.WriteTo(writer, request); err != nil {
 			// The status has already gone out, so this can only be recorded.
-			adapter.report(request.Context(), faultOf("writing the response", err))
+			adapter.report(request.Context(), faultOf("write the response", err))
 		}
 	})
 }

@@ -58,11 +58,11 @@ func Call[R, In, Out any](
 	request ClientRequest,
 ) effect.Effect[R, Fault, Out] {
 	if fault := ValidateEndpoint(endpoint); fault != nil {
-		return effect.Fail[R, Out](asFault("calling an endpoint", fault))
+		return effect.Fail[R, Out](asFault("call an endpoint", fault))
 	}
 	path, err := fillPattern(endpoint.segments, request.Path)
 	if err != nil {
-		return effect.Fail[R, Out](asFault("building the path", err))
+		return effect.Fail[R, Out](asFault("build the path", err))
 	}
 	return Fetch[R](client, endpoint.method, path, request).
 		FlatMap(func(response ClientResponse) effect.Effect[R, Fault, Out] {
@@ -80,13 +80,13 @@ func decodeResponse[R, Out any](
 	operations := effect.For[R, Fault]()
 	if response.Status != output.status {
 		return operations.Fail[Out](Fault{
-			Op:  "calling " + target,
+			Op:  "call " + target,
 			Err: Refusal{Status: response.Status, Entity: response.Entity},
 		})
 	}
 	value, err := output.decode(response.Entity)
 	if err != nil {
-		return operations.Fail[Out](Fault{Op: "reading the response body", Err: err})
+		return operations.Fail[Out](Fault{Op: "read the response body", Err: err})
 	}
 	return operations.Succeed(value)
 }

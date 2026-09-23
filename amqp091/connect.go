@@ -55,7 +55,7 @@ func Open[R any](scope effect.Scope, connection *Connection) effect.Effect[R, Fa
 			}
 			return &Channel{channel: channel}, nil
 		},
-		func(err error) Fault { return faultOf("opening a channel", "", err) },
+		func(err error) Fault { return faultOf("open a channel", "", err) },
 	).WithName("open-channel")
 
 	return scope.AcquireRelease(acquire, closeChannel[R])
@@ -73,7 +73,7 @@ func Prefetch[R any](channel *Channel, count int) effect.Effect[R, Fault, effect
 		func(context.Context, R) (effect.Unit, error) {
 			return effect.Unit{}, channel.channel.Qos(count, 0, false)
 		},
-		func(err error) Fault { return faultOf("setting the prefetch", "", err) },
+		func(err error) Fault { return faultOf("set the prefetch", "", err) },
 	).WithName("prefetch")
 }
 

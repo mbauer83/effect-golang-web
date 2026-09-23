@@ -57,7 +57,7 @@ func Open[R any](scope effect.Scope, connection *Connection) effect.Effect[R, Fa
 			}
 			return &Session{session: session}, nil
 		},
-		func(err error) Fault { return faultOf("opening a session", "", err) },
+		func(err error) Fault { return faultOf("open a session", "", err) },
 	).WithName("open-session")
 
 	return scope.AcquireRelease(acquire, endSession[R])
@@ -77,7 +77,7 @@ func Sender[R any](
 			}
 			return &senderLink{sender: sender, address: address}, nil
 		},
-		func(err error) Fault { return faultOf("attaching a sender", address, err) },
+		func(err error) Fault { return faultOf("attach a sender", address, err) },
 	).WithName("attach-sender")
 
 	return scope.AcquireRelease(acquire, detachSender[R])
@@ -105,7 +105,7 @@ func Receiver[R any](
 			}
 			return newReceiverLink(receiver, address), nil
 		},
-		func(err error) Fault { return faultOf("attaching a receiver", address, err) },
+		func(err error) Fault { return faultOf("attach a receiver", address, err) },
 	).WithName("attach-receiver")
 
 	return scope.AcquireRelease(acquire, detachReceiver[R])

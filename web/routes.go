@@ -42,10 +42,10 @@ func NewRoutesWithRejection[R, E any](
 	routes ...Route[R, E],
 ) (Routes[R, E], error) {
 	if reject == nil {
-		return Routes[R, E]{}, faultOf("assembling routes", errNoRejection)
+		return Routes[R, E]{}, faultOf("assemble routes", errNoRejection)
 	}
 	if len(routes) == 0 {
-		return Routes[R, E]{}, faultOf("assembling routes", errNoRoutes)
+		return Routes[R, E]{}, faultOf("assemble routes", errNoRoutes)
 	}
 
 	surface := Routes[R, E]{
@@ -61,7 +61,7 @@ func NewRoutesWithRejection[R, E any](
 		err := surface.tree.insert(route.segments, route.declaration.Method,
 			route.build(reject, route.phases), pattern)
 		if err != nil {
-			return Routes[R, E]{}, faultOf("assembling routes", err)
+			return Routes[R, E]{}, faultOf("assemble routes", err)
 		}
 		surface.declarations = append(surface.declarations, route.declaration)
 	}

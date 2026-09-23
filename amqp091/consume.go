@@ -124,7 +124,7 @@ func decodeDelivery[A any](deliveries Deliveries, delivery Delivery, shape schem
 		return Envelope[A]{
 			Delivery:   delivery,
 			deliveries: deliveries,
-			refusal:    faultOf("decoding a delivery", delivery.Key, err),
+			refusal:    faultOf("decode a delivery", delivery.Key, err),
 		}
 	}
 	return Envelope[A]{Delivery: delivery, deliveries: deliveries, value: value}
@@ -157,7 +157,7 @@ func streamDeliveries[R any](deliveries Deliveries, queue string) effect.Stream[
 			delivery, more, err := deliveries.Next(ctx)
 			if err != nil {
 				return effect.ExitFailure[Fault, effect.Step[Delivery]](
-					faultOf("waiting for a delivery", queue, err))
+					faultOf("wait for a delivery", queue, err))
 			}
 			if !more {
 				return effect.ExitSuccess[Fault](effect.EndOfStream[Delivery]())

@@ -99,7 +99,7 @@ func TestReadingTheBodyIsAnEffectThatCanFail(t *testing.T) {
 		t.Fatalf("expected a body that cannot be read to fail, got %+v", exit)
 	}
 	failures := cause.Failures()
-	if len(failures) != 1 || failures[0].Op != "reading the request body" {
+	if len(failures) != 1 || failures[0].Op != "read the request body" {
 		t.Fatalf("expected the stage named, got %+v", cause)
 	}
 }

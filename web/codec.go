@@ -72,7 +72,7 @@ func ValidateCodec[A any](codec Codec[A]) error {
 		return codec.fault
 	}
 	if codec.decode == nil {
-		return faultOf("using a codec", errZeroCodec)
+		return faultOf("use a codec", errZeroCodec)
 	}
 	return nil
 }
@@ -158,7 +158,7 @@ func firstCodecFault[A, B any](first Codec[A], second Codec[B]) error {
 		return fault
 	}
 	if first.entity != nil && second.entity != nil {
-		return faultOf("combining codecs", errTwoEntities)
+		return faultOf("combine codecs", errTwoEntities)
 	}
 	return duplicateParameterFault(append(append([]Parameter{}, first.parameters...), second.parameters...))
 }
@@ -172,7 +172,7 @@ func duplicateParameterFault(parameters []Parameter) error {
 	for _, parameter := range parameters {
 		key := string(parameter.In) + " " + parameter.Name
 		if seen[key] {
-			return faultOf("combining codecs",
+			return faultOf("combine codecs",
 				errors.New("two codecs read the "+string(parameter.In)+" parameter "+parameter.Name))
 		}
 		seen[key] = true

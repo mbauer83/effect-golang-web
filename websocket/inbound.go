@@ -38,7 +38,7 @@ func readExit(err error) effect.Exit[Fault, effect.Step[Message]] {
 	if isShutdown(err) {
 		return effect.ExitSuccess[Fault](effect.EndOfStream[Message]())
 	}
-	return effect.ExitFailure[Fault, effect.Step[Message]](faultOf("reading a message", err))
+	return effect.ExitFailure[Fault, effect.Step[Message]](faultOf("read a message", err))
 }
 
 // isShutdown reports the ways a conversation finishes rather than breaks.

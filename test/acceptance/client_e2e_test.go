@@ -104,7 +104,7 @@ func TestACaptureWithNothingToFillItIsRefusedBeforeAnythingIsSent(t *testing.T) 
 		t.Fatalf("expected the call to be refused, got %+v", exit)
 	}
 	fault, _ := cause.Failure()
-	if fault.Op != "building the path" {
+	if fault.Op != "build the path" {
 		t.Fatalf("unexpected fault: %+v", fault)
 	}
 }

@@ -178,7 +178,7 @@ func firstRouteFault[R, E, In, Out any](
 		return fault
 	}
 	if handle == nil {
-		return faultOf("handling "+endpoint.method+" "+renderPattern(endpoint.segments), errNoHandler)
+		return faultOf("handle "+endpoint.method+" "+renderPattern(endpoint.segments), errNoHandler)
 	}
 	return nil
 }

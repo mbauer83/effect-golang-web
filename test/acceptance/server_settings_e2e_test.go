@@ -83,7 +83,7 @@ func TestAGracePeriodThatRunsOutIsReportedRatherThanWaitedOutForever(t *testing.
 		if !failed || !cause.ContainsDefect() {
 			t.Fatalf("expected the abandoned request reported in the cause, got %+v", exit)
 		}
-		if !strings.Contains(cause.String(), "waiting for in-flight requests") {
+		if !strings.Contains(cause.String(), "wait for in-flight requests") {
 			t.Fatalf("expected the stage named, got %s", cause)
 		}
 	case <-time.After(5 * time.Second):

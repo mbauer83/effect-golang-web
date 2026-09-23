@@ -36,7 +36,7 @@ func SendValue[R, A any](
 ) effect.Effect[R, Fault, effect.Unit] {
 	return effect.Try(
 		func(context.Context, R) (Message, error) { return Encode(shape, value) },
-		func(err error) Fault { return faultOf("encoding a message", link.Address(), err) },
+		func(err error) Fault { return faultOf("encode a message", link.Address(), err) },
 	).
 		FlatMap(func(message Message) effect.Effect[R, Fault, effect.Unit] {
 			return Send[R](link, message)

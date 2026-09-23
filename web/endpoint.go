@@ -25,7 +25,7 @@ func Returns[Out any](status int, shape schema.Schema[Out]) Output[Out] {
 	content := &Content{MediaType: "application/json", Node: shape.Structure()}
 	if fault := schema.Validate(shape); fault != nil {
 		return Output[Out]{status: status, content: content,
-			fault: faultOf("declaring the response body", fault)}
+			fault: faultOf("declare the response body", fault)}
 	}
 	return Output[Out]{
 		status:  status,

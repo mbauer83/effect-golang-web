@@ -54,7 +54,7 @@ func listen[R any](scope effect.Scope, settings Settings) effect.Effect[R, Fault
 			}
 			return net.Listen("tcp", settings.Address)
 		},
-		func(err error) Fault { return Fault{Op: "opening the listener", Err: err} },
+		func(err error) Fault { return Fault{Op: "open the listener", Err: err} },
 	).WithName("listen")
 
 	return scope.AcquireRelease(acquire, closeListener[R])
@@ -129,7 +129,7 @@ func (loop acceptLoop) shutDown(ctx context.Context) {
 	}
 
 	if err := loop.server.Shutdown(cleanup); err != nil {
-		loop.abandonment <- Fault{Op: "waiting for in-flight requests", Err: err}
+		loop.abandonment <- Fault{Op: "wait for in-flight requests", Err: err}
 		return
 	}
 	<-loop.end

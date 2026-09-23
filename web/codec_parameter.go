@@ -51,7 +51,7 @@ func OptionalHeaderParam[A any](name string, shape schema.Schema[A]) Codec[*A] {
 // this module is.
 func (codec Codec[A]) WithDescription(doc string) Codec[A] {
 	if len(codec.parameters) != 1 {
-		codec.fault = faultOf("describing a parameter", errNotOneParameter)
+		codec.fault = faultOf("describe a parameter", errNotOneParameter)
 		return codec
 	}
 	parameters := append([]Parameter{}, codec.parameters...)
@@ -137,10 +137,10 @@ func headerValue(name string) func(Request) (string, bool) {
 
 func parameterFault[A any](name string, shape schema.Schema[A]) error {
 	if strings.TrimSpace(name) == "" {
-		return faultOf("declaring a parameter", errNamelessParameter)
+		return faultOf("declare a parameter", errNamelessParameter)
 	}
 	if fault := schema.Validate(shape); fault != nil {
-		return faultOf("declaring the parameter "+name, fault)
+		return faultOf("declare the parameter "+name, fault)
 	}
 	return nil
 }
@@ -150,7 +150,7 @@ func parameterFault[A any](name string, shape schema.Schema[A]) error {
 // the query parameter page" is.
 func parameterRefusal(parameter Parameter, err error) error {
 	return Fault{
-		Op:  "reading the " + string(parameter.In) + " parameter " + parameter.Name,
+		Op:  "read the " + string(parameter.In) + " parameter " + parameter.Name,
 		Err: err,
 	}
 }

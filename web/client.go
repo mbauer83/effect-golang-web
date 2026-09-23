@@ -88,7 +88,7 @@ func WithEntity[A any](
 ) (ClientRequest, error) {
 	document, err := schema.EncodeJSON(shape, value)
 	if err != nil {
-		return ClientRequest{}, faultOf("encoding the request body", err)
+		return ClientRequest{}, faultOf("encode the request body", err)
 	}
 	request.Entity = document
 	request.MediaType = "application/json"
@@ -116,7 +116,7 @@ func Fetch[R any](
 		func(ctx context.Context, _ R) (ClientResponse, error) {
 			return exchange(ctx, client, method, path, request)
 		},
-		func(err error) Fault { return asFault("calling "+method+" "+path, err) },
+		func(err error) Fault { return asFault("call "+method+" "+path, err) },
 	).WithName("fetch")
 }
 

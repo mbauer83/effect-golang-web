@@ -79,7 +79,7 @@ func TestClosingTheScopeClosesTheSocket(t *testing.T) {
 	if _, succeeded := after.Value(); succeeded {
 		t.Fatal("expected the socket to be closed with its scope")
 	}
-	if !strings.Contains(after.String(), "sending a message") {
+	if !strings.Contains(after.String(), "send a message") {
 		t.Fatalf("expected the stage named, got %s", after)
 	}
 }

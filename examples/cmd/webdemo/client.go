@@ -32,7 +32,7 @@ func runClient(runtime *effect.Runtime, base string) {
 		request, err := web.WithEntity(web.ClientRequest{}, bookstore.BookSchema, sample)
 		if err != nil {
 			do.Await(effect.Fail[effect.Unit, bookstore.Book](
-				web.Fault{Op: "encoding the book", Err: err}))
+				web.Fault{Op: "encode the book", Err: err}))
 		}
 		do.Await(web.Call[effect.Unit](client, bookstore.AddBook, request))
 		// The title fills the endpoint's captured segment by name, so the path

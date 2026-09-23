@@ -25,7 +25,7 @@ func failUnsuccessful[R any](target string) func(ClientResponse) effect.Effect[R
 			return effect.Succeed[R, Fault](response)
 		}
 		return effect.Fail[R, ClientResponse](Fault{
-			Op:  "calling " + target,
+			Op:  "call " + target,
 			Err: Refusal{Status: response.Status, Entity: response.Entity, header: response.Header},
 		})
 	}

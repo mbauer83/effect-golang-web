@@ -66,7 +66,7 @@ func writeCache[R any](
 		}
 		entity, err := marshalResponse(response)
 		if err != nil {
-			return effect.Fail[R, ClientResponse](asFault("keeping the answer", err))
+			return effect.Fail[R, ClientResponse](asFault("keep the answer", err))
 		}
 		writeEntry := cache.Write[R](upstream.store, cache.Entry{
 			Key: key, About: about, Entity: entity, Fresh: upstream.terms.TimeToLive,

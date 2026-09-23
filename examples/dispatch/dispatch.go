@@ -77,7 +77,7 @@ func Place(channel amqp091.Publisher, order Order) dispatchEffect[effect.Unit] {
 			message, err := amqp091.Encode(OrderSchema, order)
 			if err != nil {
 				return effect.For[effect.Unit, amqp091.Fault]().
-					Fail[effect.Unit](amqp091.Fault{Op: "placing an order", Err: err})
+					Fail[effect.Unit](amqp091.Fault{Op: "place an order", Err: err})
 			}
 			message.Durability = amqp091.Durable
 			return amqp091.Publish[effect.Unit](channel,

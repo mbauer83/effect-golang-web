@@ -162,11 +162,11 @@ func CallUpstream[R, In, Out any](
 	request ClientRequest,
 ) effect.Effect[R, Fault, Out] {
 	if fault := ValidateEndpoint(endpoint); fault != nil {
-		return effect.Fail[R, Out](asFault("calling an endpoint", fault))
+		return effect.Fail[R, Out](asFault("call an endpoint", fault))
 	}
 	path, err := fillPattern(endpoint.segments, request.Path)
 	if err != nil {
-		return effect.Fail[R, Out](asFault("building the path", err))
+		return effect.Fail[R, Out](asFault("build the path", err))
 	}
 	return FetchUpstream[R](upstream, endpoint.method, path, request).
 		FlatMap(func(response ClientResponse) effect.Effect[R, Fault, Out] {
@@ -210,7 +210,7 @@ func askUpstream[R any](
 func awaitTurn[R any](upstream *UpstreamClient) effect.Effect[R, Fault, effect.Unit] {
 	return rate.AwaitTurn[R](upstream.limiter, upstream.terms.Allowance, upstream.terms.MaxWait).
 		MapError(func(fault rate.Fault) Fault {
-			return Fault{Op: "waiting for a turn at " + upstream.terms.Name, Err: fault}
+			return Fault{Op: "wait for a turn at " + upstream.terms.Name, Err: fault}
 		})
 }
 
