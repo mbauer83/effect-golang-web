@@ -162,7 +162,7 @@ package acquires the dependency by calling them.
 ```go
 broker := inprocess.NewBroker()
 // ... a producer and a consumer written against the port
-broker.Accepted()   // []uint64
+broker.Acks()       // []uint64
 broker.Discards()
 broker.Requeues()
 broker.Depth("shipping")
