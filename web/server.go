@@ -61,18 +61,13 @@ func Serve[R any](scope effect.Scope, address string, handler http.Handler) effe
 // for.
 func ServeWith[R any](scope effect.Scope, settings Settings, handler http.Handler) effect.Effect[R, Fault, Server] {
 	operations := effect.For[R, Fault]()
-	return listen[R](scope, settings).
-		FlatMap(func(listener net.Listener) effect.Effect[R, Fault, Server] {
-			return reportAbandoned[R](scope).
-				FlatMap(func(abandoned chan error) effect.Effect[R, Fault, Server] {
-					loop := serveLoop[R](httpServer(settings, handler), listener, settings.Grace, abandoned)
-					return operations.ForkIn(scope, loop).
-						Map(func(fiber effect.Fiber[Fault, effect.Unit]) Server {
-							return Server{address: listener.Addr(), fiber: fiber}
-						})
-				})
-		}).
-		WithName("serve")
+	return effect.Gen(func(do *effect.Do[R, Fault]) Server {
+		listener := do.Await(listen[R](scope, settings))
+		abandoned := do.Await(reportAbandoned[R](scope))
+		loop := serveLoop[R](httpServer(settings, handler), listener, settings.Grace, abandoned)
+		fiber := do.Await(operations.ForkIn(scope, loop))
+		return Server{address: listener.Addr(), fiber: fiber}
+	}).WithName("serve")
 }
 
 // Await completes when the server stops, and fails if it stopped for a reason

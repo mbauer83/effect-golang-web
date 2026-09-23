@@ -139,16 +139,15 @@ func FetchUpstream[R any](
 	request ClientRequest,
 ) effect.Effect[R, Fault, ClientResponse] {
 	key := upstream.cacheKey(method, path, request)
-	return lookupCache[R](upstream, key).
-		FlatMap(func(lookup cache.Lookup) effect.Effect[R, Fault, ClientResponse] {
-			if received, replayed := responseFrom(lookup); replayed {
-				return effect.Succeed[R, Fault](received)
-			}
-			return readOnce[R](upstream, key,
-				askUpstream[R](upstream, method, path, request).
-					FlatMap(writeCache[R](upstream, key, request.About)))
-		}).
-		WithName("upstream read")
+	return effect.Gen(func(do *effect.Do[R, Fault]) ClientResponse {
+		lookup := do.Await(lookupCache[R](upstream, key))
+		if response, replayed := responseFrom(lookup); replayed {
+			return response
+		}
+		ask := askUpstream[R](upstream, method, path, request).
+			FlatMap(writeCache[R](upstream, key, request.About))
+		return do.Await(readOnce[R](upstream, key, ask))
+	}).WithName("upstream read")
 }
 
 // CallUpstream reads an endpoint under the same terms, and reads the answer
@@ -191,11 +190,12 @@ func askUpstream[R any](
 	path string,
 	request ClientRequest,
 ) effect.Effect[R, Fault, ClientResponse] {
-	return awaitTurn[R](upstream).
-		FlatMap(func(effect.Unit) effect.Effect[R, Fault, ClientResponse] {
-			return Fetch[R](upstream.client, method, path, request).
-				FlatMap(failUnsuccessful[R](method + " " + path))
-		}).
+	attempt := effect.Gen(func(do *effect.Do[R, Fault]) ClientResponse {
+		do.Await(awaitTurn[R](upstream))
+		response := do.Await(Fetch[R](upstream.client, method, path, request))
+		return do.Await(failUnsuccessful[R](method + " " + path)(response))
+	})
+	return attempt.
 		Retry(retrySchedule(upstream.terms.Retry)).
 		CatchAll(recoverRefusal[R])
 }
