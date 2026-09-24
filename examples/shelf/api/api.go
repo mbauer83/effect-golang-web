@@ -83,30 +83,33 @@ var (
 			WithFailure(http.StatusNotFound, "no book of that ISBN is kept")
 )
 
-type apiEffect[A any] = effect.Effect[effect.Unit, Fault, A]
+// apiEffect is what a handler does: an effect that requires the session the
+// catalogue is kept in, and fails with the catalogue's own faults.
+type apiEffect[A any] = effect.Effect[sql.Session, Fault, A]
 
 // Surface is the catalogue's routes, sending and reading documents in
-// camelCase.
-func Surface(books store.Store) (web.Routes[effect.Unit, Fault], error) {
+// camelCase. They require the session the catalogue is kept in, which the
+// boundary serving them is given.
+func Surface() (web.Routes[sql.Session, Fault], error) {
 	routes, err := web.NewRoutes(
 		web.Handle(ListBooks, func(query CatalogueQuery) apiEffect[BookPage] {
-			return asAPIEffect(books.Page(pageQuery(query))).Map(func(page sql.Page[domain.Book]) BookPage {
+			return asAPIEffect(store.Catalogue.Page(pageQuery(query))).Map(func(page sql.Page[domain.Book]) BookPage {
 				return BookPage{Books: page.Items, Next: string(page.Next), Previous: string(page.Previous)}
 			})
 		}),
-		web.Handle(SaveBook, func(valueOf effect.Product[domain.ISBN, domain.Book]) apiEffect[domain.Book] {
-			if valueOf.First != valueOf.Second.ISBN() {
-				return effect.For[effect.Unit, Fault]().Fail[domain.Book](Fault{Kind: Refused, Err: errors.New("the ISBN in the path is not the book's")})
+		web.Handle(SaveBook, func(request effect.Product[domain.ISBN, domain.Book]) apiEffect[domain.Book] {
+			if request.First != request.Second.ISBN() {
+				return effect.For[sql.Session, Fault]().Fail[domain.Book](Fault{Kind: Refused, Err: errors.New("the ISBN in the path is not the book's")})
 			}
-			return asAPIEffect(books.Save(valueOf.Second))
+			return asAPIEffect(store.Books.Save(request.Second)).As(request.Second)
 		}),
-		web.Handle(FindBook, func(isbn domain.ISBN) apiEffect[domain.Book] { return asAPIEffect(books.Find(isbn)) }),
+		web.Handle(FindBook, func(isbn domain.ISBN) apiEffect[domain.Book] { return asAPIEffect(store.Books.Find(isbn)) }),
 		web.Handle(RemoveBook, func(isbn domain.ISBN) apiEffect[effect.Unit] {
-			return asAPIEffect(books.Remove(isbn)).FlatMap(func(removed bool) apiEffect[effect.Unit] {
-				if !removed {
-					return effect.For[effect.Unit, Fault]().Fail[effect.Unit](Fault{Kind: NotFound})
+			return asAPIEffect(store.Books.Delete(isbn)).FlatMap(func(outcome sql.Outcome) apiEffect[effect.Unit] {
+				if outcome.RowsAffected == 0 {
+					return effect.For[sql.Session, Fault]().Fail[effect.Unit](Fault{Kind: NotFound})
 				}
-				return effect.For[effect.Unit, Fault]().Succeed(effect.Unit{})
+				return effect.For[sql.Session, Fault]().Succeed(effect.Unit{})
 			})
 		}),
 	)

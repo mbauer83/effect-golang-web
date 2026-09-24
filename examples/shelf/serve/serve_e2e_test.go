@@ -14,11 +14,15 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 	"time"
 
+	_ "github.com/jackc/pgx/v5/stdlib"
 	_ "modernc.org/sqlite"
+
+	"github.com/mbauer83/effect-golang-sql/ddl"
 
 	"github.com/mbauer83/effect-golang-web/examples/shelf/serve"
 )
@@ -52,14 +56,21 @@ func book(isbn string, title string, author string, year int) string {
 // serveCatalogue runs the catalogue on a fresh database until the test ends.
 func serveCatalogue(t *testing.T) (client, string) {
 	t.Helper()
+	file := "file:" + t.TempDir() + "/shelf.db"
+	// The test's own database: SQLite, in a file this test owns.
+	return serveOn(t, serve.Database{Dialect: ddl.SQLite, Driver: "sqlite", Source: file}), file
+}
+
+// serveOn runs the catalogue over that database until the test ends.
+func serveOn(t *testing.T, database serve.Database) client {
+	t.Helper()
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
-	file := "file:" + t.TempDir() + "/shelf.db"
 	within, stop := context.WithCancel(context.Background())
 	finished := make(chan error, 1)
-	go func() { finished <- serve.Serve(within, listener, file) }()
+	go func() { finished <- serve.Serve(within, listener, database) }()
 	t.Cleanup(func() {
 		stop()
 		select {
@@ -71,12 +82,12 @@ func serveCatalogue(t *testing.T) (client, string) {
 	c := client{t: t, base: "http://" + listener.Addr().String()}
 	for attempt := 0; attempt < 50; attempt++ {
 		if status, _ := c.do("GET", "/books", ""); status == http.StatusOK {
-			return c, file
+			return c
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
 	t.Fatal("the server did not start")
-	return c, file
+	return c
 }
 
 var shelf = []struct {
@@ -215,5 +226,34 @@ func TestARequestIsHeldToTheDomain(t *testing.T) {
 	}
 	if status, _ := c.do("GET", "/books/9780141439587", ""); status != http.StatusNotFound {
 		t.Errorf("expected a removed book not matches, got %d", status)
+	}
+}
+
+// The same program given a deployment's database: Postgres, with the table a
+// run before this one left dropped first.
+func TestTheCatalogueIsServedFromPostgres(t *testing.T) {
+	address := os.Getenv("SHELF_POSTGRES_URL")
+	if address == "" {
+		t.Skip("set SHELF_POSTGRES_URL to serve the catalogue from a real postgres")
+	}
+	reset, err := sql.Open("pgx", address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := reset.Exec(`DROP TABLE IF EXISTS "book"`); err != nil {
+		t.Fatal(err)
+	}
+	reset.Close()
+	c := serveOn(t, serve.Database{Dialect: ddl.Postgres, Driver: "pgx", Source: address})
+	for _, each := range shelf {
+		if status, body := c.do("PUT", "/books/"+each.isbn, book(each.isbn, each.title, each.author, each.year)); status != http.StatusOK {
+			t.Fatalf("saving %s: %d %s", each.title, status, body)
+		}
+	}
+	if found := read(t, c, "/books?q=lem+stories"); titles(found) != "Solaris and Other Stories" {
+		t.Errorf("expected the book holding both words, got [%s]", titles(found))
+	}
+	if found := read(t, c, "/books?title=sol&size=1"); titles(found) != "Solaris" || found.Next == "" {
+		t.Errorf("expected the first title beginning so, and a page after it; got [%s]", titles(found))
 	}
 }

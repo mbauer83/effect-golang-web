@@ -51,7 +51,7 @@ func StatusFor(fault Fault) web.Response {
 }
 
 // asAPIEffect is a store's answer with its fault said in the catalogue's words.
-func asAPIEffect[A any](answer effect.Effect[effect.Unit, sql.Fault, A]) apiEffect[A] {
+func asAPIEffect[A any](answer effect.Effect[sql.Session, sql.Fault, A]) apiEffect[A] {
 	return answer.MapError(func(fault sql.Fault) Fault {
 		switch {
 		case errors.Is(fault, sql.ErrNoRows):
