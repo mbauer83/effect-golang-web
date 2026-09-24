@@ -16,8 +16,8 @@ import (
 
 func TestAParameterSaysWhereTheRequestCarriesIt(t *testing.T) {
 	codec := web.Convert(
-		web.Both(
-			web.Both(web.PathParam("title", schema.Text()), web.QueryParam("shelf", schema.Text())),
+		web.Zip(
+			web.Zip(web.PathParam("title", schema.Text()), web.QueryParam("shelf", schema.Text())),
 			web.OptionalHeaderParam("X-Trace", schema.Text()),
 		),
 		func(effect.Product[effect.Product[string, string], *string]) (effect.Unit, error) {

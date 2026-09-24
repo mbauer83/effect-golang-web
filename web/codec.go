@@ -93,12 +93,12 @@ func Nothing() Codec[effect.Unit] {
 	}
 }
 
-// Both combines two codecs into one that reads both parts.
+// Zip combines two codecs into one that reads both parts.
 //
 // The result is a Product because no information may be discarded and Go has no
 // type-level record to widen; it is a package function because a method cannot
 // grow the type parameters its own result needs.
-func Both[A, B any](first Codec[A], second Codec[B]) Codec[effect.Product[A, B]] {
+func Zip[A, B any](first Codec[A], second Codec[B]) Codec[effect.Product[A, B]] {
 	codec := Codec[effect.Product[A, B]]{
 		parameters: append(append([]Parameter{}, first.parameters...), second.parameters...),
 		entity:     firstEntity(first.entity, second.entity),

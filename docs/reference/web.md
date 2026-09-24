@@ -180,7 +180,7 @@ Two codecs combine into one that keeps both parts:
 
 ```go
 codec := web.Convert(
-    web.Both(web.QueryParam("shelf", schema.Text()), web.QueryParam("page", schema.Int())),
+    web.Zip(web.QueryParam("shelf", schema.Text()), web.QueryParam("page", schema.Int())),
     func(parts effect.Product[string, int]) (Query, error) {
         return Query{Shelf: parts.First, Page: parts.Second}, nil
     },
@@ -189,8 +189,14 @@ codec := web.Convert(
 
 The result is a `Product` because no information may be discarded and Go has no
 type-level record to widen — the same structural composition the runtime uses
-for environments, for the same reason. `Both` is a package function because a
+for environments, for the same reason. `Zip` is a package function because a
 method cannot grow the type parameters its own result needs.
+
+`PageParams(sorts...)` is how a client asks for a page of a list: `sort` (one of
+those offered, the first by default), `after` or `before` a cursor a page gave,
+or `page` by number, and `size`. It reads a `PageRequest` a store turns into its
+listing's query, refuses a sort the list does not offer or two positions at
+once as the client's mistake, and declares all five parameters.
 
 Two codecs that both read the entity, or that read the same parameter twice, are
 a declaration mistake reported by `ValidateCodec`.

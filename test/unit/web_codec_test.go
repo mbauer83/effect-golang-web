@@ -101,7 +101,7 @@ func TestTwoCodecsCombineIntoOneThatKeepsBothParts(t *testing.T) {
 		Page  int
 	}
 	codec := web.Convert(
-		web.Both(web.QueryParam("shelf", schema.Text()), web.QueryParam("page", schema.Int())),
+		web.Zip(web.QueryParam("shelf", schema.Text()), web.QueryParam("page", schema.Int())),
 		func(parts effect.Product[string, int]) (query, error) {
 			return query{Shelf: parts.First, Page: parts.Second}, nil
 		},
@@ -132,11 +132,11 @@ func TestCodecDeclarationMistakesAreReportedRatherThanPanicking(t *testing.T) {
 			return err
 		}(),
 		"two codecs reading the entity": web.ValidateCodec(
-			web.Both(web.Entity(bookSchema), web.Entity(bookSchema))),
+			web.Zip(web.Entity(bookSchema), web.Entity(bookSchema))),
 		"two codecs reading one parameter": web.ValidateCodec(
-			web.Both(web.QueryParam("shelf", schema.Text()), web.QueryParam("shelf", schema.Text()))),
+			web.Zip(web.QueryParam("shelf", schema.Text()), web.QueryParam("shelf", schema.Text()))),
 		"prose for more than one parameter": web.ValidateCodec(
-			web.Both(
+			web.Zip(
 				web.QueryParam("shelf", schema.Text()),
 				web.QueryParam("page", schema.Int()),
 			).WithDescription("both of them")),
