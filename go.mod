@@ -14,7 +14,7 @@ require (
 	github.com/coder/websocket v1.8.15
 	github.com/getkin/kin-openapi v0.149.0
 	github.com/mbauer83/effect-golang v0.4.0
-	github.com/mbauer83/effect-golang-schema v0.4.0
+	github.com/mbauer83/effect-golang-schema v0.5.0
 	github.com/rabbitmq/amqp091-go v1.14.0
 	golang.org/x/net v0.59.0
 	google.golang.org/protobuf v1.36.12
