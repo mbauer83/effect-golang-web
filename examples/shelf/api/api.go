@@ -90,7 +90,7 @@ type apiEffect[A any] = effect.Effect[effect.Unit, Fault, A]
 func Surface(books store.Store) (web.Routes[effect.Unit, Fault], error) {
 	routes, err := web.NewRoutes(
 		web.Handle(ListBooks, func(query CatalogueQuery) apiEffect[BookPage] {
-			return withFault(books.Page(pageQuery(query))).Map(func(page sql.Page[domain.Book]) BookPage {
+			return asAPIEffect(books.Page(pageQuery(query))).Map(func(page sql.Page[domain.Book]) BookPage {
 				return BookPage{Books: page.Items, Next: string(page.Next), Previous: string(page.Previous)}
 			})
 		}),
@@ -98,11 +98,11 @@ func Surface(books store.Store) (web.Routes[effect.Unit, Fault], error) {
 			if valueOf.First != valueOf.Second.ISBN() {
 				return effect.For[effect.Unit, Fault]().Fail[domain.Book](Fault{Kind: Refused, Err: errors.New("the ISBN in the path is not the book's")})
 			}
-			return withFault(books.Save(valueOf.Second))
+			return asAPIEffect(books.Save(valueOf.Second))
 		}),
-		web.Handle(FindBook, func(isbn domain.ISBN) apiEffect[domain.Book] { return withFault(books.Find(isbn)) }),
+		web.Handle(FindBook, func(isbn domain.ISBN) apiEffect[domain.Book] { return asAPIEffect(books.Find(isbn)) }),
 		web.Handle(RemoveBook, func(isbn domain.ISBN) apiEffect[effect.Unit] {
-			return withFault(books.Remove(isbn)).FlatMap(func(removed bool) apiEffect[effect.Unit] {
+			return asAPIEffect(books.Remove(isbn)).FlatMap(func(removed bool) apiEffect[effect.Unit] {
 				if !removed {
 					return effect.For[effect.Unit, Fault]().Fail[effect.Unit](Fault{Kind: NotFound})
 				}

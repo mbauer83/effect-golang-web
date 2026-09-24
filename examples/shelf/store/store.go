@@ -59,7 +59,11 @@ func CreateStatements(dialect ddl.Dialect) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return append(append(statements, ddl.CreateIndexes(dialect, table, Catalogue.Indexes()...)...), searches...), nil
+	indexes, err := ddl.CreateIndexes(dialect, table, Catalogue.Indexes()...)
+	if err != nil {
+		return nil, err
+	}
+	return append(append(statements, indexes...), searches...), nil
 }
 
 // Save keeps the book, replacing one of the same ISBN.
