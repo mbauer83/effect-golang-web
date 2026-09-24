@@ -17,9 +17,8 @@ description of a book.
   side.
 
 A nested module, so that effect-golang-web does not depend on
-effect-golang-sql. It builds against the working copies through `go.work`, and
-against published versions once they include `sql.Repository` and
-`sql.Listing` searches.
+effect-golang-sql. It requires the released effect-golang-sql v0.6.0 and
+effect-golang-web v0.6.0.
 
 ```sh
 go run ./cmd/shelf        # :8080, or SHELF_ADDRESS
