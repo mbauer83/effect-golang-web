@@ -33,34 +33,28 @@ type Rate struct {
 
 // EnquirySchema describes an enquiry.
 var EnquirySchema = schema.Struct[Enquiry]("Enquiry",
-	schema.FieldOf("origin", schema.Text().Check(schema.MinLength(1)),
-		func(enquiry Enquiry) string { return enquiry.Origin },
-		func(enquiry *Enquiry, value string) { enquiry.Origin = value }).
+	schema.FieldAt("origin", schema.Text().Check(schema.MinLength(1)),
+		func(enquiry *Enquiry) *string { return &enquiry.Origin }).
 		WithNumber(1).
 		WithDescription("Origin is where the shipment starts."),
-	schema.FieldOf("destination", schema.Text().Check(schema.MinLength(1)),
-		func(enquiry Enquiry) string { return enquiry.Destination },
-		func(enquiry *Enquiry, value string) { enquiry.Destination = value }).
+	schema.FieldAt("destination", schema.Text().Check(schema.MinLength(1)),
+		func(enquiry *Enquiry) *string { return &enquiry.Destination }).
 		WithNumber(2).
 		WithDescription("Destination is where it is going."),
-	schema.FieldOf("kilos", schema.Float64().Check(schema.Above[float64](0)),
-		func(enquiry Enquiry) float64 { return enquiry.Kilos },
-		func(enquiry *Enquiry, value float64) { enquiry.Kilos = value }).
+	schema.FieldAt("kilos", schema.Float64().Check(schema.Above[float64](0)),
+		func(enquiry *Enquiry) *float64 { return &enquiry.Kilos }).
 		WithNumber(3).
 		WithDescription("Kilos is what it weighs, and it weighs something."),
 ).WithDescription("Enquiry asks what a shipment would cost.")
 
 // RateSchema describes a rate.
 var RateSchema = schema.Struct[Rate]("Rate",
-	schema.FieldOf("carrier", schema.Text().Check(schema.MinLength(1)),
-		func(rate Rate) string { return rate.Carrier },
-		func(rate *Rate, value string) { rate.Carrier = value }).WithNumber(1),
-	schema.FieldOf("currency", schema.Text().Check(schema.Pattern(`^[A-Z]{3}$`)),
-		func(rate Rate) string { return rate.Currency },
-		func(rate *Rate, value string) { rate.Currency = value }).WithNumber(2),
-	schema.FieldOf("cents", schema.Int64().Check(schema.AtLeast[int64](1)),
-		func(rate Rate) int64 { return rate.Cents },
-		func(rate *Rate, value int64) { rate.Cents = value }).WithNumber(3),
+	schema.FieldAt("carrier", schema.Text().Check(schema.MinLength(1)),
+		func(rate *Rate) *string { return &rate.Carrier }).WithNumber(1),
+	schema.FieldAt("currency", schema.Text().Check(schema.Pattern(`^[A-Z]{3}$`)),
+		func(rate *Rate) *string { return &rate.Currency }).WithNumber(2),
+	schema.FieldAt("cents", schema.Int64().Check(schema.AtLeast[int64](1)),
+		func(rate *Rate) *int64 { return &rate.Cents }).WithNumber(3),
 ).WithDescription("Rate is what a carrier would charge.")
 
 // Service is the fully-qualified proto service name, which is what forms the

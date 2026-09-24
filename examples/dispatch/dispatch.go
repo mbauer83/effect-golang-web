@@ -25,15 +25,11 @@ type Order struct {
 // OrderSchema describes an order: the wire, and nothing else, because a message
 // has no other job.
 var OrderSchema = schema.Struct[Order]("Order",
-	schema.FieldOf("reference", schema.UUID(),
-		func(order Order) string { return order.Reference },
-		func(order *Order, reference string) { order.Reference = reference }),
-	schema.FieldOf("item", schema.Text().Check(schema.MinLength(1)),
-		func(order Order) string { return order.Item },
-		func(order *Order, item string) { order.Item = item }),
-	schema.FieldOf("quantity", schema.Int32().Check(schema.AtLeast[int32](1)),
-		func(order Order) int32 { return order.Quantity },
-		func(order *Order, quantity int32) { order.Quantity = quantity }),
+	schema.FieldAt("reference", schema.UUID(), func(order *Order) *string { return &order.Reference }),
+	schema.FieldAt("item", schema.Text().Check(schema.MinLength(1)),
+		func(order *Order) *string { return &order.Item }),
+	schema.FieldAt("quantity", schema.Int32().Check(schema.AtLeast[int32](1)),
+		func(order *Order) *int32 { return &order.Quantity }),
 ).WithDescription("one order to be shipped")
 
 type dispatchEffect[A any] = effect.Effect[effect.Unit, amqp091.Fault, A]

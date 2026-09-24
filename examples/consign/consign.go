@@ -30,15 +30,12 @@ type Shipment struct {
 // ShipmentSchema describes a shipment: the wire, and nothing else, because a
 // message has no other job.
 var ShipmentSchema = schema.Struct[Shipment]("Shipment",
-	schema.FieldOf("reference", schema.UUID(),
-		func(shipment Shipment) string { return shipment.Reference },
-		func(shipment *Shipment, reference string) { shipment.Reference = reference }),
-	schema.FieldOf("carrier", schema.Text().Check(schema.MinLength(1)),
-		func(shipment Shipment) string { return shipment.Carrier },
-		func(shipment *Shipment, carrier string) { shipment.Carrier = carrier }),
-	schema.FieldOf("weight", schema.Float64().Check(schema.Above[float64](0)),
-		func(shipment Shipment) float64 { return shipment.Weight },
-		func(shipment *Shipment, weight float64) { shipment.Weight = weight }),
+	schema.FieldAt("reference", schema.UUID(),
+		func(shipment *Shipment) *string { return &shipment.Reference }),
+	schema.FieldAt("carrier", schema.Text().Check(schema.MinLength(1)),
+		func(shipment *Shipment) *string { return &shipment.Carrier }),
+	schema.FieldAt("weight", schema.Float64().Check(schema.Above[float64](0)),
+		func(shipment *Shipment) *float64 { return &shipment.Weight }),
 ).WithDescription("one shipment to be consigned")
 
 type consignEffect[A any] = effect.Effect[effect.Unit, amqp10.Fault, A]

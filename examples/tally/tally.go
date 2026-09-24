@@ -29,16 +29,12 @@ type Total struct {
 // ChangeSchema describes a change. The width is stated, so a client that sends
 // a number too large to be one is told rather than silently wrapped.
 var ChangeSchema = schema.Struct[Change]("Change",
-	schema.FieldOf("add", schema.Int32(),
-		func(change Change) int32 { return change.Add },
-		func(change *Change, add int32) { change.Add = add }),
+	schema.FieldAt("add", schema.Int32(), func(change *Change) *int32 { return &change.Add }),
 ).WithDescription("a change to apply to the tally")
 
 // TotalSchema describes an answer.
 var TotalSchema = schema.Struct[Total]("Total",
-	schema.FieldOf("total", schema.Int64(),
-		func(total Total) int64 { return total.Total },
-		func(total *Total, value int64) { total.Total = value }),
+	schema.FieldAt("total", schema.Int64(), func(total *Total) *int64 { return &total.Total }),
 ).WithDescription("the tally after the change")
 
 type tallyEffect[A any] = effect.Effect[effect.Unit, websocket.Fault, A]
