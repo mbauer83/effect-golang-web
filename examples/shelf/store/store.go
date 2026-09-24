@@ -19,7 +19,7 @@ import (
 var f = domain.BookFields
 
 // books is where books are kept, found by their ISBN.
-var books = sql.NewRepository(sql.Map(domain.BookSchema).Column(f.ISBN, "isbn13"), f.ISBN)
+var books = sql.NewRepository(sql.Map(domain.BookSchema).Column(f.ISBN, "isbn13"), f.ISBN.Shape())
 
 // Catalogue is the books read a page at a time: by title unless a reader asks
 // for the most recent editions first, found by the start of a title or by
