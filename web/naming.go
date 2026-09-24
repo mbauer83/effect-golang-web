@@ -39,23 +39,23 @@ func (route Route[R, E]) withNaming(strategy naming.Strategy) Route[R, E] {
 		return route
 	}
 	route.strategy = strategy
-	route.declaration = route.declaration.spelled(strategy)
+	route.declaration = route.declaration.withNaming(strategy)
 	return route
 }
 
 // spelled is the declaration with the documents it reads and writes described
 // as a surface with strategy spells them.
-func (declaration Declaration) spelled(strategy naming.Strategy) Declaration {
-	declaration.Entity = declaration.Entity.spelled(strategy)
-	declaration.Content = declaration.Content.spelled(strategy)
+func (declaration Declaration) withNaming(strategy naming.Strategy) Declaration {
+	declaration.Entity = declaration.Entity.withNaming(strategy)
+	declaration.Content = declaration.Content.withNaming(strategy)
 	return declaration
 }
 
-func (content *Content) spelled(strategy naming.Strategy) *Content {
+func (content *Content) withNaming(strategy naming.Strategy) *Content {
 	if content == nil || content.Node == nil {
 		return content
 	}
-	respelled := *content
-	respelled.Node = structure.Spelled(content.Node, strategy)
-	return &respelled
+	named := *content
+	named.Node = structure.Spell(content.Node, strategy)
+	return &named
 }
