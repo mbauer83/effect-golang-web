@@ -54,8 +54,11 @@ func Bytes(status int, contentType string, body []byte) Response {
 // The entity is encoded before anything is written, because a status cannot be
 // taken back once it has gone out. An encoding failure is therefore reported to
 // the caller rather than becoming a truncated body.
-func JSON[A any](status int, shape schema.Schema[A], value A) (Response, error) {
-	document, err := schema.EncodeJSON(shape, value)
+//
+// A handler that builds its own response passes the surface's naming, with
+// schema.MemberNaming, to spell it as the surface's other documents are.
+func JSON[A any](status int, shape schema.Schema[A], value A, options ...schema.JSONOption) (Response, error) {
+	document, err := schema.EncodeJSON(shape, value, options...)
 	if err != nil {
 		return Response{}, faultOf("encode the response body", err)
 	}

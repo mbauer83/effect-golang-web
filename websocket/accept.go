@@ -40,17 +40,23 @@ func Accept[R, E any](
 	converse func(Socket) effect.Effect[R, E, effect.Unit],
 	settings Settings,
 ) web.Handler[R, E] {
-	return web.FromHTTP[R, E](http.HandlerFunc(
-		func(writer http.ResponseWriter, request *http.Request) {
-			connection, err := ws.Accept(writer, request, acceptOptions(settings))
-			if err != nil {
-				// Accept has already answered the request: it is an HTTP
-				// exchange until the upgrade succeeds, and saying so twice
-				// would be worse than saying it once.
-				return
-			}
-			boundary.Interpret(request.Context(), runConversation(Socket{connection: connection}, converse))
-		}))
+	return func(request web.Request) effect.Effect[R, E, web.Response] {
+		// The surface's naming is the socket's: a conversation spells its
+		// documents as the surface that accepted it spells its responses.
+		strategy := request.NamingStrategy()
+		return web.FromHTTP[R, E](http.HandlerFunc(
+			func(writer http.ResponseWriter, request *http.Request) {
+				connection, err := ws.Accept(writer, request, acceptOptions(settings))
+				if err != nil {
+					// Accept has already answered the request: it is an HTTP
+					// exchange until the upgrade succeeds, and saying so twice
+					// would be worse than saying it once.
+					return
+				}
+				socket := Socket{connection: connection, strategy: strategy}
+				boundary.Interpret(request.Context(), runConversation(socket, converse))
+			}))(request)
+	}
 }
 
 // runConversation owns the socket for exactly as long as the conversation.

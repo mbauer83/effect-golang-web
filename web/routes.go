@@ -59,7 +59,7 @@ func NewRoutesWithRejection[R, E any](
 		}
 		pattern := renderPattern(route.segments)
 		err := surface.tree.insert(route.segments, route.declaration.Method,
-			route.build(reject, route.phases), pattern)
+			route.build(reject, route.phases, route.strategy), pattern)
 		if err != nil {
 			return Routes[R, E]{}, faultOf("assemble routes", err)
 		}

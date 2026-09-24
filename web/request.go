@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/mbauer83/effect-golang-schema/schema/naming"
 	"github.com/mbauer83/effect-golang/effect"
 )
 
@@ -17,6 +18,17 @@ import (
 type Request struct {
 	source   *http.Request
 	captures map[string]string
+	strategy naming.Strategy
+}
+
+// NamingStrategy is how the surface serving this request spells the members of
+// the documents it reads and writes; see Routes.WithNaming. A codec reading the
+// entity reads it spelled this way.
+func (request Request) NamingStrategy() naming.Strategy { return request.strategy }
+
+func (request Request) withNaming(strategy naming.Strategy) Request {
+	request.strategy = strategy
+	return request
 }
 
 // RequestFrom adapts net/http's request. It is what an adapter calls at the

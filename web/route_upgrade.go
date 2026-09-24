@@ -10,6 +10,9 @@ package web
 
 import (
 	"net/http"
+
+	"github.com/mbauer83/effect-golang-schema/schema/naming"
+	"github.com/mbauer83/effect-golang/effect"
 )
 
 // Upgrade declares a route whose handler takes over the connection.
@@ -37,7 +40,13 @@ func Upgrade[R, E any](path string, summary string, handler Handler[R, E]) Route
 		// The rejection format and the phase names are both unused: there are
 		// no codecs to refuse anything and none to name, because the exchange
 		// after the upgrade is not described here. An upgrade is one span
-		// whatever a surface is detailing, and that is the truth about it.
-		build: func(func(error) Response, phases) Handler[R, E] { return handler },
+		// whatever a surface is detailing, and that is the truth about it. The
+		// naming is passed on, so a conversation spells its documents as the
+		// surface does.
+		build: func(_ func(error) Response, _ phases, strategy naming.Strategy) Handler[R, E] {
+			return func(request Request) effect.Effect[R, E, Response] {
+				return handler(request.withNaming(strategy))
+			}
+		},
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/mbauer83/effect-golang-schema/schema/naming"
 	"github.com/mbauer83/effect-golang/effect"
 )
 
@@ -19,12 +20,15 @@ type Route[R, E any] struct {
 	// surface and not of one route -- and because a build that closed over
 	// them would close over the values they had when the route was declared,
 	// which is before a surface has said what it wants.
-	build func(reject func(error) Response, phases phases) Handler[R, E]
+	build func(reject func(error) Response, phases phases, strategy naming.Strategy) Handler[R, E]
 	// phases is how the parts of the route's own work are named and
 	// measured, or is the zero value. Its shape and its default are in
 	// phase.go.
 	phases phases
-	fault  error
+	// strategy is how the surface spells the members of the documents it
+	// reads and writes; see Routes.WithNaming.
+	strategy naming.Strategy
+	fault    error
 }
 
 // Declaration is what the route says about itself, which is what a published
@@ -46,8 +50,8 @@ func (route Route[R, E]) withMiddleware(each RouteMiddleware[R, E]) Route[R, E] 
 	}
 	inner := route.build
 	declaration := route.declaration
-	route.build = func(reject func(error) Response, phases phases) Handler[R, E] {
-		return each(declaration, inner(reject, phases))
+	route.build = func(reject func(error) Response, phases phases, strategy naming.Strategy) Handler[R, E] {
+		return each(declaration, inner(reject, phases, strategy))
 	}
 	return route
 }
@@ -75,15 +79,15 @@ func Handle[R, E, In, Out any](
 	if route.fault != nil {
 		return route
 	}
-	route.build = func(reject func(error) Response, phases phases) Handler[R, E] {
+	route.build = func(reject func(error) Response, phases phases, strategy naming.Strategy) Handler[R, E] {
 		operations := effect.For[R, E]()
-		encode := encodeOutput[R, E](endpoint.output)
+		encode := encodeOutput[R, E](endpoint.output, strategy)
 
 		// Decode, handle, encode -- as three steps, so each can be a span of
 		// its own.
 		phaseHandler := func(request Request) effect.Effect[R, E, Response] {
 			decode := operations.Suspend(func() effect.Effect[R, E, decodeResult[In]] {
-				input, err := Decode(endpoint.input, request)
+				input, err := Decode(endpoint.input, request.withNaming(strategy))
 				return operations.Succeed(decodeResult[In]{value: input, refusal: err})
 			})
 			return instrumentPhase(decode, phases.decodeSpan, phases.sampler).
@@ -112,7 +116,7 @@ func Handle[R, E, In, Out any](
 			// handler. A codec that ran when the route was built would make a
 			// route a side effect rather than a description.
 			return operations.Suspend(func() effect.Effect[R, E, Response] {
-				input, err := Decode(endpoint.input, request)
+				input, err := Decode(endpoint.input, request.withNaming(strategy))
 				if err != nil {
 					return logRefusal[R, E](route.declaration, err).As(reject(err))
 				}
@@ -156,9 +160,9 @@ func (route Route[R, E]) withPhases(sampler PhaseSampler) Route[R, E] {
 // An encoding failure is a defect rather than a typed failure: the value came
 // from this program, so a schema that cannot describe it is a mistake here and
 // not something a client can be told about or act on.
-func encodeOutput[R, E, Out any](output Output[Out]) func(Out) effect.Effect[R, E, Response] {
+func encodeOutput[R, E, Out any](output Output[Out], strategy naming.Strategy) func(Out) effect.Effect[R, E, Response] {
 	return func(value Out) effect.Effect[R, E, Response] {
-		response, err := output.encode(value)
+		response, err := output.encode(value, strategy)
 		if err != nil {
 			return effect.From(func(context.Context, R) effect.Exit[E, Response] {
 				return effect.ExitCause[E, Response](

@@ -28,7 +28,7 @@ func Entity[A any](shape schema.Schema[A]) Codec[A] {
 				var zero A
 				return zero, Fault{Op: "read the request body", Err: errNoEntity}
 			}
-			value, err := schema.DecodeJSONFrom(shape, body)
+			value, err := schema.DecodeJSONFrom(shape, body, schema.MemberNaming(request.NamingStrategy()))
 			if err != nil {
 				var zero A
 				return zero, Fault{Op: "read the request body", Err: err}

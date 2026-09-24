@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/mbauer83/effect-golang-schema/schema"
+	"github.com/mbauer83/effect-golang-schema/schema/naming"
 	"github.com/mbauer83/effect-golang/effect"
 )
 
@@ -29,6 +30,16 @@ import (
 type Client struct {
 	client  *http.Client
 	address string
+	// strategy is how the server spells the members of its documents.
+	strategy naming.Strategy
+}
+
+// WithNaming returns the client reading the documents a server answers with as
+// spelled by strategy: the strategy of the surface it calls.
+func (client *Client) WithNaming(strategy naming.Strategy) *Client {
+	named := *client
+	named.strategy = strategy
+	return &named
 }
 
 // Dial makes a client for a base address -- "http://host:8080". Each call's
@@ -85,8 +96,9 @@ func WithEntity[A any](
 	request ClientRequest,
 	shape schema.Schema[A],
 	value A,
+	options ...schema.JSONOption,
 ) (ClientRequest, error) {
-	document, err := schema.EncodeJSON(shape, value)
+	document, err := schema.EncodeJSON(shape, value, options...)
 	if err != nil {
 		return ClientRequest{}, faultOf("encode the request body", err)
 	}

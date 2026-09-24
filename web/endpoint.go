@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/mbauer83/effect-golang-schema/schema"
+	"github.com/mbauer83/effect-golang-schema/schema/naming"
 	"github.com/mbauer83/effect-golang/effect"
 )
 
@@ -15,8 +16,8 @@ import (
 type Output[Out any] struct {
 	status  int
 	content *Content
-	encode  func(Out) (Response, error)
-	decode  func([]byte) (Out, error)
+	encode  func(Out, naming.Strategy) (Response, error)
+	decode  func([]byte, naming.Strategy) (Out, error)
 	fault   error
 }
 
@@ -30,8 +31,12 @@ func Returns[Out any](status int, shape schema.Schema[Out]) Output[Out] {
 	return Output[Out]{
 		status:  status,
 		content: content,
-		encode:  func(value Out) (Response, error) { return JSON(status, shape, value) },
-		decode:  func(entity []byte) (Out, error) { return schema.DecodeJSON(shape, entity) },
+		encode: func(value Out, strategy naming.Strategy) (Response, error) {
+			return JSON(status, shape, value, schema.MemberNaming(strategy))
+		},
+		decode: func(entity []byte, strategy naming.Strategy) (Out, error) {
+			return schema.DecodeJSON(shape, entity, schema.MemberNaming(strategy))
+		},
 	}
 }
 
@@ -45,12 +50,12 @@ func ReturnsRaw(status int, mediaType string) Output[[]byte] {
 	return Output[[]byte]{
 		status:  status,
 		content: &Content{MediaType: mediaType},
-		encode: func(entity []byte) (Response, error) {
+		encode: func(entity []byte, _ naming.Strategy) (Response, error) {
 			return Bytes(status, mediaType, entity), nil
 		},
 		// The entity as it arrived, because there is no description to read it
 		// through -- which is the whole meaning of a raw output.
-		decode: func(entity []byte) ([]byte, error) { return entity, nil },
+		decode: func(entity []byte, _ naming.Strategy) ([]byte, error) { return entity, nil },
 	}
 }
 
@@ -59,8 +64,8 @@ func ReturnsRaw(status int, mediaType string) Output[[]byte] {
 func ReturnsNothing(status int) Output[effect.Unit] {
 	return Output[effect.Unit]{
 		status: status,
-		encode: func(effect.Unit) (Response, error) { return Empty(status), nil },
-		decode: func([]byte) (effect.Unit, error) { return effect.Unit{}, nil },
+		encode: func(effect.Unit, naming.Strategy) (Response, error) { return Empty(status), nil },
+		decode: func([]byte, naming.Strategy) (effect.Unit, error) { return effect.Unit{}, nil },
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 
 	ws "github.com/coder/websocket"
 
+	"github.com/mbauer83/effect-golang-schema/schema/naming"
 	"github.com/mbauer83/effect-golang/effect"
 )
 
@@ -34,6 +35,21 @@ type Message struct {
 // the time there is a socket at all.
 type Socket struct {
 	connection *ws.Conn
+	// strategy is how the members of the documents SendValue and ReceiveValue
+	// carry are spelled: the naming of the surface that accepted the socket,
+	// or the one WithNaming chose for a socket that was dialled.
+	strategy naming.Strategy
+}
+
+// NamingStrategy is how this socket spells the members of the documents it
+// sends and receives.
+func (socket Socket) NamingStrategy() naming.Strategy { return socket.strategy }
+
+// WithNaming returns the socket spelling the members of its documents by
+// strategy: the naming of the surface a dialled socket talks to.
+func (socket Socket) WithNaming(strategy naming.Strategy) Socket {
+	socket.strategy = strategy
+	return socket
 }
 
 // Send writes one message.

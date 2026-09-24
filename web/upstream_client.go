@@ -170,7 +170,8 @@ func CallUpstream[R, In, Out any](
 	}
 	return FetchUpstream[R](upstream, endpoint.method, path, request).
 		FlatMap(func(response ClientResponse) effect.Effect[R, Fault, Out] {
-			return decodeResponse[R](endpoint.output, response, endpoint.method+" "+path)
+			return decodeResponse[R](endpoint.output, response, endpoint.method+" "+path,
+				upstream.client.strategy)
 		})
 }
 

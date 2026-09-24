@@ -20,6 +20,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/mbauer83/effect-golang-schema/schema/naming"
 	"github.com/mbauer83/effect-golang/effect"
 )
 
@@ -66,7 +67,7 @@ func Call[R, In, Out any](
 	}
 	return Fetch[R](client, endpoint.method, path, request).
 		FlatMap(func(response ClientResponse) effect.Effect[R, Fault, Out] {
-			return decodeResponse[R](endpoint.output, response, endpoint.method+" "+path)
+			return decodeResponse[R](endpoint.output, response, endpoint.method+" "+path, client.strategy)
 		})
 }
 
@@ -76,6 +77,7 @@ func decodeResponse[R, Out any](
 	output Output[Out],
 	response ClientResponse,
 	target string,
+	strategy naming.Strategy,
 ) effect.Effect[R, Fault, Out] {
 	operations := effect.For[R, Fault]()
 	if response.Status != output.status {
@@ -84,7 +86,7 @@ func decodeResponse[R, Out any](
 			Err: Refusal{Status: response.Status, Entity: response.Entity},
 		})
 	}
-	value, err := output.decode(response.Entity)
+	value, err := output.decode(response.Entity, strategy)
 	if err != nil {
 		return operations.Fail[Out](Fault{Op: "read the response body", Err: err})
 	}

@@ -20,7 +20,7 @@ import (
 func SendValue[R, A any](socket Socket, shape schema.Schema[A], value A) effect.Effect[R, Fault, effect.Unit] {
 	return effect.For[R, Fault]().
 		Suspend(func() effect.Effect[R, Fault, effect.Unit] {
-			document, err := schema.EncodeJSON(shape, value)
+			document, err := schema.EncodeJSON(shape, value, schema.MemberNaming(socket.strategy))
 			if err != nil {
 				return effect.For[R, Fault]().
 					Fail[effect.Unit](faultOf("encode a message", err))
@@ -39,7 +39,7 @@ func ReceiveValue[R, A any](socket Socket, shape schema.Schema[A]) effect.Effect
 		FlatMap(func(message Message) effect.Effect[R, Fault, A] {
 			return effect.Try(
 				func(context.Context, R) (A, error) {
-					return schema.DecodeJSON(shape, message.Data)
+					return schema.DecodeJSON(shape, message.Data, schema.MemberNaming(socket.strategy))
 				},
 				func(err error) Fault { return faultOf("read a message", err) },
 			)
@@ -59,7 +59,7 @@ func Values[R, A any](socket Socket, shape schema.Schema[A]) effect.Stream[R, Fa
 		func(message Message) effect.Effect[R, Fault, A] {
 			return effect.Try(
 				func(context.Context, R) (A, error) {
-					return schema.DecodeJSON(shape, message.Data)
+					return schema.DecodeJSON(shape, message.Data, schema.MemberNaming(socket.strategy))
 				},
 				func(err error) Fault { return faultOf("read a message", err) },
 			)
