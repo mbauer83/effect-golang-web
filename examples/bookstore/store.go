@@ -76,17 +76,13 @@ func (store *Store) Add(book Book) storeEffect[effect.Unit] {
 	})
 	// Direct style: read the answer, then decide. As a FlatMap the deciding
 	// was nested inside the reading, which is the wrong way round for
-	// something that happens after it -- and a refusal is awaited like
-	// anything else, because awaiting one abandons the body, which is what a
-	// refusal means.
+	// something that happens after it -- and a refusal is a guard clause:
+	// do.Fail ends the body with the fault, so what follows it is the path on
+	// which the book was added.
 	return effect.Gen(func(do *storeDo) effect.Unit {
-		if do.Await(widenFault(insertion)) {
-			return effect.Unit{}
+		if !do.Await(widenFault(insertion)) {
+			do.Fail(Fault{Kind: AlreadyExists, Err: errors.New(book.Title + " is already held")})
 		}
-		do.Await(effect.For[effect.Unit, Fault]().Fail[effect.Unit](Fault{
-			Kind: AlreadyExists,
-			Err:  errors.New(book.Title + " is already held"),
-		}))
 		return effect.Unit{}
 	}).WithName("add-book")
 }
