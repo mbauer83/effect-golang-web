@@ -104,10 +104,17 @@ func requestBody(endpoint entry, shapes *cursor) *RequestBody {
 	}
 }
 
-// responses lists the success the endpoint declared and the failures it
-// documented, ordered by status so the same routes render identically.
+// responses lists the success the endpoint declared, the other answers it
+// gives when nothing went wrong, and the failures it documented, ordered by
+// status so the same routes render identically.
 func responses(endpoint entry, shapes *cursor) []Response {
 	list := []Response{success(endpoint, shapes)}
+	for _, alternative := range endpoint.declaration.Alternatives {
+		list = append(list, Response{
+			Status:      alternative.Status,
+			Description: responseDescription(alternative.Status, alternative.Description),
+		})
+	}
 	for _, failure := range endpoint.declaration.Failures {
 		list = append(list, Response{
 			Status:      failure.Status,

@@ -80,6 +80,17 @@ type FailureResponse struct {
 	Description string
 }
 
+// Alternative records a status an endpoint answers with that is neither its
+// ordinary answer nor a refusal: a redirect, most often.
+//
+// Its own record rather than a failure, because a sign-in that sends the
+// browser on is the flow working, and a document that listed it among the
+// refusals would say the opposite of what happens.
+type Alternative struct {
+	Status      int
+	Description string
+}
+
 // Declaration is everything about a route except how it is handled: what it
 // accepts, what it answers with, and what it says about itself.
 //
@@ -97,6 +108,9 @@ type Declaration struct {
 	Status      int
 	Content     *Content
 	Failures    []FailureResponse
+	// Alternatives are the other answers a route gives when nothing went
+	// wrong, as WithAlternative declared them.
+	Alternatives []Alternative
 }
 
 // Endpoint declares what a route accepts and returns. Its handler is separate.
@@ -108,7 +122,10 @@ type Endpoint[In, Out any] struct {
 	summary  string
 	doc      string
 	failures []FailureResponse
-	fault    error
+	// alternatives are the other successful answers, as WithAlternative
+	// declared them.
+	alternatives []Alternative
+	fault        error
 }
 
 // Declare builds an endpoint for any method.
@@ -173,17 +190,27 @@ func (endpoint Endpoint[In, Out]) WithFailure(status int, doc string) Endpoint[I
 	return endpoint
 }
 
+// WithAlternative records another status the endpoint answers with when
+// nothing went wrong -- a redirect, a page rendered with another status -- for
+// the published document.
+func (endpoint Endpoint[In, Out]) WithAlternative(status int, doc string) Endpoint[In, Out] {
+	endpoint.alternatives = append(append([]Alternative{}, endpoint.alternatives...),
+		Alternative{Status: status, Description: doc})
+	return endpoint
+}
+
 // Declaration is what the endpoint says about itself.
 func (endpoint Endpoint[In, Out]) Declaration() Declaration {
 	return Declaration{
-		Method:      endpoint.method,
-		Path:        renderPattern(endpoint.segments),
-		Summary:     endpoint.summary,
-		Description: endpoint.doc,
-		Parameters:  endpoint.input.parameters,
-		Entity:      endpoint.input.entity,
-		Status:      endpoint.output.status,
-		Content:     endpoint.output.content,
-		Failures:    endpoint.failures,
+		Method:       endpoint.method,
+		Path:         renderPattern(endpoint.segments),
+		Summary:      endpoint.summary,
+		Description:  endpoint.doc,
+		Parameters:   endpoint.input.parameters,
+		Entity:       endpoint.input.entity,
+		Status:       endpoint.output.status,
+		Content:      endpoint.output.content,
+		Failures:     endpoint.failures,
+		Alternatives: endpoint.alternatives,
 	}
 }
