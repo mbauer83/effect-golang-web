@@ -185,4 +185,4 @@ func asFault(op string, err error) Fault {
 	return Fault{Op: op, Err: err}
 }
 
-var errNoHTTPClient = errors.New("a client needs an http.Client; see web.Dial")
+var errNoHTTPClient = declarationMistake("a client needs an http.Client; see web.Dial")

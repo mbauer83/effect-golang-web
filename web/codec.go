@@ -5,8 +5,6 @@ package web
 // Product, exactly as two environments do in the runtime.
 
 import (
-	"errors"
-
 	"github.com/mbauer83/effect-golang-schema/schema/structure"
 	"github.com/mbauer83/effect-golang/effect"
 )
@@ -173,7 +171,7 @@ func duplicateParameterFault(parameters []Parameter) error {
 		key := string(parameter.In) + " " + parameter.Name
 		if seen[key] {
 			return faultOf("combine codecs",
-				errors.New("two codecs read the "+string(parameter.In)+" parameter "+parameter.Name))
+				declarationMistake("two codecs read the "+string(parameter.In)+" parameter "+parameter.Name))
 		}
 		seen[key] = true
 	}
@@ -181,6 +179,6 @@ func duplicateParameterFault(parameters []Parameter) error {
 }
 
 var (
-	errZeroCodec   = errors.New("the zero Codec reads nothing and cannot be used")
-	errTwoEntities = errors.New("a request has one body, and two codecs both read it")
+	errZeroCodec   = declarationMistake("the zero Codec reads nothing and cannot be used")
+	errTwoEntities = declarationMistake("a request has one body, and two codecs both read it")
 )

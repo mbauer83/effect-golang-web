@@ -79,8 +79,8 @@ func validateCaptures(segments []segment, parameters []Parameter) error {
 }
 
 var (
-	errZeroEndpoint     = errors.New("the zero Endpoint declares nothing and cannot be used")
-	errNamelessMethod   = errors.New("an endpoint has a method")
-	errNoOutput         = errors.New("an endpoint says what it answers with; use Returns or ReturnsNothing")
-	errUnstatusedOutput = errors.New("an endpoint answers with a status between 100 and 599")
+	errZeroEndpoint     = declarationMistake("the zero Endpoint declares nothing and cannot be used")
+	errNamelessMethod   = declarationMistake("an endpoint has a method")
+	errNoOutput         = declarationMistake("an endpoint says what it answers with; use Returns or ReturnsNothing")
+	errUnstatusedOutput = declarationMistake("an endpoint answers with a status between 100 and 599")
 )

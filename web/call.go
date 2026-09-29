@@ -22,6 +22,7 @@ import (
 
 	"github.com/mbauer83/effect-golang-schema/schema/naming"
 	"github.com/mbauer83/effect-golang/effect"
+	"github.com/mbauer83/effect-golang/effect/fault"
 )
 
 // Refusal is a response whose status was not the one the endpoint declared.
@@ -36,6 +37,21 @@ type Refusal struct {
 	// the status and the body. FetchUpstream needs it to hand back the whole
 	// response it made a refusal of, and nothing else has asked for it.
 	header http.Header
+}
+
+// Kind is what the status says: 404 and 410 are Missing; 408, 429 and every
+// 5xx are Unavailable, because asking later may help; any other is
+// Unacceptable.
+func (refusal Refusal) Kind() fault.Kind {
+	switch {
+	case refusal.Status == http.StatusNotFound || refusal.Status == http.StatusGone:
+		return fault.Missing
+	case refusal.Status == http.StatusRequestTimeout || refusal.Status == http.StatusTooManyRequests ||
+		refusal.Status >= http.StatusInternalServerError:
+		return fault.Unavailable
+	default:
+		return fault.Unacceptable
+	}
 }
 
 func (refusal Refusal) Error() string {
@@ -119,4 +135,4 @@ func fillPattern(segments []segment, captures map[string]string) (string, error)
 	return "/" + strings.Join(parts, "/"), nil
 }
 
-var errUnpatternedEndpoint = errors.New("the endpoint has no path")
+var errUnpatternedEndpoint = declarationMistake("the endpoint has no path")

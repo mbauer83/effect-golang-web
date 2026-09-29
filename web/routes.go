@@ -1,7 +1,6 @@
 package web
 
 import (
-	"errors"
 	"net/http"
 	"slices"
 	"strings"
@@ -225,6 +224,6 @@ func methodNotAllowed(methods []string) Response {
 }
 
 var (
-	errNoRoutes    = errors.New("a surface serves at least one route")
-	errNoRejection = errors.New("a rejection format is required; use NewRoutes for the default")
+	errNoRoutes    = declarationMistake("a surface serves at least one route")
+	errNoRejection = declarationMistake("a rejection format is required; use NewRoutes for the default")
 )

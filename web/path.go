@@ -109,6 +109,6 @@ func renderPattern(segments []segment) string {
 }
 
 var (
-	errUnrootedPath    = errors.New("a path begins with /")
-	errNamelessCapture = errors.New("a capture has no name")
+	errUnrootedPath    = declarationMistake("a path begins with /")
+	errNamelessCapture = declarationMistake("a capture has no name")
 )

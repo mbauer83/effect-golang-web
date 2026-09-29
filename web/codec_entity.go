@@ -1,8 +1,6 @@
 package web
 
 import (
-	"errors"
-
 	"github.com/mbauer83/effect-golang-schema/schema"
 )
 
@@ -38,4 +36,4 @@ func Entity[A any](shape schema.Schema[A]) Codec[A] {
 	}
 }
 
-var errNoEntity = errors.New("it is required and the request carried none")
+var errNoEntity = requestMistake("it is required and the request carried none")

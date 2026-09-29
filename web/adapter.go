@@ -225,6 +225,6 @@ func reportToStandardError(_ context.Context, err error) {
 func sameResponse(response Response) Response { return response }
 
 var (
-	errNoRuntime        = errors.New("a Runtime is required to interpret a handler")
-	errNoFailureMapping = errors.New("a failure mapping is required; a handler does not choose its own status")
+	errNoRuntime        = declarationMistake("a Runtime is required to interpret a handler")
+	errNoFailureMapping = declarationMistake("a failure mapping is required; a handler does not choose its own status")
 )

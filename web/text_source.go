@@ -2,7 +2,6 @@ package web
 
 import (
 	"encoding/base64"
-	"errors"
 	"strconv"
 	"time"
 )
@@ -24,7 +23,7 @@ func (source textSource) Text() (string, error) {
 func (source textSource) Integer() (int64, error) {
 	value, err := strconv.ParseInt(source.value, 10, 64)
 	if err != nil {
-		return 0, errors.New("expected a whole number, found " + strconv.Quote(source.value))
+		return 0, unreadableValue("expected a whole number, found " + strconv.Quote(source.value))
 	}
 	return value, nil
 }
@@ -32,7 +31,7 @@ func (source textSource) Integer() (int64, error) {
 func (source textSource) Number() (float64, error) {
 	value, err := strconv.ParseFloat(source.value, 64)
 	if err != nil {
-		return 0, errors.New("expected a number, found " + strconv.Quote(source.value))
+		return 0, unreadableValue("expected a number, found " + strconv.Quote(source.value))
 	}
 	return value, nil
 }
@@ -46,7 +45,7 @@ func (source textSource) Boolean() (bool, error) {
 	}
 	value, err := strconv.ParseBool(source.value)
 	if err != nil {
-		return false, errors.New("expected true or false, found " + strconv.Quote(source.value))
+		return false, unreadableValue("expected true or false, found " + strconv.Quote(source.value))
 	}
 	return value, nil
 }
@@ -54,7 +53,7 @@ func (source textSource) Boolean() (bool, error) {
 func (source textSource) Bytes() ([]byte, error) {
 	value, err := base64.StdEncoding.DecodeString(source.value)
 	if err != nil {
-		return nil, errors.New("expected base64, found " + strconv.Quote(source.value))
+		return nil, unreadableValue("expected base64, found " + strconv.Quote(source.value))
 	}
 	return value, nil
 }
@@ -62,7 +61,7 @@ func (source textSource) Bytes() ([]byte, error) {
 func (source textSource) Timestamp() (time.Time, error) {
 	value, err := time.Parse(time.RFC3339, source.value)
 	if err != nil {
-		return time.Time{}, errors.New("expected an RFC 3339 timestamp, found " + strconv.Quote(source.value))
+		return time.Time{}, unreadableValue("expected an RFC 3339 timestamp, found " + strconv.Quote(source.value))
 	}
 	return value, nil
 }
@@ -90,5 +89,5 @@ func (textSource) Skip() error {
 // errCompoundParameter reports a schema that describes an object or a list
 // being used where a request carries one scalar. Repeated query parameters and
 // structured values are a separate feature, not this one behaving oddly.
-var errCompoundParameter = errors.New(
+var errCompoundParameter = declarationMistake(
 	"a parameter carries a single value, and this schema describes a compound one")

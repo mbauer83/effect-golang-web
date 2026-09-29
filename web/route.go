@@ -2,7 +2,6 @@ package web
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"net/http"
 
@@ -193,7 +192,7 @@ func rejectRequest(err error) Response {
 	return Text(http.StatusBadRequest, err.Error())
 }
 
-var errNoHandler = errors.New("a route has a handler")
+var errNoHandler = declarationMistake("a route has a handler")
 
 // logRefusal notes a request a codec would not read.
 //
