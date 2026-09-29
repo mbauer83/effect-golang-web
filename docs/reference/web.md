@@ -65,6 +65,19 @@ a 200 with a truncated body. `Stream` accepts that trade deliberately for the
 case where materialising the entity first is the wrong one; a failure part-way
 through is reported to the boundary, which records it.
 
+### What a browser acts on
+
+| | |
+|---|---|
+| `Redirect(location)` | 302 Found with a `Location`; another status is `WithStatus` away |
+| `response.WithCookie(cookie)` | one more `Set-Cookie` line, beside any already there |
+| `response.ExpireCookie(cookie)` | the same cookie, named as it was set, told to go |
+
+Named as Effect's platform names them -- `redirect`, `setCookie`,
+`expireCookie`. A cookie `net/http` would not write is refused with
+`ErrUnwritableCookie` rather than written as nothing, because a cookie that
+silently never arrives is a sign-in that never sticks.
+
 `WithStatus` and `WithHeader` return a new response and leave the original
 alone, which is what lets middleware wrap a response it does not own.
 
@@ -170,27 +183,41 @@ need no description of their own:
 | `Entity(schema)` | the JSON body, decoded straight from its reader |
 | `Nothing()` | nothing |
 
+`OrElse(codec, fallback)` reads an optional parameter as a value, the fallback
+when it is absent.
+
 `codec.WithDescription(doc)` attaches prose for the published document, to a codec
 that reads exactly one parameter.
 
 Absent and empty are different: `?shelf=` carries an empty value and no `shelf`
 at all carries none, and an optional codec tells them apart.
 
-Two codecs combine into one that keeps both parts:
+Several parts read into a struct, one field per codec:
 
 ```go
-codec := web.Convert(
-    web.Zip(web.QueryParam("shelf", schema.Text()), web.QueryParam("page", schema.Int())),
-    func(parts effect.Product[string, int]) (Query, error) {
-        return Query{Shelf: parts.First, Page: parts.Second}, nil
-    },
+type Query struct {
+    Shelf string
+    Page  *int
+}
+
+codec := web.Struct(
+    web.FieldOf(web.QueryParam("shelf", schema.Text()), func(query *Query, shelf string) { query.Shelf = shelf }),
+    web.FieldOf(web.OptionalQueryParam("page", schema.Int()), func(query *Query, page *int) { query.Page = page }),
 )
 ```
 
-The result is a `Product` because no information may be discarded and Go has no
-type-level record to widen — the same structural composition the runtime uses
-for environments, for the same reason. `Zip` is a package function because a
-method cannot grow the type parameters its own result needs.
+Any codec can be a field: a parameter, the entity, `PageParams`, a `Convert`,
+another `Struct`. Fields are read in the order given, and every field's
+parameters are declared, so the published document and what is read cannot
+disagree.
+
+`Zip` combines two codecs into a `Product` of both, and `Convert` derives a
+codec for one type from another's, for the cases a struct does not fit:
+
+```go
+codec := web.Convert(web.Zip(web.QueryParam("from", schema.Int()), web.QueryParam("to", schema.Int())),
+    func(bounds effect.Product[int, int]) (Range, error) { return RangeOf(bounds.First, bounds.Second) })
+```
 
 `PageParams(sorts...)` is how a client asks for a page of a list: `sort` (one of
 those offered, the first by default), `after` or `before` a cursor a page gave,
@@ -200,6 +227,13 @@ once as the client's mistake, and declares all five parameters.
 
 Two codecs that both read the entity, or that read the same parameter twice, are
 a declaration mistake reported by `ValidateCodec`.
+
+A `Fault` states its kind (see the core's `fault` package). A declaration that
+cannot be served, and a value that does not decode, are `Unreadable`; a
+request missing a required part is `Unacceptable`; a connection that failed is
+`Unavailable`. A `Refusal` is the kind its status says: 404 and 410 are
+`Missing`; 408, 429 and every 5xx `Unavailable`; any other `Unacceptable`. An
+application adopts a web fault into its own with `MapError(fault.From)`.
 
 ## Endpoints
 
@@ -229,6 +263,23 @@ A request the codecs refuse never reaches the handler and never becomes the
 application's failure. That is what the failure channel is for: a malformed
 request is the transport's business, and the handler's `E` stays about the
 application.
+
+**An answer whose value decides its own response.** `ReturnsResponse(status,
+mediaType, render)` is for a value whose status, headers or entity depend on
+what it is: a sign-in's last hop that redirects and sets a cookie, a page
+rendered from a template, a token handed back in a header. The handler still
+answers with its own typed value and the rendering sits beside the endpoint,
+which is the typed form of what Effect's `HttpApi` allows by letting a handler
+return a raw response. `WithAlternative(status, doc)` documents the other
+statuses a rendering answers with when nothing went wrong -- a redirect is the
+flow working, so it is not listed among the failures. A rendered answer is not
+read back: `Call` against one answers with `ErrUnreadableOutput`.
+
+**Files.** `Files[R, E](prefix, files)` serves an `fs.FS` beneath a path, as
+`GET prefix/{file...}`. `http.ServeFileFS` does the serving, so the content type
+comes from the name and ranges and conditional requests work as `net/http`
+makes them work; a directory is never listed, and anything that is not a file
+in the file system is 404. An `embed.FS` is the usual one.
 
 `ValidateEndpoint` reports a declaration mistake, including a path parameter the
 path does not capture — a mistyped name would otherwise be a rejection on every

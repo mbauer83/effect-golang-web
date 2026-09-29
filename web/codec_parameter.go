@@ -1,7 +1,6 @@
 package web
 
 import (
-	"errors"
 	"net/textproto"
 	"strings"
 
@@ -41,6 +40,19 @@ func HeaderParam[A any](name string, shape schema.Schema[A]) Codec[A] {
 // is.
 func OptionalHeaderParam[A any](name string, shape schema.Schema[A]) Codec[*A] {
 	return optionalParameter(name, InHeader, shape, headerValue(name))
+}
+
+// OrElse reads an optional parameter as fallback when it is absent, for a
+// parameter whose absence and a default mean the same thing.
+//
+//	web.OrElse(web.OptionalQueryParam("page", schema.Int()), 1)
+func OrElse[A any](codec Codec[*A], fallback A) Codec[A] {
+	return Convert(codec, func(value *A) (A, error) {
+		if value == nil {
+			return fallback, nil
+		}
+		return *value, nil
+	})
 }
 
 // WithDescription attaches prose to a codec's parameter, for the published document.
@@ -156,7 +168,7 @@ func parameterRefusal(parameter Parameter, err error) error {
 }
 
 var (
-	errAbsentParameter   = errors.New("it is required and was not given")
-	errNamelessParameter = errors.New("a parameter has no name")
-	errNotOneParameter   = errors.New("prose applies to a codec that reads exactly one parameter")
+	errAbsentParameter   = requestMistake("it is required and was not given")
+	errNamelessParameter = declarationMistake("a parameter has no name")
+	errNotOneParameter   = declarationMistake("prose applies to a codec that reads exactly one parameter")
 )

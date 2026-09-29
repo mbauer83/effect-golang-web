@@ -3,13 +3,11 @@ package web
 // How a client asks for one page of a list.
 
 import (
-	"errors"
 	"fmt"
 	"slices"
 	"strings"
 
 	"github.com/mbauer83/effect-golang-schema/schema"
-	"github.com/mbauer83/effect-golang/effect"
 )
 
 // PageRequest is which page of a list a client asks for: in one of the sorts
@@ -23,7 +21,7 @@ type PageRequest struct {
 	Size   int
 }
 
-var errTwoPositions = errors.New("a page is after a cursor, before one, or numbered, and not two of those")
+var errTwoPositions = requestMistake("a page is after a cursor, before one, or numbered, and not two of those")
 
 // PageParams reads a page request from the query -- sort, after, before, page
 // and size -- offering the sorts named, the first of which a client gets
@@ -35,55 +33,41 @@ func PageParams(sorts ...string) Codec[PageRequest] {
 	if len(sorts) > 0 {
 		offered += "; " + sorts[0] + " unless asked"
 	}
-	return Convert(
-		Zip(
-			Zip(
-				OptionalQueryParam("sort", schema.Text()).WithDescription("the order to read in: "+offered),
-				OptionalQueryParam("after", schema.Text()).WithDescription("the cursor a page gave as its next"),
-			),
-			Zip(
-				OptionalQueryParam("before", schema.Text()).WithDescription("the cursor a page gave as its previous"),
-				Zip(
-					OptionalQueryParam("page", positive).WithDescription("a numbered page, counted from 1"),
-					OptionalQueryParam("size", positive).WithDescription("how many rows a page holds"),
-				),
-			),
-		),
-		func(params effect.Product[effect.Product[*string, *string], effect.Product[*string, effect.Product[*int, *int]]]) (PageRequest, error) {
-			request := PageRequest{
-				Sort:   given(params.First.First),
-				After:  given(params.First.Second),
-				Before: given(params.Second.First),
-				Number: givenNumber(params.Second.Second.First),
-				Size:   givenNumber(params.Second.Second.Second),
-			}
-			if request.Sort != "" && !slices.Contains(sorts, request.Sort) {
-				return PageRequest{}, fmt.Errorf("no sort is called %q; the list offers %s", request.Sort, offered)
-			}
-			positions := 0
-			for _, set := range []bool{request.After != "", request.Before != "", request.Number != 0} {
-				if set {
-					positions++
-				}
-			}
-			if positions > 1 {
-				return PageRequest{}, errTwoPositions
-			}
-			return request, nil
-		},
+	read := Struct(
+		FieldOf(OptionalQueryParam("sort", schema.Text()).WithDescription("the order to read in: "+offered),
+			func(page *PageRequest, sort *string) { page.Sort = given(sort) }),
+		FieldOf(OptionalQueryParam("after", schema.Text()).WithDescription("the cursor a page gave as its next"),
+			func(page *PageRequest, after *string) { page.After = given(after) }),
+		FieldOf(OptionalQueryParam("before", schema.Text()).WithDescription("the cursor a page gave as its previous"),
+			func(page *PageRequest, before *string) { page.Before = given(before) }),
+		FieldOf(OptionalQueryParam("page", positive).WithDescription("a numbered page, counted from 1"),
+			func(page *PageRequest, number *int) { page.Number = given(number) }),
+		FieldOf(OptionalQueryParam("size", positive).WithDescription("how many rows a page holds"),
+			func(page *PageRequest, size *int) { page.Size = given(size) }),
 	)
+	return Convert(read, func(request PageRequest) (PageRequest, error) {
+		if request.Sort != "" && !slices.Contains(sorts, request.Sort) {
+			return PageRequest{}, fmt.Errorf("no sort is called %q; the list offers %s", request.Sort, offered)
+		}
+		positions := 0
+		for _, set := range []bool{request.After != "", request.Before != "", request.Number != 0} {
+			if set {
+				positions++
+			}
+		}
+		if positions > 1 {
+			return PageRequest{}, errTwoPositions
+		}
+		return request, nil
+	})
 }
 
-func given(value *string) string {
+// given is an optional parameter's value, or the zero value for "the list's
+// default" when it was not given.
+func given[A any](value *A) A {
 	if value == nil {
-		return ""
-	}
-	return *value
-}
-
-func givenNumber(value *int) int {
-	if value == nil {
-		return 0
+		var zero A
+		return zero
 	}
 	return *value
 }
